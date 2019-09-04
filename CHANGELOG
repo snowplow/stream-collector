@@ -1,3 +1,13 @@
+Release 0.16.0 (snowplow/snowplow: 116 Madara Rider) (2019-09-12)
+-----------------------------------------------------------------
+Add options to configure secure, same-site and http-only for the cookie (snowplow/snowplow#3753)
+Allow multiple cookie domains to be used (snowplow/snowplow#3994)
+Provide a way to specify custom path mappings (snowplow/snowplow#4087)
+Send back a Cache-Control header (snowplow/snowplow#4017)
+Add sbt-native-packager and Docker config (snowplow/snowplow#4128)
+Bump Akka HTTP to 10.0.15 (snowplow/snowplow#4131)
+Bump version to 0.16.0 (snowplow/snowplow#4134)
+
 Release 0.15.0 (snowplow/snowplow: 113 Filitosa) (2019-02-27)
 -------------------------------------------------------------
 Expose Prometheus metrics (snowplow/snowplow#3421)
