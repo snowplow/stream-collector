@@ -24,6 +24,17 @@ collector {
   port = {{collectorPort}}
   port = ${?COLLECTOR_PORT}
 
+  # optional SSL/TLS configuration
+  ssl {
+    enable = false
+    enable = ${?COLLECTOR_SSL}
+    # whether to redirect HTTP to HTTPS
+    redirect = false
+    redirect = ${?COLLECTOR_SSL_REDIRECT}
+    port = 9543
+    port = ${?COLLECTOR_SSL_PORT}
+  }
+
   # The collector responds with a cookie to requests with a path that matches the 'vendor/version' protocol.
   # The expected values are:
   # - com.snowplowanalytics.snowplow/tp2 for Tracker Protocol 2
@@ -340,4 +351,22 @@ akka {
       uri-parsing-mode = ${?AKKA_HTTP_SERVER_PARSING_URI_PARSING_MODE}
     }
   }
+
+  # By default setting `collector.ssl` relies on JSSE (Java Secure Socket
+  # Extension) to enable secure communication.
+  # To override the default settings set the following section as per
+  # https://lightbend.github.io/ssl-config/ExampleSSLConfig.html
+  # ssl-config {
+  #   debug = {
+  #     ssl = true
+  #   }
+  #   keyManager = {
+  #     stores = [
+  #       {type = "PKCS12", classpath = false, path = "/etc/ssl/mycert.p12", password = "mypassword" }
+  #     ]
+  #   }
+  #   loose {
+  #     disableHostnameVerification = false
+  #   }
+  # }
 }
