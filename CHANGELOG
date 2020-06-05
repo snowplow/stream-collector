@@ -1,3 +1,11 @@
+Release 1.0.1 (snowplow/snowplow: 119 Tycho Magnetic Anomaly Two) (2020-04-30)
+------------------------------------------------------------------------------
+Bump to 1.0.1 (snowplow/snowplow#4338)
+Add Snowplow Bintray to resolvers (snowplow/snowplow#4326)
+Publish Docker image for stdout via Travis (snowplow/snowplow#4333)
+Fix config example (snowplow/snowplow#4332)
+Fix incompatible jackson dependencies to enable CBOR (snowplow/snowplow#4266)
+
 Release 1.0.0 (snowplow/snowplow: 118 Morgantina) (2020-01-16)
 --------------------------------------------------------------
 Extend copyright notice to 2020 (snowplow/snowplow#4261)
