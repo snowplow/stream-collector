@@ -35,6 +35,7 @@ object Dependencies {
     val config               = "1.3.4"
     val prometheus           = "0.6.0"
     val cbor                 = "2.9.10" // See snowplow/snowplow/issues/4266
+    val retry                = "0.3.3"
     // Scala
     val collectorPayload     = "0.0.0"
     val scalaz7              = "7.0.9"
@@ -62,6 +63,7 @@ object Dependencies {
     val prometheus           = "io.prometheus"                    %  "simpleclient"            % V.prometheus
     val prometheusCommon     = "io.prometheus"                    %  "simpleclient_common"     % V.prometheus
     val cbor                 = "com.fasterxml.jackson.dataformat" %  "jackson-dataformat-cbor" % V.cbor
+    val retry                = "com.softwaremill.retry"           %% "retry"                   % V.retry
 
     // Scala
     val collectorPayload     = "com.snowplowanalytics" %  "collector-payload-1"    % V.collectorPayload

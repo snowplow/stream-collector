@@ -83,7 +83,8 @@ lazy val kinesis = project
     libraryDependencies ++= Seq(
       Dependencies.Libraries.kinesis,
       Dependencies.Libraries.cbor,
-      Dependencies.Libraries.sqs
+      Dependencies.Libraries.sqs,
+      Dependencies.Libraries.retry
     )
   )
   .enablePlugins(JavaAppPackaging, DockerPlugin)
