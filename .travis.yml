@@ -6,6 +6,8 @@ jdk:
 - openjdk8
 script:
 - sbt compile
+after_success:
+- snyk monitor
 deploy:
 - provider: script
   script: bash .travis/deploy.sh
