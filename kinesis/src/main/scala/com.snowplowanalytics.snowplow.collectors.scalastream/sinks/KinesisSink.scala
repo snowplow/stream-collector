@@ -230,8 +230,12 @@ class KinesisSink private (
     ()
   }
 
-  type BatchEntry = (ByteBuffer, String)
-  type BatchEntryWithId = (ByteBuffer, String, UUID)
+  case class BatchEntry(msg: ByteBuffer, key: String)
+  case class BatchEntryWithId(
+    msg: ByteBuffer,
+    kwy: String,
+    id: UUID
+  )
 
   object EventStorage {
     private var storedEvents = List.empty[BatchEntry]
@@ -247,7 +251,7 @@ class KinesisSink private (
         )
       } else {
         synchronized {
-          storedEvents = (eventBytes, key) :: storedEvents
+          storedEvents = BatchEntry(eventBytes, key) :: storedEvents
           byteCount += eventSize
           if (storedEvents.size >= RecordThreshold || byteCount >= ByteThreshold) {
             flush()
@@ -358,11 +362,11 @@ class KinesisSink private (
    *   only those entries that failed within the batch.
    */
   private val addUuids: (BatchEntry) => (BatchEntryWithId) = {
-    case (msg, key) => (msg, key, java.util.UUID.randomUUID())
+    case BatchEntry(msg, key) => BatchEntryWithId(msg, key, java.util.UUID.randomUUID())
   }
 
   private val toSqsBatchEntry: (BatchEntryWithId) => (UUID, SendMessageBatchRequestEntry) = {
-    case (msg, key, id) =>
+    case BatchEntryWithId(msg, key, id) =>
       val b64EncodedMsg = encode(msg)
       val batchReqEntry = new SendMessageBatchRequestEntry(UUID.randomUUID.toString, b64EncodedMsg)
         .withMessageAttributes(
@@ -425,7 +429,7 @@ class KinesisSink private (
         val prr = new PutRecordsRequest()
         prr.setStreamName(name)
         val putRecordsRequestEntryList = batch.map {
-          case (b, s) =>
+          case BatchEntry(b, s) =>
             val prre = new PutRecordsRequestEntry()
             prre.setPartitionKey(s)
             prre.setData(b)
