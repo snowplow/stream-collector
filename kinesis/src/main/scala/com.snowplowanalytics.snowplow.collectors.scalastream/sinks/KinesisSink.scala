@@ -399,7 +399,7 @@ class KinesisSink private (
           val failed = res.getFailed().asScala
           if (failed.nonEmpty) {
             val errors = failed.map(_.toString).mkString(", ")
-            log.error(s"Sending to SQS queue: ${sqs.sqsBufferName} failed with: $errors")
+            log.error(s"Sending to SQS queue [${sqs.sqsBufferName}] failed with errors [$errors]")
             val successIds =
               res.getSuccessful().asScala.map(_.getId()).map(UUID.fromString).toList
             log.info(
