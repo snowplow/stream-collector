@@ -34,7 +34,7 @@ import com.amazonaws.services.sqs.model.{
 }
 import java.util.UUID
 import model._
-import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink.SqsClientAndName
+import KinesisSink.SqsClientAndName
 
 /** KinesisSink companion object with factory method */
 object KinesisSink {
