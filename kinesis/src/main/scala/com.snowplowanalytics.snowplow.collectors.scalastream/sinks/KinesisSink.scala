@@ -233,7 +233,7 @@ class KinesisSink private (
   case class Event(msg: ByteBuffer, key: String)
   case class EventWithId(
     msg: ByteBuffer,
-    kwy: String,
+    key: String,
     id: UUID
   )
 
