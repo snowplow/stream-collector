@@ -361,24 +361,23 @@ class KinesisSink private (
    *  UUIDs are generated for retry purpose. When batch fails, we want to retry (limited number of times)
    *   only those entries that failed within the batch.
    */
-  private val addUuids: (Event) => EventWithId = {
-    case Event(msg, key) => EventWithId(msg, key, java.util.UUID.randomUUID())
-  }
+  private val addUuids: (Event) => EventWithId =
+    event => EventWithId(event.msg, event.key, java.util.UUID.randomUUID())
 
   private val toSqsBatchEntry: (EventWithId) => (UUID, SendMessageBatchRequestEntry) = {
-    case EventWithId(msg, key, id) =>
-      val b64EncodedMsg = encode(msg)
+    eventWithId =>
+      val b64EncodedMsg = encode(eventWithId.msg)
       val batchReqEntry = new SendMessageBatchRequestEntry(UUID.randomUUID.toString, b64EncodedMsg)
         .withMessageAttributes(
           Map(
             "kinesisKey" ->
               new MessageAttributeValue()
                 .withDataType("String")
-                .withStringValue(key)
+                .withStringValue(eventWithId.key)
           ).asJava
         )
-        .withId(id.toString)
-      (id, batchReqEntry)
+        .withId(eventWithId.id.toString)
+      (eventWithId.id, batchReqEntry)
   }
 
   private def createBatchRequest(queueUrl: String, batch: List[SendMessageBatchRequestEntry]) =
@@ -428,12 +427,11 @@ class KinesisSink private (
       val putRecordsRequest = {
         val prr = new PutRecordsRequest()
         prr.setStreamName(name)
-        val putRecordsRequestEntryList = batch.map {
-          case Event(b, s) =>
-            val prre = new PutRecordsRequestEntry()
-            prre.setPartitionKey(s)
-            prre.setData(b)
-            prre
+        val putRecordsRequestEntryList = batch.map { event =>
+          val prre = new PutRecordsRequestEntry()
+          prre.setPartitionKey(event.key)
+          prre.setData(event.msg)
+          prre
         }
         prr.setRecords(putRecordsRequestEntryList.asJava)
         prr
