@@ -230,15 +230,15 @@ class KinesisSink private (
     ()
   }
 
-  case class BatchEntry(msg: ByteBuffer, key: String)
-  case class BatchEntryWithId(
+  case class Event(msg: ByteBuffer, key: String)
+  case class EventWithId(
     msg: ByteBuffer,
     kwy: String,
     id: UUID
   )
 
   object EventStorage {
-    private var storedEvents = List.empty[BatchEntry]
+    private var storedEvents = List.empty[Event]
     private var byteCount = 0L
     @volatile private var lastFlushedTime = 0L
 
@@ -251,7 +251,7 @@ class KinesisSink private (
         )
       } else {
         synchronized {
-          storedEvents = BatchEntry(eventBytes, key) :: storedEvents
+          storedEvents = Event(eventBytes, key) :: storedEvents
           byteCount += eventSize
           if (storedEvents.size >= RecordThreshold || byteCount >= ByteThreshold) {
             flush()
@@ -279,7 +279,7 @@ class KinesisSink private (
     Nil
   }
 
-  def scheduleBatch(batch: List[BatchEntry], lastBackoff: Long = minBackoff): Unit = {
+  def scheduleBatch(batch: List[Event], lastBackoff: Long = minBackoff): Unit = {
     val nextBackoff = getNextBackoff(lastBackoff)
     executorService.schedule(new Thread {
       override def run(): Unit =
@@ -295,7 +295,7 @@ class KinesisSink private (
    *  Consider using sqs buffer in heavy load scenarios.
    *
    */
-  def sendBatch(batch: List[BatchEntry], nextBackoff: Long = minBackoff): Unit =
+  def sendBatch(batch: List[Event], nextBackoff: Long = minBackoff): Unit =
     if (batch.nonEmpty) {
       log.info(s"Writing ${batch.size} Thrift records to Kinesis stream ${streamName}")
 
@@ -327,7 +327,7 @@ class KinesisSink private (
     }
 
   private def sendToSqsOrRetryToKinesis(
-    failures: List[BatchEntry],
+    failures: List[Event],
     nextBackoff: Long
   )(
     retryErrorMsg: String
@@ -347,7 +347,7 @@ class KinesisSink private (
         scheduleBatch(failures, nextBackoff)
     }
 
-  private def putToSqs(sqs: SqsClientAndName, batch: List[BatchEntry]): Future[Unit] =
+  private def putToSqs(sqs: SqsClientAndName, batch: List[Event]): Future[Unit] =
     Future {
       log.info(s"Writing ${batch.size} messages to SQS queue: ${sqs.sqsBufferName}")
       val sqsBatchEntries = batch.map(addUuids).map(toSqsBatchEntry)
@@ -361,12 +361,12 @@ class KinesisSink private (
    *  UUIDs are generated for retry purpose. When batch fails, we want to retry (limited number of times)
    *   only those entries that failed within the batch.
    */
-  private val addUuids: (BatchEntry) => (BatchEntryWithId) = {
-    case BatchEntry(msg, key) => BatchEntryWithId(msg, key, java.util.UUID.randomUUID())
+  private val addUuids: (Event) => EventWithId = {
+    case Event(msg, key) => EventWithId(msg, key, java.util.UUID.randomUUID())
   }
 
-  private val toSqsBatchEntry: (BatchEntryWithId) => (UUID, SendMessageBatchRequestEntry) = {
-    case BatchEntryWithId(msg, key, id) =>
+  private val toSqsBatchEntry: (EventWithId) => (UUID, SendMessageBatchRequestEntry) = {
+    case EventWithId(msg, key, id) =>
       val b64EncodedMsg = encode(msg)
       val batchReqEntry = new SendMessageBatchRequestEntry(UUID.randomUUID.toString, b64EncodedMsg)
         .withMessageAttributes(
@@ -423,13 +423,13 @@ class KinesisSink private (
     new String(buffer.array())
   }
 
-  private def multiPut(name: String, batch: List[BatchEntry]): Future[PutRecordsResult] =
+  private def multiPut(name: String, batch: List[Event]): Future[PutRecordsResult] =
     Future {
       val putRecordsRequest = {
         val prr = new PutRecordsRequest()
         prr.setStreamName(name)
         val putRecordsRequestEntryList = batch.map {
-          case BatchEntry(b, s) =>
+          case Event(b, s) =>
             val prre = new PutRecordsRequestEntry()
             prre.setPartitionKey(s)
             prre.setData(b)
