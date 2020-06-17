@@ -32,8 +32,8 @@ import com.amazonaws.services.sqs.model.{
   SendMessageBatchRequest,
   SendMessageBatchRequestEntry
 }
-import model._
 import java.util.UUID
+import model._
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink.SqsClientAndName
 
 /** KinesisSink companion object with factory method */
