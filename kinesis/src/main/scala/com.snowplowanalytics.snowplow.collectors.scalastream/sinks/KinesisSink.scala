@@ -54,11 +54,11 @@ object KinesisSink {
     executorService: ScheduledExecutorService
   ): Either[Throwable, KinesisSink] = {
     val clients = for {
-      provider <- getProvider(kinesisConfig.aws)
-      kinesisClient = createKinesisClient(provider, kinesisConfig.endpoint, kinesisConfig.region)
+      credentials <- getProvider(kinesisConfig.aws)
+      kinesisClient = createKinesisClient(credentials, kinesisConfig.endpoint, kinesisConfig.region)
       _ <- if (streamExists(kinesisClient, streamName)) true.asRight
       else new IllegalArgumentException(s"Kinesis stream $streamName doesn't exist").asLeft
-      sqsClientAndName <- sqsBuffer(sqsBufferName, provider, kinesisConfig.region)
+      sqsClientAndName <- sqsBuffer(sqsBufferName, credentials, kinesisConfig.region)
     } yield (kinesisClient, sqsClientAndName)
 
     clients.map {
