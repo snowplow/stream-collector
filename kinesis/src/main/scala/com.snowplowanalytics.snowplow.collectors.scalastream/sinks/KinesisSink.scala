@@ -290,8 +290,8 @@ class KinesisSink private (
 
   /**
    *  Max number of retries is unlimitted, so when Kinesis stream is under heavy load,
-   *   the events accumulate in collector memory for later retries. The fix for this is to use
-   *   sqs queue as a buffer and sqs2kinesis to move events back from sqs queue to kinesis stream.
+   *  the events accumulate in collector memory for later retries. The fix for this is to use
+   *  sqs queue as a buffer and sqs2kinesis to move events back from sqs queue to kinesis stream.
    *  Consider using sqs buffer in heavy load scenarios.
    *
    */
