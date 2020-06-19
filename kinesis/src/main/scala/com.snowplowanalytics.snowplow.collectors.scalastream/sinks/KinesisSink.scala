@@ -231,11 +231,7 @@ class KinesisSink private (
   }
 
   case class Event(msg: ByteBuffer, key: String)
-  case class EventWithId(
-    msg: ByteBuffer,
-    key: String,
-    id: UUID
-  )
+  case class EventWithId(event: Event, id: UUID)
 
   object EventStorage {
     private var storedEvents = List.empty[Event]
@@ -362,18 +358,18 @@ class KinesisSink private (
    *   only those entries that failed within the batch.
    */
   private val addUuids: (Event) => EventWithId =
-    event => EventWithId(event.msg, event.key, java.util.UUID.randomUUID())
+    event => EventWithId(event, java.util.UUID.randomUUID())
 
   private val toSqsBatchEntry: (EventWithId) => (UUID, SendMessageBatchRequestEntry) = {
     eventWithId =>
-      val b64EncodedMsg = encode(eventWithId.msg)
+      val b64EncodedMsg = encode(eventWithId.event.msg)
       val batchReqEntry = new SendMessageBatchRequestEntry(UUID.randomUUID.toString, b64EncodedMsg)
         .withMessageAttributes(
           Map(
             "kinesisKey" ->
               new MessageAttributeValue()
                 .withDataType("String")
-                .withStringValue(eventWithId.key)
+                .withStringValue(eventWithId.event.key)
           ).asJava
         )
         .withId(eventWithId.id.toString)
