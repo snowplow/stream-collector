@@ -178,8 +178,12 @@ class KinesisSink private (
   executorService: ScheduledExecutorService,
   maybeSqs: Option[SqsClientAndName]
 ) extends Sink {
-  // Records must not exceed MaxBytes - 1MB
-  val MaxBytes = 1000000
+  // Records must not exceed MaxBytes - 1MB (for Kinesis)
+  // When SQS buffer is enabled MaxBytes has to be 256k,
+  // but we encode the message with Base64 for SQS, so the limit drops to 192k
+  val SqsLimit = 192000 // 256000 / 4 * 3
+  val KinesisLimit = 1000000
+  override val MaxBytes = if (maybeSqs.isDefined) SqsLimit else KinesisLimit
   val BackoffTime = 3000L
 
   val ByteThreshold = bufferConfig.byteLimit
