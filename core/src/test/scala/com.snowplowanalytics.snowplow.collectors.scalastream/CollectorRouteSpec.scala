@@ -124,6 +124,9 @@ class CollectorRouteSpec extends Specification with Specs2RouteTest {
       "produce an empty string if the argument is None" in {
         route.queryString(None) shouldEqual None
       }
+      "produce the query string when some of the values are URL encoded" in {
+        route.queryString(Some("/abc/def?schema=iglu%3Acom.acme%2Fcampaign%2Fjsonschema%2F1-0-0&aid=test")) shouldEqual Some("schema=iglu%3Acom.acme%2Fcampaign%2Fjsonschema%2F1-0-0&aid=test")
+      }
     }
 
     "have a directive extracting a cookie" in {
