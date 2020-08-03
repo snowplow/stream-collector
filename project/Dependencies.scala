@@ -17,7 +17,7 @@ import sbt._
 object Dependencies {
 
   val resolutionRepos = Seq(
-    "Snowplow Analytics Maven repo" at "http://maven.snplow.com/releases/",
+    ("Snowplow Analytics Maven repo" at "http://maven.snplow.com/releases/").withAllowInsecureProtocol(true),
     // For uaParser utils
     "user-agent-parser repo" at "https://clojars.org/repo/",
     // For Snowplow libraries
@@ -26,16 +26,20 @@ object Dependencies {
 
   object V {
     // Java
-    val awsSdk               = "1.11.573"
-    val pubsub               = "1.78.0"
+    val awsSdk               = "1.11.822"
+    val pubsub               = "1.108.0"
     val kafka                = "2.2.1"
-    val nsqClient            = "1.2.0"
+    val nsqClient            = "1.3.0"
     val jodaTime             = "2.10.2"
     val slf4j                = "1.7.26"
     val config               = "1.3.4"
     val prometheus           = "0.6.0"
     val cbor                 = "2.9.10" // See snowplow/snowplow/issues/4266
     val retry                = "0.3.3"
+    val jackson              = "2.9.10.5" // force this version of lib from dependencies to mitigate secutiry vulnerabilities, TODO: update underlying libraries
+    val thrift               = "0.13.0" // force this version of lib from dependencies to mitigate secutiry vulnerabilities, TODO: update underlying libraries
+    val commonsCodec         = "1.13" // force this version of lib from dependencies to mitigate secutiry vulnerabilities, TODO: update underlying libraries
+    val grpcCore             = "1.31.0" // force this version of lib from dependencies to mitigate secutiry vulnerabilities, TODO: update underlying libraries
     // Scala
     val collectorPayload     = "0.0.0"
     val scalaz7              = "7.0.9"
@@ -51,6 +55,10 @@ object Dependencies {
 
   object Libraries {
     // Java
+    val jackson              = "com.fasterxml.jackson.core"       %  "jackson-databind"        % V.jackson
+    val thrift               = "org.apache.thrift"                %  "libthrift"               % V.thrift
+    val commonsCodec         = "commons-codec"                    %  "commons-codec"           % V.commonsCodec
+    val grpcCore             = "io.grpc"                          %  "grpc-core"               % V.grpcCore
     val kinesis              = "com.amazonaws"                    %  "aws-java-sdk-kinesis"    % V.awsSdk
     val sqs                  = "com.amazonaws"                    %  "aws-java-sdk-sqs"        % V.awsSdk
     val pubsub               = "com.google.cloud"                 %  "google-cloud-pubsub"     % V.pubsub
