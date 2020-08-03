@@ -22,6 +22,7 @@ import com.snowplowanalytics.iglu.core._
 import com.snowplowanalytics.iglu.core.circe.CirceIgluCodecs._
 import com.snowplowanalytics.snowplow.badrows._
 import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
+import com.snowplowanalytics.snowplow.collectors.scalastream.generated
 import io.circe.Json
 import io.circe.parser._
 import io.circe.syntax._
