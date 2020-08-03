@@ -42,7 +42,7 @@ lazy val commonDependencies = Seq(
 lazy val buildSettings = Seq(
   organization  :=  "com.snowplowanalytics",
   name          :=  "snowplow-stream-collector",
-  version       :=  "1.0.1",
+  version       :=  "1.1.0",
   description   :=  "Scala Stream Collector for Snowplow raw events",
   scalaVersion  :=  "2.12.10",
   resolvers     ++= Dependencies.resolutionRepos
@@ -79,7 +79,14 @@ lazy val kinesis = project
   .settings(moduleName := "snowplow-stream-collector-kinesis")
   .settings(allSettings)
   .settings(packageName in Docker := "snowplow/scala-stream-collector-kinesis")
-  .settings(libraryDependencies ++= Seq(Dependencies.Libraries.kinesis, Dependencies.Libraries.cbor))
+  .settings(
+    libraryDependencies ++= Seq(
+      Dependencies.Libraries.kinesis,
+      Dependencies.Libraries.cbor,
+      Dependencies.Libraries.sqs,
+      Dependencies.Libraries.retry
+    )
+  )
   .enablePlugins(JavaAppPackaging, DockerPlugin)
   .dependsOn(core)
 
