@@ -14,59 +14,74 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 package sinks
 
 import java.nio.ByteBuffer
+import scala.collection.concurrent.TrieMap
 import java.util.concurrent.ScheduledExecutorService
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
-
 import cats.syntax.either._
 import com.amazonaws.auth._
 import com.amazonaws.services.kinesis.model._
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
 import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClientBuilder}
-
+import com.amazonaws.services.sqs.{AmazonSQS, AmazonSQSClientBuilder}
+import com.amazonaws.services.sqs.model.{
+  MessageAttributeValue,
+  SendMessageBatchRequest,
+  SendMessageBatchRequestEntry
+}
+import java.util.UUID
 import model._
+import KinesisSink.SqsClientAndName
 
 /** KinesisSink companion object with factory method */
 object KinesisSink {
 
-  @volatile var shuttingDown = false
+  case class SqsClientAndName(sqsClient: AmazonSQS, sqsBufferName: String)
 
   /**
    * Create a KinesisSink and schedule a task to flush its EventStorage
    * Exists so that no threads can get a reference to the KinesisSink
    * during its construction
-   * TODO: rm scalaz \/ once 2.12
    */
   def createAndInitialize(
     kinesisConfig: Kinesis,
     bufferConfig: BufferConfig,
     streamName: String,
+    sqsBufferName: Option[String],
     executorService: ScheduledExecutorService
   ): Either[Throwable, KinesisSink] = {
-    val client = for {
-      provider <- getProvider(kinesisConfig.aws)
-      client = createKinesisClient(provider, kinesisConfig.endpoint, kinesisConfig.region)
-      _ <- if (streamExists(client, streamName)) true.asRight
+    val clients = for {
+      credentials <- getProvider(kinesisConfig.aws)
+      kinesisClient = createKinesisClient(credentials, kinesisConfig.endpoint, kinesisConfig.region)
+      _ <- if (streamExists(kinesisClient, streamName)) true.asRight
       else new IllegalArgumentException(s"Kinesis stream $streamName doesn't exist").asLeft
-    } yield client
+      sqsClientAndName <- sqsBuffer(sqsBufferName, credentials, kinesisConfig.region)
+    } yield (kinesisClient, sqsClientAndName)
 
-    client.map { c =>
-      val ks = new KinesisSink(c, kinesisConfig, bufferConfig, streamName, executorService)
-      ks.scheduleFlush()
+    clients.map {
+      case (kinesisClient, sqsClientAndName) =>
+        val ks =
+          new KinesisSink(
+            kinesisClient,
+            kinesisConfig,
+            bufferConfig,
+            streamName,
+            executorService,
+            sqsClientAndName
+          )
+        ks.scheduleFlush()
 
-      // When the application is shut down, stop accepting incoming requests
-      // and send all stored events
-      Runtime.getRuntime.addShutdownHook(new Thread {
-        override def run(): Unit = {
-          shuttingDown = true
-          ks.EventStorage.flush()
-          ks.shutdown()
-        }
-      })
-      ks
+        // When the application is shut down try to send all stored events
+        Runtime.getRuntime.addShutdownHook(new Thread {
+          override def run(): Unit = {
+            ks.EventStorage.flush()
+            ks.shutdown()
+          }
+        })
+        ks
     }
   }
 
@@ -128,6 +143,28 @@ object KinesisSink {
     } catch {
       case _: ResourceNotFoundException => false
     }
+
+  private def createSqsClient(provider: AWSCredentialsProvider, region: String) =
+    Either.catchNonFatal(
+      AmazonSQSClientBuilder
+        .standard()
+        .withRegion(region)
+        .withCredentials(provider)
+        .build
+    )
+
+  def sqsBuffer(
+    sqsBufferName: Option[String],
+    provider: AWSCredentialsProvider,
+    region: String
+  ): Either[Throwable, Option[SqsClientAndName]] =
+    sqsBufferName match {
+      case Some(name) =>
+        createSqsClient(provider, region)
+          .map(amazonSqs => Some(SqsClientAndName(amazonSqs, name)))
+      case None => None.asRight
+    }
+
 }
 
 /**
@@ -138,10 +175,15 @@ class KinesisSink private (
   kinesisConfig: Kinesis,
   bufferConfig: BufferConfig,
   streamName: String,
-  executorService: ScheduledExecutorService
+  executorService: ScheduledExecutorService,
+  maybeSqs: Option[SqsClientAndName]
 ) extends Sink {
-  // Records must not exceed MaxBytes - 1MB
-  val MaxBytes = 1000000
+  // Records must not exceed MaxBytes - 1MB (for Kinesis)
+  // When SQS buffer is enabled MaxBytes has to be 256k,
+  // but we encode the message with Base64 for SQS, so the limit drops to 192k
+  val SqsLimit = 192000 // 256000 / 4 * 3
+  val KinesisLimit = 1000000
+  override val MaxBytes = if (maybeSqs.isDefined) SqsLimit else KinesisLimit
   val BackoffTime = 3000L
 
   val ByteThreshold = bufferConfig.byteLimit
@@ -153,6 +195,16 @@ class KinesisSink private (
   private val randomGenerator = new java.util.Random()
 
   log.info("Creating thread pool of size " + kinesisConfig.threadPoolSize)
+  maybeSqs match {
+    case Some(sqs) =>
+      log.info(
+        s"SQS buffer for failed Kinesis stream '$streamName' is set up as: ${sqs.sqsBufferName}."
+      )
+    case None =>
+      log.warn(
+        s"No SQS buffer for surge protection set up (consider setting a SQS Buffer in config.hocon)."
+      )
+  }
 
   implicit lazy val ec = concurrent.ExecutionContext.fromExecutorService(executorService)
 
@@ -182,8 +234,11 @@ class KinesisSink private (
     ()
   }
 
+  case class Event(msg: ByteBuffer, key: String)
+  case class EventWithId(event: Event, id: UUID)
+
   object EventStorage {
-    private var storedEvents = List[(ByteBuffer, String)]()
+    private var storedEvents = List.empty[Event]
     private var byteCount = 0L
     @volatile private var lastFlushedTime = 0L
 
@@ -196,7 +251,7 @@ class KinesisSink private (
         )
       } else {
         synchronized {
-          storedEvents = (eventBytes, key) :: storedEvents
+          storedEvents = Event(eventBytes, key) :: storedEvents
           byteCount += eventSize
           if (storedEvents.size >= RecordThreshold || byteCount >= ByteThreshold) {
             flush()
@@ -224,7 +279,7 @@ class KinesisSink private (
     Nil
   }
 
-  def scheduleBatch(batch: List[(ByteBuffer, String)], lastBackoff: Long = minBackoff): Unit = {
+  def scheduleBatch(batch: List[Event], lastBackoff: Long = minBackoff): Unit = {
     val nextBackoff = getNextBackoff(lastBackoff)
     executorService.schedule(new Thread {
       override def run(): Unit =
@@ -233,52 +288,160 @@ class KinesisSink private (
     ()
   }
 
-  // TODO: limit max retries?
-  def sendBatch(batch: List[(ByteBuffer, String)], nextBackoff: Long = minBackoff): Unit =
-    if (batch.size > 0) {
+  /**
+   *  Max number of retries is unlimitted, so when Kinesis stream is under heavy load,
+   *  the events accumulate in collector memory for later retries. The fix for this is to use
+   *  sqs queue as a buffer and sqs2kinesis to move events back from sqs queue to kinesis stream.
+   *  Consider using sqs buffer in heavy load scenarios.
+   *
+   */
+  def sendBatch(batch: List[Event], nextBackoff: Long = minBackoff): Unit =
+    if (batch.nonEmpty) {
       log.info(s"Writing ${batch.size} Thrift records to Kinesis stream ${streamName}")
-      val putData = for {
-        p <- multiPut(streamName, batch)
-      } yield p
 
-      putData onComplete {
+      multiPut(streamName, batch).onComplete {
         case Success(s) => {
           val results = s.getRecords.asScala.toList
           val failurePairs = batch zip results filter { _._2.getErrorMessage != null }
           log.info(
             s"Successfully wrote ${batch.size - failurePairs.size} out of ${batch.size} records"
           )
-          if (failurePairs.size > 0) {
+          if (failurePairs.nonEmpty) {
             failurePairs.foreach(
               f =>
                 log.error(
                   s"Record failed with error code [${f._2.getErrorCode}] and message [${f._2.getErrorMessage}]"
                 )
             )
-            log.error(s"Retrying all failed records in $nextBackoff milliseconds...")
             val failures = failurePairs.map(_._1)
-            scheduleBatch(failures, nextBackoff)
+            val retryErrorMsg = s"Retrying all failed records in $nextBackoff milliseconds..."
+            sendToSqsOrRetryToKinesis(failures, nextBackoff)(retryErrorMsg)
           }
         }
         case Failure(f) => {
           log.error("Writing failed.", f)
-          log.error(s"Retrying in $nextBackoff milliseconds...")
-          scheduleBatch(batch, nextBackoff)
+          val retryErrorMsg = s"Retrying in $nextBackoff milliseconds..."
+          sendToSqsOrRetryToKinesis(batch, nextBackoff)(retryErrorMsg)
         }
       }
     }
 
-  private def multiPut(name: String, batch: List[(ByteBuffer, String)]): Future[PutRecordsResult] =
+  private def sendToSqsOrRetryToKinesis(
+    failures: List[Event],
+    nextBackoff: Long
+  )(
+    retryErrorMsg: String
+  ): Unit =
+    maybeSqs match {
+      case Some(sqs) =>
+        log.info(
+          s"Sending ${failures.size} events from a batch to SQS buffer queue: ${sqs.sqsBufferName}"
+        )
+        putToSqs(sqs, failures)
+        ()
+      case None =>
+        log.error(retryErrorMsg)
+        log.warn(
+          s"${failures.size} failed events scheduled for retry (consider setting a SQS Buffer in config.hocon)"
+        )
+        scheduleBatch(failures, nextBackoff)
+    }
+
+  private def putToSqs(sqs: SqsClientAndName, batch: List[Event]): Future[Unit] =
+    Future {
+      log.info(s"Writing ${batch.size} messages to SQS queue: ${sqs.sqsBufferName}")
+      val sqsBatchEntries = batch.map(addUuids).map(toSqsBatchEntry)
+      val MaxSqsBatchSize = 10
+      val MaxRetries = 10
+      sqsBatchEntries.grouped(MaxSqsBatchSize).foreach { batchEntryGroup =>
+        sendToSqsWithRetry(sqs, batchEntryGroup, MaxRetries).transform {
+          case failure @ Failure(ex) =>
+            log.info(s"Sending to sqs failed with exception: $ex")
+            failure
+          case notSent @ Success(None) =>
+            log.info(s"Sending to sqs didn't succeed after $MaxRetries retries. Dropping events.")
+            notSent
+          case s @ Success(Some(_)) => s
+        }
+      }
+    }
+
+  /**
+   *  UUIDs are generated for retry purpose. When batch fails, we want to retry (limited number of times)
+   *   only those entries that failed within the batch.
+   */
+  private val addUuids: (Event) => EventWithId =
+    event => EventWithId(event, java.util.UUID.randomUUID())
+
+  private val toSqsBatchEntry: (EventWithId) => (UUID, SendMessageBatchRequestEntry) = {
+    eventWithId =>
+      val b64EncodedMsg = encode(eventWithId.event.msg)
+      val batchReqEntry = new SendMessageBatchRequestEntry(UUID.randomUUID.toString, b64EncodedMsg)
+        .withMessageAttributes(
+          Map(
+            "kinesisKey" ->
+              new MessageAttributeValue()
+                .withDataType("String")
+                .withStringValue(eventWithId.event.key)
+          ).asJava
+        )
+        .withId(eventWithId.id.toString)
+      (eventWithId.id, batchReqEntry)
+  }
+
+  private def createBatchRequest(queueUrl: String, batch: List[SendMessageBatchRequestEntry]) =
+    new SendMessageBatchRequest()
+      .withQueueUrl(queueUrl)
+      .withEntries(batch.asJava)
+
+  private def sendToSqsWithRetry(
+    sqs: SqsClientAndName,
+    batchEntryGroup: List[(UUID, SendMessageBatchRequestEntry)],
+    maxRetries: Int
+  ) = {
+    val current = TrieMap(batchEntryGroup: _*)
+    retry
+      .JitterBackoff(maxRetries, 1.second)
+      .apply { () =>
+        Future {
+          val batchRequest = createBatchRequest(sqs.sqsBufferName, current.values.toList)
+          val res = sqs.sqsClient.sendMessageBatch(batchRequest)
+          val failed = res.getFailed().asScala
+          if (failed.nonEmpty) {
+            val errors = failed.map(_.toString).mkString(", ")
+            log.error(s"Sending to SQS queue [${sqs.sqsBufferName}] failed with errors [$errors]")
+            val successIds =
+              res.getSuccessful().asScala.map(_.getId()).map(UUID.fromString).toList
+            log.info(
+              s"${successIds.size} out of ${current.size} from batch was successfully send to SQS queue: ${sqs.sqsBufferName}"
+            )
+            successIds.foreach(current.remove)
+            None // means: retry
+          } else {
+            log.info(
+              s"Batch of ${current.size} was successfully send to SQS queue: ${sqs.sqsBufferName}."
+            )
+            Some(res.getSuccessful.size) //means: do not retry (the number doesn't matter in this context)
+          }
+        }
+      }
+  }
+
+  private def encode(bufMsg: ByteBuffer): String = {
+    val buffer = java.util.Base64.getEncoder.encode(bufMsg)
+    new String(buffer.array())
+  }
+
+  private def multiPut(name: String, batch: List[Event]): Future[PutRecordsResult] =
     Future {
       val putRecordsRequest = {
         val prr = new PutRecordsRequest()
         prr.setStreamName(name)
-        val putRecordsRequestEntryList = batch.map {
-          case (b, s) =>
-            val prre = new PutRecordsRequestEntry()
-            prre.setPartitionKey(s)
-            prre.setData(b)
-            prre
+        val putRecordsRequestEntryList = batch.map { event =>
+          val prre = new PutRecordsRequestEntry()
+          prre.setPartitionKey(event.key)
+          prre.setData(event.msg)
+          prre
         }
         prr.setRecords(putRecordsRequestEntryList.asJava)
         prr
