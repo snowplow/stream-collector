@@ -79,7 +79,14 @@ lazy val kinesis = project
   .settings(moduleName := "snowplow-stream-collector-kinesis")
   .settings(allSettings)
   .settings(packageName in Docker := "snowplow/scala-stream-collector-kinesis")
-  .settings(libraryDependencies ++= Seq(Dependencies.Libraries.kinesis, Dependencies.Libraries.cbor))
+  .settings(
+    libraryDependencies ++= Seq(
+      Dependencies.Libraries.kinesis,
+      Dependencies.Libraries.cbor,
+      Dependencies.Libraries.sqs,
+      Dependencies.Libraries.retry
+    )
+  )
   .enablePlugins(JavaAppPackaging, DockerPlugin)
   .dependsOn(core)
 
