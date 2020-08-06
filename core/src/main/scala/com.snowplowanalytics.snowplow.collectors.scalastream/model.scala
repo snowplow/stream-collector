@@ -156,7 +156,7 @@ package model {
     cors: CORSConfig,
     streams: StreamsConfig,
     prometheusMetrics: PrometheusMetricsConfig,
-    enableDefaultRedirect: Boolean = true,
+    enableDefaultRedirect: Boolean = false,
     ssl: SSLConfig = SSLConfig()
   ) {
     val cookieConfig = if (cookie.enabled) Some(cookie) else None
