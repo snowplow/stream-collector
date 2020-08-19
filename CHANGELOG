@@ -1,3 +1,13 @@
+Release 2.0.0 (2020-09-04)
+--------------------------
+Bump to 2.0.0 (close #61)
+Bump vulnerable libs (#56)
+Implement surge protection (#57)
+Add test for extracting a URL-encoded schema from the querystring (#60)
+Add snyk monitor (#52)
+Add DockerHub credentials to .travis.yml (#49)
+Add travis integration (#59)
+
 Release 1.0.1 (snowplow/snowplow: 119 Tycho Magnetic Anomaly Two) (2020-04-30)
 ------------------------------------------------------------------------------
 Bump to 1.0.1 (snowplow/snowplow#4338)
