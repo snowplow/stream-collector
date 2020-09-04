@@ -36,7 +36,7 @@ object Dependencies {
     val prometheus           = "0.6.0"
     val cbor                 = "2.9.10" // See snowplow/snowplow/issues/4266
     val retry                = "0.3.3"
-    val jackson              = "2.9.10.5" // force this version of lib from dependencies to mitigate secutiry vulnerabilities, TODO: update underlying libraries
+    val jackson              = "2.9.10.6" // force this version of lib from dependencies to mitigate secutiry vulnerabilities, TODO: update underlying libraries
     val thrift               = "0.13.0" // force this version of lib from dependencies to mitigate secutiry vulnerabilities, TODO: update underlying libraries
     val commonsCodec         = "1.13" // force this version of lib from dependencies to mitigate secutiry vulnerabilities, TODO: update underlying libraries
     val grpcCore             = "1.31.0" // force this version of lib from dependencies to mitigate secutiry vulnerabilities, TODO: update underlying libraries
