@@ -289,7 +289,7 @@ class KinesisSink private (
   }
 
   /**
-   *  Max number of retries is unlimitted, so when Kinesis stream is under heavy load,
+   *  Max number of retries is unlimited, so when Kinesis stream is under heavy load,
    *  the events accumulate in collector memory for later retries. The fix for this is to use
    *  sqs queue as a buffer and sqs2kinesis to move events back from sqs queue to kinesis stream.
    *  Consider using sqs buffer in heavy load scenarios.
@@ -326,6 +326,48 @@ class KinesisSink private (
       }
     }
 
+  case class EventWithCounter(event: Event, counter: Int)
+
+  import java.util.concurrent.ConcurrentLinkedQueue
+  val q = new ConcurrentLinkedQueue[EventWithCounter]
+  scala.sys.addShutdownHook {
+    if (!q.isEmpty) maybeSqs.foreach(sqs => {
+      log.warn(
+        s"Executing shutdown hook, sending ${q.size()} events from internal kinesis retry buffer to SQS"
+      )
+      putToSqs(sqs, q.iterator.asScala.map(_.event).toList)
+    })
+  }
+  executorService.scheduleWithFixedDelay(
+    new Thread {
+      override def run(): Unit = {
+        val first100 = (1 to 100).map(_ => Option(q.peek)).flatten
+        val result = multiPut(streamName, first100.map(_.event).toList)
+        result.foreach {
+          res =>
+            val results = res.getRecords.asScala.toList
+            val failurePairs = first100 zip results filter { _._2.getErrorMessage != null } //TODO: fix this!
+            val failures = failurePairs.map(_._1)
+            val (retryToKinesis, toSqs) = failures.partition(_.counter > 0)
+            maybeSqs.foreach(sqs => {
+              log.info(
+                s"After retries (in internal kinesis retry buffer) sending ${toSqs.size} events to SQS"
+              )
+              putToSqs(sqs, toSqs.map(_.event).toList)
+            })
+            if (retryToKinesis.nonEmpty) {
+              log.info(s"Retrying to send to Kinesis from internal kinesis retry buffer")
+              q.addAll(retryToKinesis.map(ev => ev.copy(counter = ev.counter - 1)).asJava)
+            }
+        }
+        ()
+      }
+    },
+    1000,
+    1000,
+    MILLISECONDS
+  )
+
   private def sendToSqsOrRetryToKinesis(
     failures: List[Event],
     nextBackoff: Long
@@ -334,10 +376,13 @@ class KinesisSink private (
   ): Unit =
     maybeSqs match {
       case Some(sqs) =>
-        log.info(
-          s"Sending ${failures.size} events from a batch to SQS buffer queue: ${sqs.sqsBufferName}"
-        )
-        putToSqs(sqs, failures)
+        if (q.size + failures.size <= 1000) q.addAll(failures.map(EventWithCounter(_, 3)).asJava)
+        else {
+          log.info(
+            s"Internal kinesis retry buffer full (buffer size: ${q.size}, events: ${failures.size}). Sending to SQS without retrying."
+          )
+          putToSqs(sqs, failures)
+        }
         ()
       case None =>
         log.error(retryErrorMsg)
