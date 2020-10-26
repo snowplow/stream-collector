@@ -8,15 +8,16 @@ import scala.util.control.NonFatal
 
 object Bar extends App {
 
-  val RetryPeriod = 3.second
+  val RetryPeriod = 2.seconds
 
   case class IntWithCounter(
     x: Int,
-    counter: Int,
+    kinesisCounter: Int,
+    sqsCounter: Int,
     nanoTime: Long,
     lastRetryNanoTime: Long
   ) {
-    override def toString = s"Int($x, $counter)"
+    override def toString = s"Int($x, $kinesisCounter, $sqsCounter)"
   }
 
   val executorService = new ScheduledThreadPoolExecutor(4)
@@ -28,11 +29,15 @@ object Bar extends App {
   val kinesisBuffer = new ConcurrentLinkedQueue[IntWithCounter]
   val sqsBuffer = new ConcurrentLinkedQueue[IntWithCounter]
 
-  q.addAll((1 to 100).toList.map(x => (IntWithCounter(x, 3, 0L, System.nanoTime))).asJava)
+  q.addAll((1 to 100).toList.map(x => (IntWithCounter(x, 3, 10, 0L, System.nanoTime))).asJava)
 
   scala.sys.addShutdownHook {
     println(s"shutting down with shutdown hook")
     println(s"size of queue: ${q.size}")
+    println(s"size of queue: ${kinesisQ.size}")
+    println(s"size of queue: ${sqsQ.size}")
+    println(s"size of queue: ${kinesisBuffer.size}")
+    println(s"size of queue: ${sqsBuffer.size}")
   }
 
   executorService.scheduleAtFixedRate(
@@ -66,7 +71,9 @@ object Bar extends App {
 
   def bar() =
     Option(q.poll()).foreach { head =>
-      if (head.counter > 0) kinesisQ.add(head) else sqsQ.add(head)
+      if (head.kinesisCounter > 0) kinesisQ.add(head)
+      else if (head.sqsCounter > 0) sqsQ.add(head)
+      else println(s"Dropping $head")
     }
 
   def buffer(
@@ -103,7 +110,10 @@ object Bar extends App {
         println(s"Sending to Kinesis: $retryToKinesis")
         q.addAll(
           retryToKinesis
-            .map(ev => ev.copy(counter = ev.counter - 1, lastRetryNanoTime = System.nanoTime))
+            .map(
+              ev =>
+                ev.copy(kinesisCounter = ev.kinesisCounter - 1, lastRetryNanoTime = System.nanoTime)
+            )
             .asJava
         )
       }
@@ -119,9 +129,18 @@ object Bar extends App {
       sqsFlow
     )
 
-  def sqsFlow(): Unit = {
-    val toSqs = (1 to sqsBuffer.size).toList.map(_ => Option(sqsBuffer.poll)).flatten
-    if (toSqs.nonEmpty) println(s"Sending to SQS: $toSqs")
-  }
+  def sqsFlow(): Unit =
+    if (sqsBuffer.peek != null && System.nanoTime > sqsBuffer.peek.lastRetryNanoTime + RetryPeriod.toNanos) {
+      val toSqs = (1 to sqsBuffer.size).toList.map(_ => Option(sqsBuffer.poll)).flatten
+      if (toSqs.nonEmpty) {
+        println(s"Sending to SQS: $toSqs")
+        q.addAll(
+          toSqs
+            .map(ev => ev.copy(sqsCounter = ev.sqsCounter - 1, lastRetryNanoTime = System.nanoTime))
+            .asJava
+        )
+      }
+      ()
+    }
 
 }
