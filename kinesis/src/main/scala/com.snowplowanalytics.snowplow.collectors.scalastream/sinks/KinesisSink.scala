@@ -341,7 +341,7 @@ class KinesisSink private (
   executorService.scheduleWithFixedDelay(
     new Thread {
       override def run(): Unit = {
-        val first100 = (1 to 100).map(_ => Option(q.peek)).flatten
+        val first100 = (1 to 100).map(_ => Option(q.poll)).flatten
         val result = multiPut(streamName, first100.map(_.event).toList)
         result.foreach {
           res =>
