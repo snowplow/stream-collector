@@ -8,14 +8,19 @@ import scala.util.control.NonFatal
 
 object Bar extends App {
 
+  val RetryPeriod = 3.second
+
   case class IntWithCounter(
     x: Int,
     counter: Int,
-    nanoTime: Long
-  )
+    nanoTime: Long,
+    lastRetryNanoTime: Long
+  ) {
+    override def toString = s"Int($x, $counter)"
+  }
 
-  val q = new ConcurrentLinkedQueue[IntWithCounter]
   val executorService = new ScheduledThreadPoolExecutor(4)
+  val q = new ConcurrentLinkedQueue[IntWithCounter]
 
   val kinesisQ = new ConcurrentLinkedQueue[IntWithCounter]
   val sqsQ = new ConcurrentLinkedQueue[IntWithCounter]
@@ -23,7 +28,7 @@ object Bar extends App {
   val kinesisBuffer = new ConcurrentLinkedQueue[IntWithCounter]
   val sqsBuffer = new ConcurrentLinkedQueue[IntWithCounter]
 
-  q.addAll((1 to 100).toList.map(x => (IntWithCounter(x, 3, 0L))).asJava)
+  q.addAll((1 to 100).toList.map(x => (IntWithCounter(x, 3, 0L, System.nanoTime))).asJava)
 
   scala.sys.addShutdownHook {
     println(s"shutting down with shutdown hook")
@@ -90,15 +95,20 @@ object Bar extends App {
       kinesisFlow
     )
 
-  def kinesisFlow(): Unit = {
-    val retryToKinesis =
-      (1 to kinesisBuffer.size).toList.map(_ => Option(kinesisBuffer.poll)).flatten
-    if (retryToKinesis.nonEmpty) {
-      println(s"Sending to Kinesis: $retryToKinesis")
-      q.addAll(retryToKinesis.map(ev => ev.copy(counter = ev.counter - 1)).asJava)
+  def kinesisFlow(): Unit =
+    if (kinesisBuffer.peek != null && System.nanoTime > kinesisBuffer.peek.lastRetryNanoTime + RetryPeriod.toNanos) {
+      val retryToKinesis =
+        (1 to kinesisBuffer.size).toList.map(_ => Option(kinesisBuffer.poll)).flatten
+      if (retryToKinesis.nonEmpty) {
+        println(s"Sending to Kinesis: $retryToKinesis")
+        q.addAll(
+          retryToKinesis
+            .map(ev => ev.copy(counter = ev.counter - 1, lastRetryNanoTime = System.nanoTime))
+            .asJava
+        )
+      }
+      ()
     }
-    ()
-  }
 
   def bufferedSqs() =
     buffer(
