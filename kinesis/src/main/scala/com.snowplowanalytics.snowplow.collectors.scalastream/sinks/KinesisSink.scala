@@ -14,7 +14,7 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 package sinks
 
 import java.nio.ByteBuffer
-import scala.collection.concurrent.TrieMap
+
 import java.util.concurrent.ScheduledExecutorService
 
 import scala.collection.JavaConverters._
@@ -33,8 +33,12 @@ import com.amazonaws.services.sqs.model.{
   SendMessageBatchRequestEntry
 }
 import java.util.UUID
+
 import model._
 import KinesisSink.SqsClientAndName
+import com.amazonaws.{AmazonClientException, AmazonWebServiceRequest, ClientConfiguration}
+import com.amazonaws.retry.RetryPolicy.RetryCondition
+import com.amazonaws.retry.{PredefinedBackoffStrategies, RetryPolicy}
 
 /** KinesisSink companion object with factory method */
 object KinesisSink {
@@ -127,6 +131,29 @@ object KinesisSink {
       .standard()
       .withCredentials(provider)
       .withEndpointConfiguration(new EndpointConfiguration(endpoint, region))
+      .withClientConfiguration(
+        new ClientConfiguration()
+          .withRetryPolicy(
+            new RetryPolicy(
+              new RetryCondition {
+                override def shouldRetry(
+                  originalRequest: AmazonWebServiceRequest,
+                  exception: AmazonClientException,
+                  retriesAttempted: Int
+                ): Boolean =
+                  retriesAttempted < 10 &&
+                    (exception match {
+                      case _: ProvisionedThroughputExceededException => false
+                      case _ => true
+                    })
+              },
+              new PredefinedBackoffStrategies.FullJitterBackoffStrategy(1000, 5 * 3600),
+              10,
+              true,
+              true
+            )
+          )
+      )
       .build()
 
   /**
@@ -150,6 +177,24 @@ object KinesisSink {
         .standard()
         .withRegion(region)
         .withCredentials(provider)
+        .withClientConfiguration(
+          new ClientConfiguration().withRetryPolicy(
+            new RetryPolicy(
+              new RetryCondition {
+                override def shouldRetry(
+                  originalRequest: AmazonWebServiceRequest,
+                  exception: AmazonClientException,
+                  retriesAttempted: Int
+                ): Boolean =
+                  retriesAttempted < 10
+              },
+              new PredefinedBackoffStrategies.FullJitterBackoffStrategy(1000, 5 * 3600),
+              10,
+              true,
+              true
+            )
+          )
+        )
         .build
     )
 
@@ -234,8 +279,9 @@ class KinesisSink private (
     ()
   }
 
+  // 'key' is used to populate the 'kinesisKey' message attribute for SQS
+  // and as partition key for Kinesis
   case class Event(msg: ByteBuffer, key: String)
-  case class EventWithId(event: Event, id: UUID)
 
   object EventStorage {
     private var storedEvents = List.empty[Event]
@@ -302,7 +348,7 @@ class KinesisSink private (
       multiPut(streamName, batch).onComplete {
         case Success(s) => {
           val results = s.getRecords.asScala.toList
-          val failurePairs = batch zip results filter { _._2.getErrorMessage != null }
+          val failurePairs = batch.zip(results).filter(_._2.getErrorMessage != null)
           log.info(
             s"Successfully wrote ${batch.size - failurePairs.size} out of ${batch.size} records"
           )
@@ -350,43 +396,32 @@ class KinesisSink private (
   private def putToSqs(sqs: SqsClientAndName, batch: List[Event]): Future[Unit] =
     Future {
       log.info(s"Writing ${batch.size} messages to SQS queue: ${sqs.sqsBufferName}")
-      val sqsBatchEntries = batch.map(addUuids).map(toSqsBatchEntry)
       val MaxSqsBatchSize = 10
-      val MaxRetries = 10
-      sqsBatchEntries.grouped(MaxSqsBatchSize).foreach { batchEntryGroup =>
-        sendToSqsWithRetry(sqs, batchEntryGroup, MaxRetries).transform {
-          case failure @ Failure(ex) =>
-            log.info(s"Sending to sqs failed with exception: $ex")
-            failure
-          case notSent @ Success(None) =>
-            log.info(s"Sending to sqs didn't succeed after $MaxRetries retries. Dropping events.")
-            notSent
-          case s @ Success(Some(_)) => s
+      batch
+        .map(toSqsBatchEntry)
+        .grouped(MaxSqsBatchSize)
+        .foreach { batchEntryGroup =>
+          sendToSqs(sqs, batchEntryGroup).transform {
+            case failure @ Failure(ex) =>
+              log.info(s"Sending to sqs failed with exception: $ex")
+              failure
+            case s @ Success(_) => s
+          }
         }
-      }
     }
 
-  /**
-   *  UUIDs are generated for retry purpose. When batch fails, we want to retry (limited number of times)
-   *   only those entries that failed within the batch.
-   */
-  private val addUuids: (Event) => EventWithId =
-    event => EventWithId(event, java.util.UUID.randomUUID())
-
-  private val toSqsBatchEntry: (EventWithId) => (UUID, SendMessageBatchRequestEntry) = {
-    eventWithId =>
-      val b64EncodedMsg = encode(eventWithId.event.msg)
-      val batchReqEntry = new SendMessageBatchRequestEntry(UUID.randomUUID.toString, b64EncodedMsg)
-        .withMessageAttributes(
-          Map(
-            "kinesisKey" ->
-              new MessageAttributeValue()
-                .withDataType("String")
-                .withStringValue(eventWithId.event.key)
-          ).asJava
-        )
-        .withId(eventWithId.id.toString)
-      (eventWithId.id, batchReqEntry)
+  private def toSqsBatchEntry(event: Event): SendMessageBatchRequestEntry = {
+    val b64EncodedMsg = encode(event.msg)
+    // The UUID is not used anywhere currently but is required by the constructor
+    new SendMessageBatchRequestEntry(UUID.randomUUID.toString, b64EncodedMsg)
+      .withMessageAttributes(
+        Map(
+          "kinesisKey" ->
+            new MessageAttributeValue()
+              .withDataType("String")
+              .withStringValue(event.key)
+        ).asJava
+      )
   }
 
   private def createBatchRequest(queueUrl: String, batch: List[SendMessageBatchRequestEntry]) =
@@ -394,38 +429,28 @@ class KinesisSink private (
       .withQueueUrl(queueUrl)
       .withEntries(batch.asJava)
 
-  private def sendToSqsWithRetry(
+  private def sendToSqs(
     sqs: SqsClientAndName,
-    batchEntryGroup: List[(UUID, SendMessageBatchRequestEntry)],
-    maxRetries: Int
-  ) = {
-    val current = TrieMap(batchEntryGroup: _*)
-    retry
-      .JitterBackoff(maxRetries, 1.second)
-      .apply { () =>
-        Future {
-          val batchRequest = createBatchRequest(sqs.sqsBufferName, current.values.toList)
-          val res = sqs.sqsClient.sendMessageBatch(batchRequest)
-          val failed = res.getFailed().asScala
-          if (failed.nonEmpty) {
-            val errors = failed.map(_.toString).mkString(", ")
-            log.error(s"Sending to SQS queue [${sqs.sqsBufferName}] failed with errors [$errors]")
-            val successIds =
-              res.getSuccessful().asScala.map(_.getId()).map(UUID.fromString).toList
-            log.info(
-              s"${successIds.size} out of ${current.size} from batch was successfully send to SQS queue: ${sqs.sqsBufferName}"
-            )
-            successIds.foreach(current.remove)
-            None // means: retry
-          } else {
-            log.info(
-              s"Batch of ${current.size} was successfully send to SQS queue: ${sqs.sqsBufferName}."
-            )
-            Some(res.getSuccessful.size) //means: do not retry (the number doesn't matter in this context)
-          }
-        }
-      }
-  }
+    batchEntryGroup: List[SendMessageBatchRequestEntry]
+  ) =
+    Future {
+      val batchRequest = createBatchRequest(sqs.sqsBufferName, batchEntryGroup)
+      val res = sqs.sqsClient.sendMessageBatch(batchRequest)
+      val failed = res.getFailed().asScala
+      if (failed.nonEmpty) {
+        // It could be improved even more by storing events (that failed to be sent to SQS) to some persistance storage
+        val errors = failed.map(_.toString).mkString(", ")
+        log.error(
+          s"Sending to SQS queue [${sqs.sqsBufferName}] failed with errors [$errors]. Dropping events."
+        )
+        log.info(
+          s"${res.getSuccessful.size} out of ${batchEntryGroup.size} from batch was successfully send to SQS queue: ${sqs.sqsBufferName}"
+        )
+      } else
+        log.info(
+          s"Batch of ${batchEntryGroup.size} was successfully send to SQS queue: ${sqs.sqsBufferName}."
+        )
+    }
 
   private def encode(bufMsg: ByteBuffer): String = {
     val buffer = java.util.Base64.getEncoder.encode(bufMsg)
