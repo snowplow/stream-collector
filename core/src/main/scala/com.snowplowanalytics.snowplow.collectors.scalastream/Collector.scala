@@ -146,7 +146,7 @@ trait Collector {
 
     lazy val http2GrpcEndpoint =
       bindHttp2(
-        CollectorServiceHandler(new CollectorServiceImpl),
+        collectorRoute.gRPCHandler,
         collectorConf.interface,
         collectorConf.grpc.port
       )

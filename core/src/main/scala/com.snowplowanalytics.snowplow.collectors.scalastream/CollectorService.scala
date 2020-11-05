@@ -17,15 +17,13 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 import java.util.UUID
 
 import scala.collection.JavaConverters._
-
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model.headers.CacheDirectives._
-
 import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
+import com.snowplowanalytics.snowplow.collectors.scalastream.grpc._
 import org.apache.commons.codec.binary.Base64
 import org.slf4j.LoggerFactory
-
 import generated.BuildInfo
 import model._
 import utils.SplitBatch
@@ -56,6 +54,7 @@ trait Service {
   def doNotTrackCookie: Option[DntCookieMatcher]
   def determinePath(vendor: String, version: String): String
   def enableDefaultRedirect: Boolean
+  def grpcResponse(in: TrackPayloadRequest): TrackPayloadResponse
 }
 
 object CollectorService {
@@ -141,6 +140,12 @@ class CollectorService(
     (httpResponse, badRedirectResponses ++ sinkResponses)
   }
 
+  override def grpcResponse(in: TrackPayloadRequest): TrackPayloadResponse = {
+    val event: CollectorPayload = buildEvent(in)
+    sinkEvent(event, in.ip)
+    TrackPayloadResponse.of(true)
+  }
+
   /**
    * Creates a response to the CORS preflight Options request
    * @param request Incoming preflight Options request
@@ -215,6 +220,22 @@ class CollectorService(
     e.networkUserId = networkUserId
     e.headers = (headers(request) ++ contentType).asJava
     contentType.foreach(e.contentType = _)
+    e
+  }
+
+  /** Builds a raw event from a gRPC request. */
+  def buildEvent(in: TrackPayloadRequest): CollectorPayload = {
+    val e = new CollectorPayload(
+      "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0",
+      in.ip,
+      System.currentTimeMillis,
+      "UTF-8",
+      collector
+    )
+    e.body = ???
+    e.userAgent = ???
+    e.refererUri = ???
+    e.networkUserId = in.tnuid // ???
     e
   }
 
