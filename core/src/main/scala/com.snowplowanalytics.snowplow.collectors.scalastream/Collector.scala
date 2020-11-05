@@ -24,10 +24,12 @@ import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.sslconfig.akka.AkkaSSLConfig
+import io.opentracing.noop.NoopTracerFactory
 import org.slf4j.LoggerFactory
 import pureconfig._
 import pureconfig.generic.{FieldCoproductHint, ProductHint}
 import pureconfig.generic.auto._
+
 
 import metrics._
 import model._
@@ -73,8 +75,11 @@ trait Collector {
     implicit val materializer = ActorMaterializer()
     implicit val executionContext = system.dispatcher
 
+    val sharedTracer = NoopTracerFactory.create
+
     val collectorRoute = new CollectorRoute {
-      override def collectorService = new CollectorService(collectorConf, sinks)
+      override def collectorService = new CollectorService(collectorConf, sinks, sharedTracer)
+      override def tracer = sharedTracer
     }
 
     val prometheusMetricsService = new PrometheusMetricsService(collectorConf.prometheusMetrics)

@@ -23,6 +23,8 @@ import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model.headers.CacheDirectives._
 
 import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
+import io.opentracing.Tracer
+import io.opentracing.propagation.{Format, TextMapAdapter}
 import org.apache.commons.codec.binary.Base64
 import org.slf4j.LoggerFactory
 
@@ -66,7 +68,8 @@ object CollectorService {
 
 class CollectorService(
   config: CollectorConfig,
-  sinks: CollectorSinks
+  sinks: CollectorSinks,
+  tracer: Tracer
 ) extends Service {
 
   private val logger = LoggerFactory.getLogger(getClass)
@@ -199,6 +202,7 @@ class CollectorService(
     networkUserId: String,
     contentType: Option[String]
   ): CollectorPayload = {
+
     val e = new CollectorPayload(
       "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0",
       ipAddress,
@@ -213,7 +217,7 @@ class CollectorService(
     refererUri.foreach(e.refererUri = _)
     e.hostname = hostname
     e.networkUserId = networkUserId
-    e.headers = (headers(request) ++ contentType).asJava
+    e.headers = (headers(request) ++ contentType ++ tracerHeaders).asJava
     contentType.foreach(e.contentType = _)
     e
   }
@@ -226,8 +230,10 @@ class CollectorService(
     // Split events into Good and Bad
     val eventSplit = SplitBatch.splitAndSerializePayload(event, sinks.good.MaxBytes)
     // Send events to respective sinks
+    val span = tracer.buildSpan("SinkRawEvents").start
     val sinkResponseGood = sinks.good.storeRawEvents(eventSplit.good, partitionKey)
     val sinkResponseBad  = sinks.bad.storeRawEvents(eventSplit.bad, partitionKey)
+    span.finish
     // Sink Responses for Test Sink
     sinkResponseGood ++ sinkResponseBad
   }
@@ -343,6 +349,13 @@ class CollectorService(
   def headers(request: HttpRequest): Seq[String] = request.headers.flatMap {
     case _: `Remote-Address` | _: `Raw-Request-URI` => None
     case other => Some(other.toString)
+  }
+
+  def tracerHeaders: Iterable[String] = {
+    val m = scala.collection.mutable.Map.empty[String, String]
+    val adapter = new TextMapAdapter(m.asJava)
+    tracer.inject(tracer.activeSpan.context, Format.Builtin.HTTP_HEADERS, adapter)
+    m.map { case (k, v) => s"$k: $v" }
   }
 
   /** If the pixel is requested, this attaches cache control headers to the response to prevent any caching. */

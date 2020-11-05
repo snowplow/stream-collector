@@ -16,14 +16,19 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.HttpCookiePair
-import akka.http.scaladsl.server.{Directive1, Route}
+import akka.http.scaladsl.server.{Directive1, Route, StandardRoute}
 import akka.http.scaladsl.server.Directives._
+
+import io.opentracing.{Span, Tracer}
 
 import model.DntCookieMatcher
 import monitoring.BeanRegistry
 
+import scala.concurrent.ExecutionContext
+
 trait CollectorRoute {
   def collectorService: Service
+  def tracer: Tracer
 
   private val headers = optionalHeaderValueByName("User-Agent") &
     optionalHeaderValueByName("Referer") &
@@ -42,8 +47,18 @@ trait CollectorRoute {
       complete(StatusCodes.NotFound -> "redirects disabled")
     }
 
+  def completeWithSpan(r: HttpResponse, span: Span): StandardRoute =
+    requestContext => {
+      val fut = complete(r)(requestContext)
+      fut.onComplete { _ =>
+        span.finish
+      }(ExecutionContext.global)
+      fut
+    }
+
   def routes: Route =
     doNotTrack(collectorService.doNotTrackCookie) { dnt =>
+      val span = tracer.buildSpan("CollectorRequest").start
       cookieIfWanted(collectorService.cookieName) { reqCookie =>
         val cookie = reqCookie.map(_.toCookie)
         headers { (userAgent, refererURI, rawRequestURI) =>
@@ -69,7 +84,7 @@ trait CollectorRoute {
                       doNotTrack = dnt,
                       Some(ct))
                     incrementRequests(r.status)
-                    complete(r)
+                    completeWithSpan(r, span)
                   }
                 }
               } ~
@@ -87,7 +102,7 @@ trait CollectorRoute {
                   pixelExpected = true,
                   doNotTrack = dnt)
                 incrementRequests(r.status)
-                complete(r)
+                completeWithSpan(r, span)
               }
             } ~
             path("""ice\.png""".r | "i".r) { path =>
@@ -105,7 +120,7 @@ trait CollectorRoute {
                   pixelExpected = true,
                   doNotTrack = dnt)
                 incrementRequests(r.status)
-                complete(r)
+                completeWithSpan(r, span)
               }
             }
           }
