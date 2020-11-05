@@ -44,6 +44,7 @@ object Dependencies {
     val collectorPayload     = "0.0.0"
     val scalaz7              = "7.0.9"
     val akkaHttp             = "10.1.10"
+    val scalapbJson4s        = "0.10.1"
     val akka                 = "2.5.23"
     val scopt                = "3.6.0"
     val pureconfig           = "0.11.1"
@@ -82,6 +83,7 @@ object Dependencies {
     val akkaHttp2Support     = "com.typesafe.akka"     %% "akka-http2-support"     % V.akkaHttp
     val akkaStream           = "com.typesafe.akka"     %% "akka-stream"            % V.akka
     val akkaSlf4j            = "com.typesafe.akka"     %% "akka-slf4j"             % V.akka
+    val scalapbJson4s        = "com.thesamet.scalapb"  %% "scalapb-json4s"         % V.scalapbJson4s
     val json4sJackson        = "org.json4s"            %% "json4s-jackson"         % V.json4s
     val pureconfig           = "com.github.pureconfig" %% "pureconfig"             % V.pureconfig
 

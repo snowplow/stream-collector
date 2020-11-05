@@ -24,6 +24,8 @@ import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPa
 import com.snowplowanalytics.snowplow.collectors.scalastream.grpc._
 import org.apache.commons.codec.binary.Base64
 import org.slf4j.LoggerFactory
+import scalapb.json4s.JsonFormat
+
 import generated.BuildInfo
 import model._
 import utils.SplitBatch
@@ -142,7 +144,8 @@ class CollectorService(
 
   override def grpcResponse(in: TrackPayloadRequest): TrackPayloadResponse = {
     val event: CollectorPayload = buildEvent(in)
-    sinkEvent(event, in.ip)
+    val partitionKey: String = if (in.ip.nonEmpty) in.ip else UUID.randomUUID().toString
+    sinkEvent(event, partitionKey)
     TrackPayloadResponse.of(true)
   }
 
@@ -232,10 +235,11 @@ class CollectorService(
       "UTF-8",
       collector
     )
-    e.body = ???
-    e.userAgent = ???
-    e.refererUri = ???
-    e.networkUserId = in.tnuid // ???
+    val payloadDataSchemaKey = "iglu:com.snowplowanalytics.snowplow/payload_data/jsonschema/1-0-4"
+    e.body = s"""{ "schema":"$payloadDataSchemaKey", "data":[${JsonFormat.toJsonString(in)}]}"""
+    e.userAgent = in.ua
+    e.refererUri = in.refr
+    e.networkUserId = if (in.tnuid.nonEmpty) in.tnuid else UUID.randomUUID().toString
     e
   }
 

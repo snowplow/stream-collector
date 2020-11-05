@@ -34,6 +34,7 @@ lazy val commonDependencies = Seq(
   Dependencies.Libraries.akkaHttp2Support,
   Dependencies.Libraries.akkaStream,
   Dependencies.Libraries.akkaSlf4j,
+  Dependencies.Libraries.scalapbJson4s,
   Dependencies.Libraries.badRows,
   Dependencies.Libraries.collectorPayload,
   Dependencies.Libraries.pureconfig,
