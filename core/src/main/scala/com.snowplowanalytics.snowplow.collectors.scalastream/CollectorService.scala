@@ -229,13 +229,16 @@ class CollectorService(
   ): List[Array[Byte]] = {
     // Split events into Good and Bad
     val eventSplit = SplitBatch.splitAndSerializePayload(event, sinks.good.MaxBytes)
-    // Send events to respective sinks
-    val span = tracer.buildSpan("SinkRawEvents").start
-    val sinkResponseGood = sinks.good.storeRawEvents(eventSplit.good, partitionKey)
-    val sinkResponseBad  = sinks.bad.storeRawEvents(eventSplit.bad, partitionKey)
-    span.finish
-    // Sink Responses for Test Sink
-    sinkResponseGood ++ sinkResponseBad
+    val span = tracer.buildSpan("SinkRawEvents").start()
+    try {
+      // Send events to respective sinks
+      val sinkResponseGood = sinks.good.storeRawEvents(eventSplit.good, partitionKey)
+      val sinkResponseBad  = sinks.bad.storeRawEvents(eventSplit.bad, partitionKey)
+      // Sink Responses for Test Sink
+      sinkResponseGood ++ sinkResponseBad
+    } finally {
+      span.finish
+    }
   }
 
   /** Builds the final http response from  */
@@ -351,12 +354,16 @@ class CollectorService(
     case other => Some(other.toString)
   }
 
-  def tracerHeaders: Iterable[String] = {
-    val m = scala.collection.mutable.Map.empty[String, String]
-    val adapter = new TextMapAdapter(m.asJava)
-    tracer.inject(tracer.activeSpan.context, Format.Builtin.HTTP_HEADERS, adapter)
-    m.map { case (k, v) => s"$k: $v" }
-  }
+  def tracerHeaders: Iterable[String] =
+    Option(tracer.activeSpan) match {
+      case Some(span) =>
+        val m = scala.collection.mutable.Map.empty[String, String]
+        val adapter = new TextMapAdapter(m.asJava)
+        tracer.inject(span.context, Format.Builtin.HTTP_HEADERS, adapter)
+        m.map { case (k, v) => s"$k: $v" }
+      case None =>
+        Iterable()
+    }
 
   /** If the pixel is requested, this attaches cache control headers to the response to prevent any caching. */
   def cacheControl(pixelExpected: Boolean): List[`Cache-Control`] =

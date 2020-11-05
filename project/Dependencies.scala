@@ -41,6 +41,7 @@ object Dependencies {
     val commonsCodec         = "1.13" // force this version of lib from dependencies to mitigate secutiry vulnerabilities, TODO: update underlying libraries
     val grpcCore             = "1.31.0" // force this version of lib from dependencies to mitigate secutiry vulnerabilities, TODO: update underlying libraries
     val opentracing          = "0.33.0"
+    val jaeger               = "1.4.0"
     // Scala
     val collectorPayload     = "0.0.0"
     val scalaz7              = "7.0.9"
@@ -74,6 +75,7 @@ object Dependencies {
     val cbor                 = "com.fasterxml.jackson.dataformat" %  "jackson-dataformat-cbor" % V.cbor
     val opentracingApi       = "io.opentracing"                   %  "opentracing-api"         % V.opentracing
     val opentracingNoop      = "io.opentracing"                   %  "opentracing-noop"        % V.opentracing
+    val jaeger               = "io.jaegertracing"                 %  "jaeger-client"           % V.jaeger
     val retry                = "com.softwaremill.retry"           %% "retry"                   % V.retry
 
     // Scala

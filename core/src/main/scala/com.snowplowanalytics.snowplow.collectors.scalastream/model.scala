@@ -142,6 +142,13 @@ package model {
     redirect: Boolean = false,
     port: Int = 443
   )
+
+  sealed trait TracerConfig
+  object TracerConfig {
+    case object Noop extends TracerConfig
+    case object Jaeger extends TracerConfig
+  }
+
   final case class CollectorConfig(
     interface: String,
     port: Int,
@@ -157,7 +164,8 @@ package model {
     streams: StreamsConfig,
     prometheusMetrics: PrometheusMetricsConfig,
     enableDefaultRedirect: Boolean = false,
-    ssl: SSLConfig = SSLConfig()
+    ssl: SSLConfig = SSLConfig(),
+    tracer: TracerConfig = TracerConfig.Noop
   ) {
     val cookieConfig = if (cookie.enabled) Some(cookie) else None
     val doNotTrackHttpCookie =

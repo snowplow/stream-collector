@@ -24,6 +24,8 @@ import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.sslconfig.akka.AkkaSSLConfig
+import io.jaegertracing.{Configuration => JaegerConfiguration}
+import io.opentracing.Tracer
 import io.opentracing.noop.NoopTracerFactory
 import org.slf4j.LoggerFactory
 import pureconfig._
@@ -40,7 +42,8 @@ trait Collector {
   lazy val log = LoggerFactory.getLogger(getClass())
 
   implicit def hint[T] = ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
-  implicit val _ = new FieldCoproductHint[SinkConfig]("enabled")
+  implicit val sinkHint = new FieldCoproductHint[SinkConfig]("enabled")
+  implicit val tracerHint = new FieldCoproductHint[TracerConfig]("enabled")
 
   def parseConfig(args: Array[String]): (CollectorConfig, Config) = {
     case class FileConfig(config: File = new File("."))
@@ -69,13 +72,23 @@ trait Collector {
     (loadConfigOrThrow[CollectorConfig](conf.getConfig("collector")), conf)
   }
 
+  def tracer(config: TracerConfig): Tracer =
+    config match {
+      case TracerConfig.Noop =>
+        log.debug("Using noop tracer")
+        NoopTracerFactory.create
+      case TracerConfig.Jaeger =>
+        log.debug("Using jaeger tracer")
+        JaegerConfiguration.fromEnv.getTracer
+    }
+
   def run(collectorConf: CollectorConfig, akkaConf: Config, sinks: CollectorSinks): Unit = {
 
     implicit val system = ActorSystem.create("scala-stream-collector", akkaConf)
     implicit val materializer = ActorMaterializer()
     implicit val executionContext = system.dispatcher
 
-    val sharedTracer = NoopTracerFactory.create
+    val sharedTracer = tracer(collectorConf.tracer)
 
     val collectorRoute = new CollectorRoute {
       override def collectorService = new CollectorService(collectorConf, sinks, sharedTracer)
