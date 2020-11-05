@@ -142,6 +142,9 @@ package model {
     redirect: Boolean = false,
     port: Int = 443
   )
+  final case class GRPCConfig(
+    port: Int = 9544
+  )
   final case class CollectorConfig(
     interface: String,
     port: Int,
@@ -157,7 +160,8 @@ package model {
     streams: StreamsConfig,
     prometheusMetrics: PrometheusMetricsConfig,
     enableDefaultRedirect: Boolean = false,
-    ssl: SSLConfig = SSLConfig()
+    ssl: SSLConfig = SSLConfig(),
+    grpc: GRPCConfig = GRPCConfig()
   ) {
     val cookieConfig = if (cookie.enabled) Some(cookie) else None
     val doNotTrackHttpCookie =

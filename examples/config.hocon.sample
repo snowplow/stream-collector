@@ -35,6 +35,12 @@ collector {
     port = ${?COLLECTOR_SSL_PORT}
   }
 
+  # gRPC
+  grpc {
+    port = 9544
+    port = ${?COLLECTOR_GRPC_PORT}
+  }
+
   # The collector responds with a cookie to requests with a path that matches the 'vendor/version' protocol.
   # The expected values are:
   # - com.snowplowanalytics.snowplow/tp2 for Tracker Protocol 2
@@ -346,6 +352,10 @@ akka {
       max-uri-length = ${?AKKA_HTTP_SERVER_PARSING_MAX_URI_LENGTH}
       uri-parsing-mode = relaxed
       uri-parsing-mode = ${?AKKA_HTTP_SERVER_PARSING_URI_PARSING_MODE}
+    }
+
+    preview {
+      enable-http2 = on
     }
   }
 

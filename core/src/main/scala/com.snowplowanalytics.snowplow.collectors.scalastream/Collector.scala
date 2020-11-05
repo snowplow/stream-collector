@@ -17,7 +17,7 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 import java.io.File
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.{ConnectionContext, Http}
+import akka.http.scaladsl.{ConnectionContext, Http, Http2}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.Directives._
@@ -28,7 +28,6 @@ import org.slf4j.LoggerFactory
 import pureconfig._
 import pureconfig.generic.{FieldCoproductHint, ProductHint}
 import pureconfig.generic.auto._
-
 import metrics._
 import model._
 
@@ -92,6 +91,8 @@ trait Collector {
         metricsRoute.metricsRoute ~ metricsDirectives.logRequest(collectorRoute.collectorRoute)
       else collectorRoute.collectorRoute
 
+    val gRPCRoutes: Route = routes
+
     lazy val redirectRoutes =
       scheme("http") {
         extract(_.request.uri) { uri =>
@@ -116,6 +117,20 @@ trait Collector {
             s"${collectorConf.interface}:${collectorConf.port}", ex.getMessage)
         }
 
+    def bindHttp2(
+        rs: Route,
+        interface: String,
+        port: Int,
+        connectionContext: ConnectionContext = SSLConfig.secureConnectionContext(system, AkkaSSLConfig())
+    ) =
+      Http2().bindAndHandleAsync(Route.asyncHandler(rs), interface, port, connectionContext)
+        .map { binding =>
+          log.info(s"gRPC interface bound to ${binding.localAddress}")
+        } recover { case ex =>
+        log.error( "gRPC interface could not be bound to " +
+          s"$interface:$port", ex.getMessage)
+      }
+
     lazy val secureEndpoint =
       bind(routes,
            collectorConf.interface,
@@ -126,17 +141,27 @@ trait Collector {
     lazy val unsecureEndpoint = (routes: Route) =>
       bind(routes, collectorConf.interface, collectorConf.port)
 
+    lazy val http2GrpcEndpoint =
+      bindHttp2(
+        gRPCRoutes,
+        collectorConf.interface,
+        collectorConf.grpc.port
+      )
+
     collectorConf.ssl match {
       case SSLConfig(true, true, _) =>
         unsecureEndpoint(redirectRoutes)
         secureEndpoint
+        http2GrpcEndpoint
         ()
       case SSLConfig(true, false, _) =>
         unsecureEndpoint(routes)
         secureEndpoint
+        http2GrpcEndpoint
         ()
       case _ =>
         unsecureEndpoint(routes)
+        http2GrpcEndpoint
         ()
     }
   }

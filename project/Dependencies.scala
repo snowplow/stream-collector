@@ -79,6 +79,7 @@ object Dependencies {
     val badRows              = "com.snowplowanalytics" %% "snowplow-badrows"       % V.badRows
     val scopt                = "com.github.scopt"      %% "scopt"                  % V.scopt
     val akkaHttp             = "com.typesafe.akka"     %% "akka-http"              % V.akkaHttp
+    val akkaHttp2Support     = "com.typesafe.akka"     %% "akka-http2-support"     % V.akkaHttp
     val akkaStream           = "com.typesafe.akka"     %% "akka-stream"            % V.akka
     val akkaSlf4j            = "com.typesafe.akka"     %% "akka-slf4j"             % V.akka
     val json4sJackson        = "org.json4s"            %% "json4s-jackson"         % V.json4s

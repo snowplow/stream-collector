@@ -31,6 +31,7 @@ lazy val commonDependencies = Seq(
   Dependencies.Libraries.scalaz7,
   Dependencies.Libraries.akkaStream,
   Dependencies.Libraries.akkaHttp,
+  Dependencies.Libraries.akkaHttp2Support,
   Dependencies.Libraries.akkaStream,
   Dependencies.Libraries.akkaSlf4j,
   Dependencies.Libraries.badRows,
@@ -73,7 +74,7 @@ lazy val core = project
   .settings(moduleName := "snowplow-stream-collector-core")
   .settings(buildSettings)
   .settings(libraryDependencies ++= commonDependencies)
-  .enablePlugins(BuildInfoPlugin)
+  .enablePlugins(BuildInfoPlugin, AkkaGrpcPlugin)
   .settings(
     buildInfoKeys := Seq[BuildInfoKey](organization, name, version, "shortName" -> "ssc", scalaVersion),
     buildInfoPackage := "com.snowplowanalytics.snowplow.collectors.scalastream.generated"
