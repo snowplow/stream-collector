@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-import "google/protobuf/struct.proto";
-
 option go_package = "github.com/snowplow/snowplow-golang-tracker/tracker";
 
 package tracker;
@@ -9,8 +7,8 @@ package tracker;
 // Service
 
 service CollectorService {
-  rpc TrackPayload_1_0_4(TrackEventRequest) returns (TrackEventResponse) {}
-  rpc StreamTrackPayload_1_0_4(stream TrackEventRequest) returns (TrackEventResponse) {}
+  rpc TrackPayload104(TrackEventRequest) returns (TrackEventResponse) {}
+  rpc StreamTrackPayload104(stream TrackEventRequest) returns (TrackEventResponse) {}
 }
 
 // Requests
@@ -132,11 +130,4 @@ message TrackEventRequest {
 
 message TrackEventResponse {
 	bool success = 1;
-}
-
-// Structs
-
-message SelfDescribing {
-	string schema = 1;
-	map<string, google.protobuf.Struct> payload = 2;  
 }
