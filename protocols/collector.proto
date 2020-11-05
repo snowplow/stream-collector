@@ -73,6 +73,35 @@ messsage TrackEventRequest {
 	string ut_variable = 49; // variable
 	string ut_timing   = 50; // timing
 	string ut_label    = 51; // label
+
+	// extras
+	string domain_sessionidx = 52;        // vid
+	string domain_sessionid = 53;         // sid
+	string br_cookies = 54;               // cookie
+	string br_features_pdf = 55;          // f_pdf
+	string br_features_quicktime = 56;    // f_qt
+	string br_features_realplayer = 57;   // f_realp
+	string br_features_windowsmedia = 58; // f_wma
+	string br_features_director = 59;     // f_dir
+	string br_features_flash = 60;        // f_fla
+	string br_features_java = 61;         // f_java
+	string br_features_gears = 62;        // f_gears
+	string br_features_silverlight = 63;  // f_ag
+	string doc_width_height = 64;         // ds
+	string doc_charset = 65;              // cs
+	string mac_address = 66;              // mac
+	string pp_xoffset_min = 67;           // pp_mix
+	string pp_xoffset_max = 68;           // pp_max
+	string pp_yoffset_min = 69;           // pp_miy
+	string pp_yoffset_max = 70;           // pp_may
+	string adi_bannerid = 71;             // ad_ba
+	string adi_campaignid = 72;           // ad_ca
+	string adi_advertiserid = 73;         // ad_ad
+	string adi_userid = 74;               // ad_uid
+	string social_action = 75;            // sa
+	string social_network = 76;           // sn
+	string social_target = 77;            // st
+	string social_pagepath = 78;          // sp
 }
 
 // Responses
