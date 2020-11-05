@@ -1,0 +1,89 @@
+syntax = "proto3";
+
+service CollectorService {
+  rpc TrackEvent(TrackEventRequest) returns (TrackEventResponse) {}
+}
+
+// Requests
+
+messsage TrackEventRequest {
+	repeated SelfDescribing contexts = 1;     // co
+	SelfDescribing self_describing_event = 2; // ue_pr
+
+	string event = 3;           // e
+	string event_id = 4;        // eid
+	string timestamp = 5;       // dtm
+	string sent_timestamp = 6;  // stm
+	string true_timestamp = 7;  // ttm
+	string tracker_version = 8; // tv
+	string application_id = 9;  // aid
+	string namespace = 10;      // tna
+	string platform = 11;       // p
+
+	// subject class
+	string user_id = 12;         // uid
+	string resolution = 13;      // res
+	string viewport = 14;        // vp
+	string color_depth = 15;     // cd
+	string timezone = 16;        // tz
+	string language = 17;        // lang
+	string ip_address = 18;      // ip
+	string useragent = 19;       // ua
+	string domain_user_id = 20;  // duid
+	string network_user_id = 21; // tnuid
+
+	// page view
+	string page_url = 22;   // url
+	string page_title = 23; // page
+	string page_refr = 24;  // refr
+
+	// structured event
+	string se_category = 25; // se_ca
+	string se_action   = 26; // se_ac
+	string se_label    = 27; // se_la
+	string se_property = 28; // se_pr
+	string se_value    = 29; // se_va
+
+	// ecomm transaction
+	string tr_id          = 30; // tr_id
+	string tr_total       = 31; // tr_tt
+	string tr_affiliation = 32; // tr_af
+	string tr_tax         = 33; // tr_tx
+	string tr_shipping    = 34; // tr_sh
+	string tr_city        = 35; // tr_ci
+	string tr_state       = 36; // tr_st
+	string tr_country     = 37; // tr_co
+	string tr_currency    = 38; // tr_cu
+
+	// transaction item
+	string ti_item_id       = 39; // ti_id
+	string ti_item_sku      = 40; // ti_sk
+	string ti_item_name     = 41; // ti_nm
+	string ti_item_category = 42; // ti_ca
+	string ti_item_price    = 43; // ti_pr
+	string ti_item_quantity = 44; // ti_qu
+	string ti_item_currency = 45; // ti_cu
+
+	// screen view
+	string sv_id   = 46; // id
+	string sv_name = 47; // name
+
+	// user timing
+	string ut_category = 48; // category
+	string ut_variable = 49; // variable
+	string ut_timing   = 50; // timing
+	string ut_label    = 51; // label
+}
+
+// Responses
+
+message TrackEventResponse {
+	bool success = 1;
+}
+
+// Structs
+
+message SelfDescribing {
+	string schema = 1;
+	map<string, Value> payload = 2;  
+}
