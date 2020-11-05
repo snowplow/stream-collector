@@ -16,13 +16,15 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.HttpCookiePair
-import akka.http.scaladsl.server.{Directive1, Route}
+import akka.http.scaladsl.server.{Directive1, Route, RouteResult}
 import akka.http.scaladsl.server.Directives._
 
 import io.opentracing.{Span, Tracer}
 
 import model.DntCookieMatcher
 import monitoring.BeanRegistry
+import scala.collection.JavaConverters._
+import scala.util.{Success, Failure}
 
 trait CollectorRoute {
   def collectorService: Service
@@ -48,8 +50,21 @@ trait CollectorRoute {
   def traceRoute(inner: Span => Route): Route =
     requestContext => {
       val span = tracer.buildSpan("HandleRequest").start
+      span.setTag("http.method", requestContext.request.method.name)
+      span.setTag("http.url", requestContext.request.uri.toString)
+
       val fut = inner(span)(requestContext)
-      fut.onComplete { _ =>
+      fut.onComplete { result =>
+        result match {
+          case Success(RouteResult.Complete(response)) =>
+            span.setTag("http.status", response.status.intValue)
+          case Success(RouteResult.Rejected(rejections)) =>
+            span.setTag("error", result.isFailure)
+            span.log(Map("event" -> "error", "error.object" -> rejections).asJava)
+          case Failure(e) =>
+            span.setTag("error", result.isFailure)
+            span.log(Map("event" -> "error", "error.object" -> e).asJava)
+        }
         span.finish
       }(requestContext.executionContext)
       fut

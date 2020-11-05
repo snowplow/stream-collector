@@ -104,6 +104,7 @@ class CollectorService(
     doNotTrack: Boolean,
     contentType: Option[ContentType] = None
   ): (HttpResponse, List[Array[Byte]]) = {
+    Option(tracer.activeSpan).map(_.log(Map("message" -> "cookie handler").asJava))
     val queryParams = Uri.Query(queryString).toMap
 
     val (ipAddress, partitionKey) = ipAndPartitionKey(ip, config.streams.useIpAddressAsPartitionKey)
@@ -230,6 +231,7 @@ class CollectorService(
     // Split events into Good and Bad
     val eventSplit = SplitBatch.splitAndSerializePayload(event, sinks.good.MaxBytes)
     val span = tracer.buildSpan("SinkRawEvents").start()
+    span.setTag("component", sinks.good.getClass.getSimpleName)
     try {
       // Send events to respective sinks
       val sinkResponseGood = sinks.good.storeRawEvents(eventSplit.good, partitionKey)

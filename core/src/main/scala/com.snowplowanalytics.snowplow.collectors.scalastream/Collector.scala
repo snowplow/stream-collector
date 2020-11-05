@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory
 import pureconfig._
 import pureconfig.generic.{FieldCoproductHint, ProductHint}
 import pureconfig.generic.auto._
+import scala.collection.JavaConverters._
 
 
 import metrics._
@@ -77,9 +78,28 @@ trait Collector {
       case TracerConfig.Noop =>
         log.debug("Using noop tracer")
         NoopTracerFactory.create
-      case TracerConfig.Jaeger =>
+      case j: TracerConfig.Jaeger =>
         log.debug("Using jaeger tracer")
-        JaegerConfiguration.fromEnv.getTracer
+        new JaegerConfiguration(j.serviceName)
+          .withReporter {
+            val rc = new JaegerConfiguration.ReporterConfiguration
+            rc.withSender {
+              val sender = new JaegerConfiguration.SenderConfiguration
+              j.agentHost.foreach(sender.withAgentHost(_))
+              j.agentPort.foreach(sender.withAgentPort(_))
+              sender
+            }
+            rc
+          }
+          .withSampler {
+            val sampler = new JaegerConfiguration.SamplerConfiguration
+            j.samplerType.foreach(sampler.withType(_))
+            j.samplerParam.foreach(sampler.withParam(_))
+            j.managerHostPort.foreach(sampler.withManagerHostPort(_))
+            sampler
+          }
+          .withTracerTags(j.tracerTags.asJava)
+          .getTracer
     }
 
   def run(collectorConf: CollectorConfig, akkaConf: Config, sinks: CollectorSinks): Unit = {

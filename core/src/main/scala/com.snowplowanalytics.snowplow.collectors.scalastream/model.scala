@@ -146,7 +146,15 @@ package model {
   sealed trait TracerConfig
   object TracerConfig {
     case object Noop extends TracerConfig
-    case object Jaeger extends TracerConfig
+    case class Jaeger(
+      serviceName: String,
+      agentHost: Option[String],
+      agentPort: Option[Int],
+      samplerType: Option[String],
+      samplerParam: Option[Float],
+      managerHostPort: Option[String],
+      tracerTags: Map[String, String] = Map()
+    ) extends TracerConfig
   }
 
   final case class CollectorConfig(
