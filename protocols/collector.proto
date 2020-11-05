@@ -9,120 +9,123 @@ package tracker;
 // Service
 
 service CollectorService {
-  rpc TrackEvent(TrackEventRequest) returns (TrackEventResponse) {}
-  rpc TrackEventStream(stream TrackEventRequest) returns (TrackEventResponse) {}
+  rpc TrackPayload_1_0_4(TrackEventRequest) returns (TrackEventResponse) {}
+  rpc StreamTrackPayload_1_0_4(stream TrackEventRequest) returns (TrackEventResponse) {}
 }
 
 // Requests
 
 message TrackEventRequest {
-	repeated SelfDescribing co = 1;
-	SelfDescribing ue_pr = 2;
+	string e = 1;
+	string eid = 2;
+	string dtm = 3;
+	string stm = 4;
+	string ttm = 5;
+	string tv = 6;
+	string aid = 7;
+	string tna = 8;
+	string p = 9;
 
-	string e = 3;
-	string eid = 4;
-	string dtm = 5;
-	string stm = 6;
-	string ttm = 7;
-	string tv = 8;
-	string aid = 9;
-	string tna = 10;
-	string p = 11;
+	string cx = 10;
+	string ue_px = 11;
 
 	// subject class
 	string uid = 12;
-	string res = 13;
-	string vp = 14;
-	string cd = 15;
-	string tz = 16;
-	string lang = 17;
-	string ip = 18;
-	string ua = 19;
+	string ip = 13;
+	string ua = 14;
+	string res = 15;
+	string vp = 16;
+	string cd = 17;
+	string tz = 18;
+	string lang = 19;
 	string duid = 20;
 	string tnuid = 21;
 
+	string co = 22;
+	string ue_pr = 23;
+
 	// page view
-	string url = 22;
-	string page = 23;
-	string refr = 24;
+	string url = 24;
+	string page = 25;
+	string refr = 26;
 
 	// structured event
-	string se_ca = 25;
-	string se_ac = 26;
-	string se_la = 27;
-	string se_pr = 28;
-	string se_va = 29;
+	string se_ca = 27;
+	string se_ac = 28;
+	string se_la = 29;
+	string se_pr = 30;
+	string se_va = 31;
 
 	// ecomm transaction
-	string tr_id = 30;
-	string tr_tt = 31;
-	string tr_af = 32;
-	string tr_tx = 33;
-	string tr_sh = 34;
-	string tr_ci = 35;
-	string tr_st = 36;
-	string tr_co = 37;
-	string tr_cu = 38;
+	string tr_id = 32;
+	string tr_tt = 33;
+	string tr_af = 34;
+	string tr_tx = 35;
+	string tr_sh = 36;
+	string tr_ci = 37;
+	string tr_st = 38;
+	string tr_co = 39;
+	string tr_cu = 40;
 
 	// transaction item
-	string ti_id = 39;
-	string ti_sk = 40;
-	string ti_nm = 41;
-	string ti_ca = 42;
-	string ti_pr = 43;
-	string ti_qu = 44;
-	string ti_cu = 45;
+	string ti_id = 41;
+	string ti_sk = 42;
+	string ti_nm = 43;
+	string ti_ca = 44;
+	string ti_pr = 45;
+	string ti_qu = 46;
+	string ti_cu = 47;
 
 	// screen view
-	string sv_id = 46;
-	string sv_name = 47;
+	string sv_id = 48;
+	string sv_name = 49;
 
 	// user timing
-	string ut_category = 48;
-	string ut_variable = 49;
-	string ut_timing = 50;
-	string ut_label = 51;
+	string ut_category = 50;
+	string ut_variable = 51;
+	string ut_timing = 52;
+	string ut_label = 53;
 
-	// domain
-	string vid = 52;
-	string sid = 53;
+	// domain session
+	string vid = 54;
+	string sid = 55;
 
 	// browser
-	string cookie = 54;
-	string f_pdf = 55;
-	string f_qt = 56;
-	string f_realp = 57;
-	string f_wma = 58;
-	string f_dir = 59;
-	string f_fla = 60;
-	string f_java = 61;
-	string f_gears = 62;
-	string f_ag = 63;
+	string cookie = 56;
+	string f_pdf = 57;
+	string f_qt = 58;
+	string f_realp = 59;
+	string f_wma = 60;
+	string f_dir = 61;
+	string f_fla = 62;
+	string f_java = 63;
+	string f_gears = 64;
+	string f_ag = 65;
 
 	// document
-	string ds = 64;
-	string cs = 65;
+	string ds = 66;
+	string cs = 67;
 
 	// mac
-	string mac = 66;
+	string mac = 68;
 
 	// page ping
-	string pp_mix = 67;
-	string pp_max = 68;
-	string pp_miy = 69;
-	string pp_may = 70;
+	string pp_mix = 69;
+	string pp_max = 70;
+	string pp_miy = 71;
+	string pp_may = 72;
 
 	// advertising impressions
-	string ad_ba = 71;
-	string ad_ca = 72;
-	string ad_ad = 73;
-	string ad_uid = 74;
+	string ad_ba = 73;
+	string ad_ca = 74;
+	string ad_ad = 75;
+	string ad_uid = 76;
 
 	// social interactions
-	string sa = 75;
-	string sn = 76;
-	string st = 77;
-	string sp = 78;
+	string sa = 77;
+	string sn = 78;
+	string st = 79;
+	string sp = 80;
 }
 
 // Responses
