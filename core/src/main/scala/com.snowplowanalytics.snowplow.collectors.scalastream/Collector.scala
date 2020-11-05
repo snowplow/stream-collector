@@ -18,7 +18,7 @@ import java.io.File
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.{ConnectionContext, Http, Http2}
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
@@ -30,6 +30,9 @@ import pureconfig.generic.{FieldCoproductHint, ProductHint}
 import pureconfig.generic.auto._
 import metrics._
 import model._
+import grpc._
+
+import scala.concurrent.Future
 
 // Main entry point of the Scala collector.
 trait Collector {
@@ -118,12 +121,12 @@ trait Collector {
         }
 
     def bindHttp2(
-        rs: Route,
+        handler: HttpRequest => Future[HttpResponse],
         interface: String,
         port: Int,
         connectionContext: ConnectionContext = SSLConfig.secureConnectionContext(system, AkkaSSLConfig())
     ) =
-      Http2().bindAndHandleAsync(Route.asyncHandler(rs), interface, port, connectionContext)
+      Http2().bindAndHandleAsync(handler, interface, port, connectionContext)
         .map { binding =>
           log.info(s"gRPC interface bound to ${binding.localAddress}")
         } recover { case ex =>
@@ -143,7 +146,7 @@ trait Collector {
 
     lazy val http2GrpcEndpoint =
       bindHttp2(
-        gRPCRoutes,
+        CollectorServiceHandler(new CollectorServiceImpl),
         collectorConf.interface,
         collectorConf.grpc.port
       )
