@@ -1,22 +1,19 @@
 syntax = "proto3";
 
 option go_package = "github.com/snowplow/snowplow-golang-tracker/tracker";
-option java_multiple_files = true;
-option java_package = "com.snowplowanalytics.snowplow.collectors.scalastream.grpc";
-option java_outer_classname = "CollectorServiceProto";
 
 package tracker;
 
 // Service
 
 service CollectorService {
-  rpc TrackPayload(TrackEventRequest) returns (TrackEventResponse) {}
-  rpc StreamTrackPayload(stream TrackEventRequest) returns (TrackEventResponse) {}
+  rpc TrackPayload(TrackPayloadRequest) returns (TrackPayloadResponse) {}
+  rpc StreamTrackPayload(stream TrackPayloadRequest) returns (TrackPayloadResponse) {}
 }
 
 // Requests
 
-message TrackEventRequest {
+message TrackPayloadRequest {
 	string e = 1;
 	string eid = 2;
 	string dtm = 3;
@@ -131,6 +128,6 @@ message TrackEventRequest {
 
 // Responses
 
-message TrackEventResponse {
+message TrackPayloadResponse {
 	bool success = 1;
 }
