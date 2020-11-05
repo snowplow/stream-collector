@@ -7,8 +7,8 @@ package tracker;
 // Service
 
 service CollectorService {
-  rpc TrackPayload104(TrackEventRequest) returns (TrackEventResponse) {}
-  rpc StreamTrackPayload104(stream TrackEventRequest) returns (TrackEventResponse) {}
+  rpc TrackPayload(TrackEventRequest) returns (TrackEventResponse) {}
+  rpc StreamTrackPayload(stream TrackEventRequest) returns (TrackEventResponse) {}
 }
 
 // Requests
