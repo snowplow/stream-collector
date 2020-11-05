@@ -6,7 +6,7 @@ service CollectorService {
 
 // Requests
 
-messsage TrackEventRequest {
+message TrackEventRequest {
 	repeated SelfDescribing contexts = 1;     // co
 	SelfDescribing self_describing_event = 2; // ue_pr
 
