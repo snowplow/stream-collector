@@ -1,6 +1,9 @@
 syntax = "proto3";
 
 option go_package = "github.com/snowplow/snowplow-golang-tracker/tracker";
+option java_multiple_files = true;
+option java_package = "com.snowplowanalytics.snowplow.collectors.scalastream.grpc";
+option java_outer_classname = "CollectorServiceProto";
 
 package tracker;
 
