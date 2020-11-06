@@ -19,10 +19,12 @@ import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.testkit.Specs2RouteTest
 import akka.http.scaladsl.server.Directives._
 import com.snowplowanalytics.snowplow.collectors.scalastream.model.DntCookieMatcher
+import io.opentracing.noop.NoopTracerFactory
 import org.specs2.mutable.Specification
 
 class CollectorRouteSpec extends Specification with Specs2RouteTest {
   val mkRoute = (withRedirects: Boolean) => new CollectorRoute {
+    override val tracer = NoopTracerFactory.create
     override val collectorService = new Service {
       def preflightResponse(req: HttpRequest): HttpResponse =
         HttpResponse(200, entity = "preflight response")

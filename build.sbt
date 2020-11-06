@@ -26,6 +26,12 @@ lazy val commonDependencies = Seq(
   Dependencies.Libraries.config,
   Dependencies.Libraries.prometheus,
   Dependencies.Libraries.prometheusCommon,
+  Dependencies.Libraries.opentracingApi,
+  Dependencies.Libraries.opentracingNoop,
+  Dependencies.Libraries.jaeger,
+  Dependencies.Libraries.jaegerZipkin,
+  Dependencies.Libraries.zipkin,
+  Dependencies.Libraries.zipkinSender,
   // Scala
   Dependencies.Libraries.scopt,
   Dependencies.Libraries.scalaz7,

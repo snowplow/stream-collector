@@ -142,6 +142,28 @@ package model {
     redirect: Boolean = false,
     port: Int = 443
   )
+
+  sealed trait TracerConfig
+  object TracerConfig {
+    case object Noop extends TracerConfig
+    case class Jaeger(
+      serviceName: String,
+      agentHost: Option[String],
+      agentPort: Option[Int],
+      samplerType: Option[String],
+      samplerParam: Option[Float],
+      managerHostPort: Option[String],
+      tracerTags: Map[String, String] = Map()
+    ) extends TracerConfig
+    case class Zipkin(
+      serviceName: String,
+      endpoint: String,
+      samplerType: String = "const",
+      samplerParam: Float = 1.0f,
+      tracerTags: Map[String, String] = Map()
+    ) extends TracerConfig
+  }
+
   final case class CollectorConfig(
     interface: String,
     port: Int,
@@ -157,7 +179,8 @@ package model {
     streams: StreamsConfig,
     prometheusMetrics: PrometheusMetricsConfig,
     enableDefaultRedirect: Boolean = false,
-    ssl: SSLConfig = SSLConfig()
+    ssl: SSLConfig = SSLConfig(),
+    tracer: TracerConfig = TracerConfig.Noop
   ) {
     val cookieConfig = if (cookie.enabled) Some(cookie) else None
     val doNotTrackHttpCookie =

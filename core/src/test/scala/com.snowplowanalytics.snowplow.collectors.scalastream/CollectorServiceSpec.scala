@@ -24,6 +24,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model.headers.CacheDirectives._
 
+import io.opentracing.noop.NoopTracerFactory
 import org.apache.thrift.{TDeserializer, TSerializer}
 
 import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
@@ -35,11 +36,13 @@ import model._
 class CollectorServiceSpec extends Specification {
   val service = new CollectorService(
     TestUtils.testConf,
-    CollectorSinks(new TestSink, new TestSink)
+    CollectorSinks(new TestSink, new TestSink),
+    NoopTracerFactory.create
   )
   val bouncingService = new CollectorService(
     TestUtils.testConf.copy(cookieBounce = TestUtils.testConf.cookieBounce.copy(enabled = true)),
-    CollectorSinks(new TestSink, new TestSink)
+    CollectorSinks(new TestSink, new TestSink),
+    NoopTracerFactory.create
   )
   val uuidRegex = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}".r
   val event = new CollectorPayload(
@@ -503,7 +506,8 @@ class CollectorServiceSpec extends Specification {
       "should pass on the original path if no mapping for it can be found" in {
         val service = new CollectorService(
           TestUtils.testConf.copy(paths = Map.empty[String, String]),
-          CollectorSinks(new TestSink, new TestSink)
+          CollectorSinks(new TestSink, new TestSink),
+          NoopTracerFactory.create
         )
         val expected1 = "/com.acme/track"
         val expected2 = "/com.acme/redirect"

@@ -318,6 +318,45 @@ collector {
     }
   }
 
+  # Enable Jaeger distributed tracing
+  #tracer {
+  #  enabled = jaeger
+  #  serviceName = collector
+  #
+  #  # The following are all optional, and use the Jaeger client defaults if not set.
+  #  agentHost = localhost
+  #  agentPort = 6831
+  #  managerHostPort = localhost:5778
+  #  # For sampler types see https://www.jaegertracing.io/docs/1.17/sampling/#client-sampling-configuration
+  #  samplerType = remote
+  #  samplerParam = # Not needed for remote sampler type
+  #
+  #  # Optional tags to append to the trace
+  #  tracerTags = {
+  #    tag1 = value1
+  #    tag2 = value2
+  #  }
+  #}
+
+  # Or enable Zipkin distributed tracing
+  tracer {
+    enabled = zipkin
+    serviceName = collector
+    endpoint = "http://localhost:9411/api/v2/spans"
+
+    # samplerType must be one of constant, probabilistic, or ratelimiting. Default is constant.
+    # See https://www.jaegertracing.io/docs/1.17/sampling/#client-sampling-configuration
+    # Note we use jaeger client sampling, even when we send traces to zipkin backend.
+    samplerType = ratelimiting
+    samplerParam = 2.0
+
+    # Optional tags to append to the trace
+    tracerTags = {
+      tag1 = value1
+      tag2 = value2
+    }
+  }
+
 }
 
 # Akka has a variety of possible configuration options defined at

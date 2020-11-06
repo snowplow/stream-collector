@@ -38,7 +38,8 @@ trait Collector {
   lazy val log = LoggerFactory.getLogger(getClass())
 
   implicit def hint[T] = ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
-  implicit val _ = new FieldCoproductHint[SinkConfig]("enabled")
+  implicit val sinkHint = new FieldCoproductHint[SinkConfig]("enabled")
+  implicit val tracerHint = new FieldCoproductHint[TracerConfig]("enabled")
 
   def parseConfig(args: Array[String]): (CollectorConfig, Config) = {
     case class FileConfig(config: File = new File("."))
@@ -73,8 +74,11 @@ trait Collector {
     implicit val materializer = ActorMaterializer()
     implicit val executionContext = system.dispatcher
 
+    val sharedTracer = Tracing.tracer(collectorConf.tracer)
+
     val collectorRoute = new CollectorRoute {
-      override def collectorService = new CollectorService(collectorConf, sinks)
+      override def collectorService = new CollectorService(collectorConf, sinks, sharedTracer)
+      override def tracer = sharedTracer
     }
 
     val prometheusMetricsService = new PrometheusMetricsService(collectorConf.prometheusMetrics)

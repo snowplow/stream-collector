@@ -16,14 +16,19 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.HttpCookiePair
-import akka.http.scaladsl.server.{Directive1, Route}
+import akka.http.scaladsl.server.{Directive1, Route, RouteResult}
 import akka.http.scaladsl.server.Directives._
+
+import io.opentracing.{Span, Tracer}
 
 import model.DntCookieMatcher
 import monitoring.BeanRegistry
+import scala.collection.JavaConverters._
+import scala.util.{Success, Failure}
 
 trait CollectorRoute {
   def collectorService: Service
+  def tracer: Tracer
 
   private val headers = optionalHeaderValueByName("User-Agent") &
     optionalHeaderValueByName("Referer") &
@@ -42,22 +47,78 @@ trait CollectorRoute {
       complete(StatusCodes.NotFound -> "redirects disabled")
     }
 
+  def traceRoute(inner: Span => Route): Route =
+    requestContext => {
+      val span = tracer.buildSpan("handle-request").start
+      span.setTag("http.method", requestContext.request.method.name)
+      span.setTag("http.url", requestContext.request.uri.toString)
+
+      val fut = inner(span)(requestContext)
+      fut.onComplete { result =>
+        result match {
+          case Success(RouteResult.Complete(response)) =>
+            span.setTag("http.status", response.status.intValue)
+          case Success(RouteResult.Rejected(rejections)) =>
+            span.setTag("error", result.isFailure)
+            span.log(Map("event" -> "error", "error.object" -> rejections).asJava)
+          case Failure(e) =>
+            span.setTag("error", result.isFailure)
+            span.log(Map("event" -> "error", "error.object" -> e).asJava)
+        }
+        span.finish
+      }(requestContext.executionContext)
+      fut
+    }
+
+  // Activates the span only for the local thread
+  def withActiveSpan[T](span: Span)(f: => T): T = {
+    val scope = tracer.activateSpan(span)
+    try {
+      f
+    } finally {
+      scope.close
+    }
+  }
+
   def routes: Route =
     doNotTrack(collectorService.doNotTrackCookie) { dnt =>
-      cookieIfWanted(collectorService.cookieName) { reqCookie =>
-        val cookie = reqCookie.map(_.toCookie)
-        headers { (userAgent, refererURI, rawRequestURI) =>
-          val qs = queryString(rawRequestURI)
-          extractors { (host, ip, request) =>
-            // get the adapter vendor and version from the path
-            path(Segment / Segment) { (vendor, version) =>
-              val path = collectorService.determinePath(vendor, version)
-              post {
-                extractContentType { ct =>
-                  entity(as[String]) { body =>
+      traceRoute { span =>
+        cookieIfWanted(collectorService.cookieName) { reqCookie =>
+          val cookie = reqCookie.map(_.toCookie)
+          headers { (userAgent, refererURI, rawRequestURI) =>
+            val qs = queryString(rawRequestURI)
+            extractors { (host, ip, request) =>
+              // get the adapter vendor and version from the path
+              path(Segment / Segment) { (vendor, version) =>
+                val path = collectorService.determinePath(vendor, version)
+                post {
+                  extractContentType { ct =>
+                    entity(as[String]) { body =>
+                      withActiveSpan(span) {
+                        val (r, _) = collectorService.cookie(
+                          qs,
+                          Some(body),
+                          path,
+                          cookie,
+                          userAgent,
+                          refererURI,
+                          host,
+                          ip,
+                          request,
+                          pixelExpected = false,
+                          doNotTrack = dnt,
+                          Some(ct))
+                        incrementRequests(r.status)
+                        complete(r)
+                      }
+                    }
+                  }
+                } ~
+                (get | head) {
+                  withActiveSpan(span) {
                     val (r, _) = collectorService.cookie(
                       qs,
-                      Some(body),
+                      None,
                       path,
                       cookie,
                       userAgent,
@@ -65,47 +126,32 @@ trait CollectorRoute {
                       host,
                       ip,
                       request,
-                      pixelExpected = false,
-                      doNotTrack = dnt,
-                      Some(ct))
+                      pixelExpected = true,
+                      doNotTrack = dnt)
                     incrementRequests(r.status)
                     complete(r)
                   }
                 }
               } ~
-              (get | head) {
-                val (r, _) = collectorService.cookie(
-                  qs,
-                  None,
-                  path,
-                  cookie,
-                  userAgent,
-                  refererURI,
-                  host,
-                  ip,
-                  request,
-                  pixelExpected = true,
-                  doNotTrack = dnt)
-                incrementRequests(r.status)
-                complete(r)
-              }
-            } ~
-            path("""ice\.png""".r | "i".r) { path =>
-              (get | head) {
-                val (r, _) = collectorService.cookie(
-                  qs,
-                  None,
-                  "/" + path,
-                  cookie,
-                  userAgent,
-                  refererURI,
-                  host,
-                  ip,
-                  request,
-                  pixelExpected = true,
-                  doNotTrack = dnt)
-                incrementRequests(r.status)
-                complete(r)
+              path("""ice\.png""".r | "i".r) { path =>
+                (get | head) {
+                  withActiveSpan(span) {
+                    val (r, _) = collectorService.cookie(
+                      qs,
+                      None,
+                      "/" + path,
+                      cookie,
+                      userAgent,
+                      refererURI,
+                      host,
+                      ip,
+                      request,
+                      pixelExpected = true,
+                      doNotTrack = dnt)
+                    incrementRequests(r.status)
+                    complete(r)
+                  }
+                }
               }
             }
           }
