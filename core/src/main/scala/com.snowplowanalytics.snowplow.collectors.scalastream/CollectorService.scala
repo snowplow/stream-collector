@@ -59,6 +59,7 @@ trait Service {
   def determinePath(vendor: String, version: String): String
   def enableDefaultRedirect: Boolean
   def grpcResponse(in: TrackPayloadRequest, metadata: Metadata): TrackPayloadResponse
+  // def grpcHealthCheckResponse(in: HealthCheckRequest): HealthCheckResponse
 }
 
 object CollectorService {

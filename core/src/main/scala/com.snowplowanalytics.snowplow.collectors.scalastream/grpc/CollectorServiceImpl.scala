@@ -20,4 +20,7 @@ class CollectorServiceImpl(collectorService: Service)(implicit system: ActorSyst
       case Success(_) => Success(TrackPayloadResponse(success = true))
       case Failure(_) => Success(TrackPayloadResponse(success = false))
     }
+
+  override def healthCheck(in: HealthCheckRequest, metadata: Metadata): Future[HealthCheckResponse] =
+    Future.successful(HealthCheckResponse(status = HealthCheckResponse.ServingStatus.SERVING))
 }
