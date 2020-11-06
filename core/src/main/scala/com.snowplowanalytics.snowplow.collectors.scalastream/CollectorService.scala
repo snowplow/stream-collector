@@ -231,7 +231,7 @@ class CollectorService(
   def buildEvent(in: TrackPayloadRequest, metadata: Metadata): CollectorPayload = {
     val e = new CollectorPayload(
       "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0",
-      in.ip,
+      metadata.getText("Remote-Address").getOrElse(in.ip),
       System.currentTimeMillis,
       "UTF-8",
       collector

@@ -30,7 +30,6 @@ import pureconfig.generic.{FieldCoproductHint, ProductHint}
 import pureconfig.generic.auto._
 import metrics._
 import model._
-import grpc._
 
 import scala.concurrent.Future
 
@@ -93,8 +92,6 @@ trait Collector {
       if (collectorConf.prometheusMetrics.enabled)
         metricsRoute.metricsRoute ~ metricsDirectives.logRequest(collectorRoute.collectorRoute)
       else collectorRoute.collectorRoute
-
-    val gRPCRoutes: Route = routes
 
     lazy val redirectRoutes =
       scheme("http") {
