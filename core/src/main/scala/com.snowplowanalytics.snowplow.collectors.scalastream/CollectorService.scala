@@ -15,6 +15,7 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import java.util.UUID
+import java.net.InetAddress
 
 import akka.grpc.scaladsl.Metadata
 
@@ -229,14 +230,9 @@ class CollectorService(
 
   /** Builds a raw event from a gRPC request. */
   def buildEvent(in: TrackPayloadRequest, metadata: Metadata): CollectorPayload = {
-    val ipAddress = metadata
-      .getBinary("Remote-Address")
-      .flatMap(bb => RemoteAddress(bb.toArray[Byte]).toIP)
-      .map(_.ip.getHostAddress)
-      .getOrElse(in.ip)
     val e = new CollectorPayload(
       "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0",
-      ipAddress,
+      metadata.getText("Remote-Address").getOrElse(in.ip),
       System.currentTimeMillis,
       "UTF-8",
       collector
