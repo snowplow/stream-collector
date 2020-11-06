@@ -24,15 +24,10 @@ import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.sslconfig.akka.AkkaSSLConfig
-import io.jaegertracing.{Configuration => JaegerConfiguration}
-import io.opentracing.Tracer
-import io.opentracing.noop.NoopTracerFactory
 import org.slf4j.LoggerFactory
 import pureconfig._
 import pureconfig.generic.{FieldCoproductHint, ProductHint}
 import pureconfig.generic.auto._
-import scala.collection.JavaConverters._
-
 
 import metrics._
 import model._
@@ -73,42 +68,13 @@ trait Collector {
     (loadConfigOrThrow[CollectorConfig](conf.getConfig("collector")), conf)
   }
 
-  def tracer(config: TracerConfig): Tracer =
-    config match {
-      case TracerConfig.Noop =>
-        log.debug("Using noop tracer")
-        NoopTracerFactory.create
-      case j: TracerConfig.Jaeger =>
-        log.debug("Using jaeger tracer")
-        new JaegerConfiguration(j.serviceName)
-          .withReporter {
-            val rc = new JaegerConfiguration.ReporterConfiguration
-            rc.withSender {
-              val sender = new JaegerConfiguration.SenderConfiguration
-              j.agentHost.foreach(sender.withAgentHost(_))
-              j.agentPort.foreach(sender.withAgentPort(_))
-              sender
-            }
-            rc
-          }
-          .withSampler {
-            val sampler = new JaegerConfiguration.SamplerConfiguration
-            j.samplerType.foreach(sampler.withType(_))
-            j.samplerParam.foreach(sampler.withParam(_))
-            j.managerHostPort.foreach(sampler.withManagerHostPort(_))
-            sampler
-          }
-          .withTracerTags(j.tracerTags.asJava)
-          .getTracer
-    }
-
   def run(collectorConf: CollectorConfig, akkaConf: Config, sinks: CollectorSinks): Unit = {
 
     implicit val system = ActorSystem.create("scala-stream-collector", akkaConf)
     implicit val materializer = ActorMaterializer()
     implicit val executionContext = system.dispatcher
 
-    val sharedTracer = tracer(collectorConf.tracer)
+    val sharedTracer = Tracing.tracer(collectorConf.tracer)
 
     val collectorRoute = new CollectorRoute {
       override def collectorService = new CollectorService(collectorConf, sinks, sharedTracer)

@@ -155,6 +155,13 @@ package model {
       managerHostPort: Option[String],
       tracerTags: Map[String, String] = Map()
     ) extends TracerConfig
+    case class Zipkin(
+      serviceName: String,
+      endpoint: String,
+      samplerType: String = "const",
+      samplerParam: Float = 1.0f,
+      tracerTags: Map[String, String] = Map()
+    ) extends TracerConfig
   }
 
   final case class CollectorConfig(

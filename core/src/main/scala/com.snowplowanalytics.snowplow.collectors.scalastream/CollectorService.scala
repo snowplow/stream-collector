@@ -230,7 +230,7 @@ class CollectorService(
   ): List[Array[Byte]] = {
     // Split events into Good and Bad
     val eventSplit = SplitBatch.splitAndSerializePayload(event, sinks.good.MaxBytes)
-    val span = tracer.buildSpan("SinkRawEvents").start()
+    val span = tracer.buildSpan("sink-raw-events").start()
     span.setTag("component", sinks.good.getClass.getSimpleName)
     try {
       // Send events to respective sinks

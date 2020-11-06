@@ -42,6 +42,7 @@ object Dependencies {
     val grpcCore             = "1.31.0" // force this version of lib from dependencies to mitigate secutiry vulnerabilities, TODO: update underlying libraries
     val opentracing          = "0.33.0"
     val jaeger               = "1.4.0"
+    val zipkin               = "2.16.0"
     // Scala
     val collectorPayload     = "0.0.0"
     val scalaz7              = "7.0.9"
@@ -76,6 +77,9 @@ object Dependencies {
     val opentracingApi       = "io.opentracing"                   %  "opentracing-api"         % V.opentracing
     val opentracingNoop      = "io.opentracing"                   %  "opentracing-noop"        % V.opentracing
     val jaeger               = "io.jaegertracing"                 %  "jaeger-client"           % V.jaeger
+    val jaegerZipkin         = "io.jaegertracing"                 %  "jaeger-zipkin"           % V.jaeger
+    val zipkin               = "io.zipkin.reporter2"              %  "zipkin-reporter"         % V.zipkin
+    val zipkinSender         = "io.zipkin.reporter2"              %  "zipkin-sender-okhttp3"   % V.zipkin
     val retry                = "com.softwaremill.retry"           %% "retry"                   % V.retry
 
     // Scala

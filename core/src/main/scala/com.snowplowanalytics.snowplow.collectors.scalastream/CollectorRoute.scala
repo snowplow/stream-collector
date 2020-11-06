@@ -49,7 +49,7 @@ trait CollectorRoute {
 
   def traceRoute(inner: Span => Route): Route =
     requestContext => {
-      val span = tracer.buildSpan("HandleRequest").start
+      val span = tracer.buildSpan("handle-request").start
       span.setTag("http.method", requestContext.request.method.name)
       span.setTag("http.url", requestContext.request.uri.toString)
 
