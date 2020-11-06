@@ -244,6 +244,7 @@ class CollectorService(
     e.userAgent = metadata.getText("User-Agent").getOrElse(in.ua)
     e.refererUri = in.refr
     e.networkUserId = if (in.tnuid.nonEmpty) in.tnuid else UUID.randomUUID().toString
+    e.contentType = "application/json; charset=utf-8"
     e
   }
 
