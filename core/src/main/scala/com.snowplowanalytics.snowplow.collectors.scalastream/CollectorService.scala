@@ -145,6 +145,7 @@ class CollectorService(
   }
 
   override def grpcResponse(in: TrackPayloadRequest, metadata: Metadata): TrackPayloadResponse = {
+    logger.warn(metadata.asList.toString())
     val event: CollectorPayload = buildEvent(in, metadata)
     val partitionKey: String = if (in.ip.nonEmpty) in.ip else UUID.randomUUID().toString
     sinkEvent(event, partitionKey)
@@ -232,7 +233,7 @@ class CollectorService(
   def buildEvent(in: TrackPayloadRequest, metadata: Metadata): CollectorPayload = {
     val e = new CollectorPayload(
       "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0",
-      metadata.getText("Remote-Address").getOrElse(in.ip),
+      in.ip match { case "" => metadata.getText("Remote-Address").getOrElse("") case ip => ip },
       System.currentTimeMillis,
       "UTF-8",
       collector
@@ -243,7 +244,7 @@ class CollectorService(
     val payloadDataSchemaKey = "iglu:com.snowplowanalytics.snowplow/payload_data/jsonschema/1-0-4"
     e.path = "com.snowplowanalytics.snowplow/tp2"
     e.body = s"""{ "schema":"$payloadDataSchemaKey", "data":[${json}]}"""
-    e.userAgent = metadata.getText("User-Agent").getOrElse(in.ua)
+    e.userAgent = in.ua match { case "" => metadata.getText("User-Agent").getOrElse("") case ua => ua }
     e.refererUri = in.refr
     e.contentType = "application/json; charset=utf-8"
     e
