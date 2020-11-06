@@ -239,6 +239,7 @@ class CollectorService(
       collector
     )
     val payloadDataSchemaKey = "iglu:com.snowplowanalytics.snowplow/payload_data/jsonschema/1-0-4"
+    e.path = "com.snowplowanalytics.snowplow/tp2"
     e.body = s"""{ "schema":"$payloadDataSchemaKey", "data":[${JsonFormat.toJsonString(in)}]}"""
     e.userAgent = metadata.getText("User-Agent").getOrElse(in.ua)
     e.refererUri = in.refr
