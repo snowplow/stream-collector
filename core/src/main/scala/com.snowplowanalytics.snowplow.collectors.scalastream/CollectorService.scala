@@ -145,7 +145,6 @@ class CollectorService(
   }
 
   override def grpcResponse(in: TrackPayloadRequest, metadata: Metadata): TrackPayloadResponse = {
-    logger.warn(metadata.asList.toString())
     val event: CollectorPayload = buildEvent(in, metadata)
     val partitionKey: String = if (in.ip.nonEmpty) in.ip else UUID.randomUUID().toString
     sinkEvent(event, partitionKey)
