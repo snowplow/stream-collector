@@ -1,6 +1,5 @@
 syntax = "proto3";
 
-option go_package = "github.com/snowplow/snowplow-golang-tracker/tracker";
 option java_multiple_files = true;
 option java_package = "com.snowplowanalytics.snowplow.collectors.scalastream.grpc";
 option java_outer_classname = "CollectorServiceProto";
@@ -82,63 +81,49 @@ message TrackPayloadRequest {
 	string ti_qu = 46;
 	string ti_cu = 47;
 
-	// screen view
-	string sv_id = 48;
-	string sv_name = 49;
-
-	// user timing
-	string ut_category = 50;
-	string ut_variable = 51;
-	string ut_timing = 52;
-	string ut_label = 53;
-
 	// domain session
-	string vid = 54;
-	string sid = 55;
+	string vid = 48;
+	string sid = 49;
 
 	// browser
-	string cookie = 56;
-	string f_pdf = 57;
-	string f_qt = 58;
-	string f_realp = 59;
-	string f_wma = 60;
-	string f_dir = 61;
-	string f_fla = 62;
-	string f_java = 63;
-	string f_gears = 64;
-	string f_ag = 65;
+	string cookie = 50;
+	string f_pdf = 51;
+	string f_qt = 52;
+	string f_realp = 53;
+	string f_wma = 54;
+	string f_dir = 55;
+	string f_fla = 56;
+	string f_java = 57;
+	string f_gears = 58;
+	string f_ag = 59;
 
 	// document
-	string ds = 66;
-	string cs = 67;
+	string ds = 60;
+	string cs = 61;
 
 	// mac
-	string mac = 68;
+	string mac = 62;
 
 	// page ping
-	string pp_mix = 69;
-	string pp_max = 70;
-	string pp_miy = 71;
-	string pp_may = 72;
+	string pp_mix = 63;
+	string pp_max = 64;
+	string pp_miy = 65;
+	string pp_may = 66;
 
 	// advertising impressions
-	string ad_ba = 73;
-	string ad_ca = 74;
-	string ad_ad = 75;
-	string ad_uid = 76;
+	string ad_ba = 67;
+	string ad_ca = 68;
+	string ad_ad = 69;
+	string ad_uid = 70;
 
 	// social interactions
-	string sa = 77;
-	string sn = 78;
-	string st = 79;
-	string sp = 80;
+	string sa = 71;
+	string sn = 72;
+	string st = 73;
+	string sp = 74;
 }
 
 // Responses
-
-message TrackPayloadResponse {
-	bool success = 1;
-}
 
 message HealthCheckResponse {
 	enum ServingStatus {
@@ -148,3 +133,8 @@ message HealthCheckResponse {
 	}
 	ServingStatus status = 1;
 }
+
+message TrackPayloadResponse {
+	bool success = 1;
+}
+
