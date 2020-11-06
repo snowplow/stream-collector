@@ -10,12 +10,16 @@ package tracker;
 // Service
 
 service CollectorService {
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse) {}
   rpc TrackPayload(TrackPayloadRequest) returns (TrackPayloadResponse) {}
   rpc StreamTrackPayload(stream TrackPayloadRequest) returns (TrackPayloadResponse) {}
-  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse) {}
 }
 
 // Requests
+
+message HealthCheckRequest {
+	string service = 1;
+}
 
 message TrackPayloadRequest {
 	string e = 1;
@@ -130,10 +134,6 @@ message TrackPayloadRequest {
 	string sp = 80;
 }
 
-message HealthCheckRequest {
-  string service = 1;
-}
-
 // Responses
 
 message TrackPayloadResponse {
@@ -141,11 +141,10 @@ message TrackPayloadResponse {
 }
 
 message HealthCheckResponse {
-  enum ServingStatus {
-    UNKNOWN = 0;
-    SERVING = 1;
-    NOT_SERVING = 2;
-    SERVICE_UNKNOWN = 3;  // Used only by the Watch method.
-  }
-  ServingStatus status = 1;
+	enum ServingStatus {
+		UNKNOWN = 0;
+		SERVING = 1;
+		NOT_SERVING = 2;
+	}
+	ServingStatus status = 1;
 }

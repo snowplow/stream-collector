@@ -12,6 +12,9 @@ import scala.util.{Failure, Success}
 class CollectorServiceImpl(collectorService: Service)(implicit system: ActorSystem) extends CollectorServicePowerApi {
   implicit val ec: ExecutionContext = system.dispatcher
 
+  override def healthCheck(in: HealthCheckRequest, metadata: Metadata): Future[HealthCheckResponse] =
+    Future.successful(HealthCheckResponse(status = HealthCheckResponse.ServingStatus.SERVING))
+
   override def trackPayload(in: TrackPayloadRequest, metadata: Metadata): Future[TrackPayloadResponse] =
     Future.successful(collectorService.grpcResponse(in, metadata))
 
