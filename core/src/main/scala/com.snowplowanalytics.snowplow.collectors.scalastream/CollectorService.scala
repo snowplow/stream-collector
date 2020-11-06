@@ -16,6 +16,8 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import java.util.UUID
 
+import akka.grpc.scaladsl.Metadata
+
 import scala.collection.JavaConverters._
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
@@ -25,7 +27,6 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.grpc._
 import org.apache.commons.codec.binary.Base64
 import org.slf4j.LoggerFactory
 import scalapb.json4s.JsonFormat
-
 import generated.BuildInfo
 import model._
 import utils.SplitBatch
@@ -56,7 +57,7 @@ trait Service {
   def doNotTrackCookie: Option[DntCookieMatcher]
   def determinePath(vendor: String, version: String): String
   def enableDefaultRedirect: Boolean
-  def grpcResponse(in: TrackPayloadRequest): TrackPayloadResponse
+  def grpcResponse(in: TrackPayloadRequest, metadata: Metadata): TrackPayloadResponse
 }
 
 object CollectorService {
@@ -142,8 +143,8 @@ class CollectorService(
     (httpResponse, badRedirectResponses ++ sinkResponses)
   }
 
-  override def grpcResponse(in: TrackPayloadRequest): TrackPayloadResponse = {
-    val event: CollectorPayload = buildEvent(in)
+  override def grpcResponse(in: TrackPayloadRequest, metadata: Metadata): TrackPayloadResponse = {
+    val event: CollectorPayload = buildEvent(in, metadata)
     val partitionKey: String = if (in.ip.nonEmpty) in.ip else UUID.randomUUID().toString
     sinkEvent(event, partitionKey)
     TrackPayloadResponse.of(true)
@@ -227,7 +228,7 @@ class CollectorService(
   }
 
   /** Builds a raw event from a gRPC request. */
-  def buildEvent(in: TrackPayloadRequest): CollectorPayload = {
+  def buildEvent(in: TrackPayloadRequest, metadata: Metadata): CollectorPayload = {
     val e = new CollectorPayload(
       "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0",
       in.ip,
@@ -237,7 +238,7 @@ class CollectorService(
     )
     val payloadDataSchemaKey = "iglu:com.snowplowanalytics.snowplow/payload_data/jsonschema/1-0-4"
     e.body = s"""{ "schema":"$payloadDataSchemaKey", "data":[${JsonFormat.toJsonString(in)}]}"""
-    e.userAgent = in.ua
+    e.userAgent = metadata.getText("User-Agent").getOrElse(in.ua)
     e.refererUri = in.refr
     e.networkUserId = if (in.tnuid.nonEmpty) in.tnuid else UUID.randomUUID().toString
     e

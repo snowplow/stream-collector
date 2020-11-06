@@ -19,7 +19,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.HttpCookiePair
 import akka.http.scaladsl.server.{Directive1, Route}
 import akka.http.scaladsl.server.Directives._
-import com.snowplowanalytics.snowplow.collectors.scalastream.grpc.{CollectorServiceHandler, CollectorServiceImpl}
+import com.snowplowanalytics.snowplow.collectors.scalastream.grpc.{CollectorServiceImpl, CollectorServicePowerApiHandler}
 import model.DntCookieMatcher
 import monitoring.BeanRegistry
 
@@ -39,7 +39,7 @@ trait CollectorRoute {
     if (collectorService.enableDefaultRedirect) routes else rejectRedirect ~ routes
 
   def gRPCHandler(implicit actorSystem: ActorSystem) =
-    CollectorServiceHandler(new CollectorServiceImpl(collectorService))
+    CollectorServicePowerApiHandler(new CollectorServiceImpl(collectorService))
 
   def rejectRedirect: Route =
     path("r" / Segment) { _ =>

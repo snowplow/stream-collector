@@ -61,6 +61,11 @@ lazy val dockerSettings = Seq(
   dockerUpdateLatest := true
 )
 
+lazy val akkaGrpcSettings = Seq(
+  akkaGrpcGeneratedSources := Seq(AkkaGrpc.Server),
+  akkaGrpcCodeGeneratorSettings += "server_power_apis"
+)
+
 lazy val allSettings = buildSettings ++
   BuildSettings.sbtAssemblySettings ++
   BuildSettings.formatting ++
@@ -73,7 +78,7 @@ lazy val root = project.in(file("."))
 
 lazy val core = project
   .settings(moduleName := "snowplow-stream-collector-core")
-  .settings(buildSettings)
+  .settings(buildSettings ++ akkaGrpcSettings)
   .settings(libraryDependencies ++= commonDependencies)
   .enablePlugins(BuildInfoPlugin, AkkaGrpcPlugin)
   .settings(
