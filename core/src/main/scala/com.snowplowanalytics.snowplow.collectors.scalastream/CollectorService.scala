@@ -238,9 +238,12 @@ class CollectorService(
       "UTF-8",
       collector
     )
+    val json = new scalapb.json4s.Printer(
+      preservingProtoFieldNames = true
+    ).print(in)
     val payloadDataSchemaKey = "iglu:com.snowplowanalytics.snowplow/payload_data/jsonschema/1-0-4"
     e.path = "com.snowplowanalytics.snowplow/tp2"
-    e.body = s"""{ "schema":"$payloadDataSchemaKey", "data":[${JsonFormat.toJsonString(in)}]}"""
+    e.body = s"""{ "schema":"$payloadDataSchemaKey", "data":[${json}]}"""
     e.userAgent = metadata.getText("User-Agent").getOrElse(in.ua)
     e.refererUri = in.refr
     e.networkUserId = if (in.tnuid.nonEmpty) in.tnuid else UUID.randomUUID().toString
