@@ -59,7 +59,6 @@ trait Service {
   def determinePath(vendor: String, version: String): String
   def enableDefaultRedirect: Boolean
   def grpcResponse(in: TrackPayloadRequest, metadata: Metadata): TrackPayloadResponse
-  // def grpcHealthCheckResponse(in: HealthCheckRequest): HealthCheckResponse
 }
 
 object CollectorService {
@@ -246,7 +245,6 @@ class CollectorService(
     e.body = s"""{ "schema":"$payloadDataSchemaKey", "data":[${json}]}"""
     e.userAgent = metadata.getText("User-Agent").getOrElse(in.ua)
     e.refererUri = in.refr
-    e.networkUserId = if (in.tnuid.nonEmpty) in.tnuid else UUID.randomUUID().toString
     e.contentType = "application/json; charset=utf-8"
     e
   }
