@@ -14,10 +14,12 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
+import akka.grpc.scaladsl.Metadata
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.testkit.Specs2RouteTest
 import akka.http.scaladsl.server.Directives._
+import com.snowplowanalytics.snowplow.collectors.scalastream.grpc.{TrackPayloadRequest, TrackPayloadResponse}
 import com.snowplowanalytics.snowplow.collectors.scalastream.model.DntCookieMatcher
 import org.specs2.mutable.Specification
 
@@ -46,6 +48,7 @@ class CollectorRouteSpec extends Specification with Specs2RouteTest {
       def doNotTrackCookie: Option[DntCookieMatcher] = None
       def determinePath(vendor: String, version: String): String = "/p1/p2"
       def enableDefaultRedirect = withRedirects
+      def grpcResponse(in: TrackPayloadRequest, metadata: Metadata): TrackPayloadResponse = TrackPayloadResponse(true)
     }
   }
   val route = mkRoute(true)
