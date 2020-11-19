@@ -29,21 +29,21 @@ object KinesisCollector extends Collector {
     val sinks: Either[Throwable, CollectorSinks] = for {
       kc <- collectorConf.streams.sink match {
         case kc: Kinesis => kc.asRight
-        case _ => new IllegalArgumentException("Configured sink is not Kinesis").asLeft
+        case _           => new IllegalArgumentException("Configured sink is not Kinesis").asLeft
       }
-      es = new ScheduledThreadPoolExecutor(kc.threadPoolSize)
+      es         = new ScheduledThreadPoolExecutor(kc.threadPoolSize)
       goodStream = collectorConf.streams.good
-      badStream = collectorConf.streams.bad
+      badStream  = collectorConf.streams.bad
       bufferConf = collectorConf.streams.buffer
-      sqsGood = kc.sqsGoodBuffer
-      sqsBad = kc.sqsBadBuffer
+      sqsGood    = kc.sqsGoodBuffer
+      sqsBad     = kc.sqsBadBuffer
       good <- KinesisSink.createAndInitialize(kc, bufferConf, goodStream, sqsGood, es)
-      bad <- KinesisSink.createAndInitialize(kc, bufferConf, badStream, sqsBad, es)
+      bad  <- KinesisSink.createAndInitialize(kc, bufferConf, badStream, sqsBad, es)
     } yield CollectorSinks(good, bad)
 
     sinks match {
       case Right(s) => run(collectorConf, akkaConf, s)
-      case Left(e) => throw e
+      case Left(e)  => throw e
     }
   }
 }

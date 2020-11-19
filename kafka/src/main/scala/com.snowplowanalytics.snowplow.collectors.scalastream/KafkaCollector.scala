@@ -22,7 +22,7 @@ object KafkaCollector extends Collector {
     val (collectorConf, akkaConf) = parseConfig(args)
     val sinks = {
       val goodStream = collectorConf.streams.good
-      val badStream = collectorConf.streams.bad
+      val badStream  = collectorConf.streams.bad
       val bufferConf = collectorConf.streams.buffer
       val (good, bad) = collectorConf.streams.sink match {
         case kc: Kafka =>

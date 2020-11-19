@@ -38,7 +38,7 @@ trait Collector {
   lazy val log = LoggerFactory.getLogger(getClass())
 
   implicit def hint[T] = ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
-  implicit val _ = new FieldCoproductHint[SinkConfig]("enabled")
+  implicit val _       = new FieldCoproductHint[SinkConfig]("enabled")
 
   def parseConfig(args: Array[String]): (CollectorConfig, Config) = {
     case class FileConfig(config: File = new File("."))
@@ -46,7 +46,9 @@ trait Collector {
       head(generated.BuildInfo.name, generated.BuildInfo.version)
       help("help")
       version("version")
-      opt[File]("config").required().valueName("<filename>")
+      opt[File]("config")
+        .required()
+        .valueName("<filename>")
         .action((f: File, c: FileConfig) => c.copy(f))
         .validate(f =>
           if (f.exists) success
@@ -69,8 +71,8 @@ trait Collector {
 
   def run(collectorConf: CollectorConfig, akkaConf: Config, sinks: CollectorSinks): Unit = {
 
-    implicit val system = ActorSystem.create("scala-stream-collector", akkaConf)
-    implicit val materializer = ActorMaterializer()
+    implicit val system           = ActorSystem.create("scala-stream-collector", akkaConf)
+    implicit val materializer     = ActorMaterializer()
     implicit val executionContext = system.dispatcher
 
     val collectorRoute = new CollectorRoute {
@@ -103,28 +105,34 @@ trait Collector {
       }
 
     def bind(
-        rs: Route,
-        interface: String,
-        port: Int,
-        connectionContext: ConnectionContext = ConnectionContext.noEncryption()
+      rs: Route,
+      interface: String,
+      port: Int,
+      connectionContext: ConnectionContext = ConnectionContext.noEncryption()
     ) =
-      Http().bindAndHandle(rs, interface, port, connectionContext)
+      Http()
+        .bindAndHandle(rs, interface, port, connectionContext)
         .map { binding =>
           log.info(s"REST interface bound to ${binding.localAddress}")
-        } recover { case ex =>
-          log.error( "REST interface could not be bound to " +
-            s"${collectorConf.interface}:${collectorConf.port}", ex.getMessage)
+        }
+        .recover {
+          case ex =>
+            log.error(
+              "REST interface could not be bound to " +
+                s"${collectorConf.interface}:${collectorConf.port}",
+              ex.getMessage
+            )
         }
 
     lazy val secureEndpoint =
-      bind(routes,
-           collectorConf.interface,
-           collectorConf.ssl.port,
-           SSLConfig.secureConnectionContext(system, AkkaSSLConfig())
+      bind(
+        routes,
+        collectorConf.interface,
+        collectorConf.ssl.port,
+        SSLConfig.secureConnectionContext(system, AkkaSSLConfig())
       )
 
-    lazy val unsecureEndpoint = (routes: Route) =>
-      bind(routes, collectorConf.interface, collectorConf.port)
+    lazy val unsecureEndpoint = (routes: Route) => bind(routes, collectorConf.interface, collectorConf.port)
 
     collectorConf.ssl match {
       case SSLConfig(true, true, _) =>

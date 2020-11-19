@@ -31,26 +31,26 @@ import sinks.Sink
 package model {
 
   /**
-   * Case class for holding both good and
-   * bad sinks for the Stream Collector.
-   */
+    * Case class for holding both good and
+    * bad sinks for the Stream Collector.
+    */
   final case class CollectorSinks(good: Sink, bad: Sink)
 
   /**
-   * Case class for holding the results of
-   * splitAndSerializePayload.
-   *
-   * @param good All good results
-   * @param bad All bad results
-   */
+    * Case class for holding the results of
+    * splitAndSerializePayload.
+    *
+    * @param good All good results
+    * @param bad All bad results
+    */
   final case class EventSerializeResult(good: List[Array[Byte]], bad: List[Array[Byte]])
 
   /**
-   * Class for the result of splitting a too-large array of events in the body of a POST request
-   *
-   * @param goodBatches List of batches of events
-   * @param failedBigEvents List of events that were too large
-   */
+    * Class for the result of splitting a too-large array of events in the body of a POST request
+    *
+    * @param goodBatches List of batches of events
+    * @param failedBigEvents List of events that were too large
+    */
   final case class SplitBatchResult(goodBatches: List[List[Json]], failedBigEvents: List[Json])
 
   final case class CookieConfig(
@@ -69,7 +69,7 @@ package model {
     value: String
   )
   final case class DntCookieMatcher(name: String, value: String) {
-    private val pattern = value.r.pattern
+    private val pattern                                  = value.r.pattern
     def matches(httpCookiePair: HttpCookiePair): Boolean = pattern.matcher(httpCookiePair.value).matches()
   }
   final case class CookieBounceConfig(
@@ -86,7 +86,7 @@ package model {
     enabled: Boolean,
     statusCode: Int,
     headers: Map[String, String] = Map.empty[String, String],
-    body: String = ""
+    body: String                 = ""
   )
   final case class P3PConfig(policyRef: String, CP: String)
   final case class CrossDomainConfig(enabled: Boolean, domains: List[String], secure: Boolean)
@@ -110,8 +110,8 @@ package model {
     sqsBadBuffer: Option[String]
   ) extends SinkConfig {
     val endpoint = customEndpoint.getOrElse(region match {
-      case cn@"cn-north-1" => s"https://kinesis.$cn.amazonaws.com.cn"
-      case _ => s"https://kinesis.$region.amazonaws.com"
+      case cn @ "cn-north-1" => s"https://kinesis.$cn.amazonaws.com.cn"
+      case _                 => s"https://kinesis.$region.amazonaws.com"
     })
   }
   final case class GooglePubSub(
@@ -121,7 +121,7 @@ package model {
   final case class Kafka(
     brokers: String,
     retries: Int,
-    producerConf: Option[Map[String,String]]
+    producerConf: Option[Map[String, String]]
   ) extends SinkConfig
   final case class Nsq(host: String, port: Int) extends SinkConfig
   case object Stdout extends SinkConfig
@@ -138,9 +138,9 @@ package model {
     durationBucketsInSeconds: Option[List[Double]]
   )
   final case class SSLConfig(
-    enable: Boolean = false,
+    enable: Boolean   = false,
     redirect: Boolean = false,
-    port: Int = 443
+    port: Int         = 443
   )
   final case class CollectorConfig(
     interface: String,
@@ -157,7 +157,7 @@ package model {
     streams: StreamsConfig,
     prometheusMetrics: PrometheusMetricsConfig,
     enableDefaultRedirect: Boolean = false,
-    ssl: SSLConfig = SSLConfig()
+    ssl: SSLConfig                 = SSLConfig()
   ) {
     val cookieConfig = if (cookie.enabled) Some(cookie) else None
     val doNotTrackHttpCookie =
@@ -166,9 +166,9 @@ package model {
       else
         None
 
-    def cookieName = cookieConfig.map(_.name)
-    def cookieDomain = cookieConfig.flatMap(_.domains)
-    def fallbackDomain = cookieConfig.flatMap(_.fallbackDomain)
+    def cookieName       = cookieConfig.map(_.name)
+    def cookieDomain     = cookieConfig.flatMap(_.domains)
+    def fallbackDomain   = cookieConfig.flatMap(_.fallbackDomain)
     def cookieExpiration = cookieConfig.map(_.expiration)
   }
 
@@ -180,7 +180,7 @@ package model {
         sslConfig.validateDefaultTrustManager(config)
         SSLContext.getDefault
       } else {
-        val mkLogger = new AkkaLoggerFactory(system)
+        val mkLogger            = new AkkaLoggerFactory(system)
         val keyManagerFactory   = sslConfig.buildKeyManagerFactory(config)
         val trustManagerFactory = sslConfig.buildTrustManagerFactory(config)
         new ConfigSSLContextBuilder(mkLogger, config, keyManagerFactory, trustManagerFactory).build()

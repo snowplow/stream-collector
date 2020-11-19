@@ -24,14 +24,16 @@ trait MetricsRoute {
 
   def metricsRoute: Route =
     (path("metrics") & get) {
-      complete(HttpResponse(
-        StatusCodes.OK,
-        entity = HttpEntity.Strict(MetricsRoute.`text/plain(UTF-8) v0.0.4`, ByteString(metricsService.report()))
-      ))
+      complete(
+        HttpResponse(
+          StatusCodes.OK,
+          entity = HttpEntity.Strict(MetricsRoute.`text/plain(UTF-8) v0.0.4`, ByteString(metricsService.report()))
+        )
+      )
     }
 }
 
 object MetricsRoute {
   val `text/plain(UTF-8) v0.0.4`: ContentType.WithCharset =
-    MediaTypes.`text/plain` withParams Map("version" -> "0.0.4") withCharset HttpCharsets.`UTF-8`
+    MediaTypes.`text/plain`.withParams(Map("version" -> "0.0.4")).withCharset(HttpCharsets.`UTF-8`)
 }

@@ -22,8 +22,8 @@ import org.apache.kafka.clients.producer._
 import model._
 
 /**
- * Kafka Sink for the Scala collector
- */
+  * Kafka Sink for the Scala collector
+  */
 class KafkaSink(
   kafkaConfig: Kafka,
   bufferConfig: BufferConfig,
@@ -36,11 +36,11 @@ class KafkaSink(
   private val kafkaProducer = createProducer
 
   /**
-   * Creates a new Kafka Producer with the given
-   * configuration options
-   *
-   * @return a new Kafka Producer
-   */
+    * Creates a new Kafka Producer with the given
+    * configuration options
+    *
+    * @return a new Kafka Producer
+    */
   private def createProducer: KafkaProducer[String, Array[Byte]] = {
 
     log.info(s"Create Kafka Producer to brokers: ${kafkaConfig.brokers}")
@@ -60,11 +60,11 @@ class KafkaSink(
   }
 
   /**
-   * Store raw events to the topic
-   *
-   * @param events The list of events to send
-   * @param key The partition key to use
-   */
+    * Store raw events to the topic
+    *
+    * @param events The list of events to send
+    * @param key The partition key to use
+    */
   override def storeRawEvents(events: List[Array[Byte]], key: String): List[Array[Byte]] = {
     log.debug(s"Writing ${events.size} Thrift records to Kafka topic $topicName at key $key")
     events.foreach { event =>

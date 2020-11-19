@@ -21,11 +21,11 @@ import model._
 object TestUtils {
   val testConf = CollectorConfig(
     interface = "0.0.0.0",
-    port = 8080,
+    port      = 8080,
     paths = Map(
-      "/com.acme/track" -> "/com.snowplowanalytics.snowplow/tp2",
+      "/com.acme/track"    -> "/com.snowplowanalytics.snowplow/tp2",
       "/com.acme/redirect" -> "/r/tp2",
-      "/com.acme/iglu" -> "/com.snowplowanalytics.iglu/v1"
+      "/com.acme/iglu"     -> "/com.snowplowanalytics.iglu/v1"
     ),
     p3p = P3PConfig("/w3c/p3p.xml", "NOI DSP COR NID PSA OUR IND COM NAV STA"),
     CrossDomainConfig(enabled = true, List("*"), secure = false),
@@ -35,27 +35,27 @@ object TestUtils {
       365.days,
       None,
       None,
-      secure = false,
+      secure   = false,
       httpOnly = false,
       sameSite = None
     ),
     doNotTrackCookie = DoNotTrackCookieConfig(false, "abc", "123"),
-    cookieBounce = CookieBounceConfig(false, "bounce", "new-nuid", None),
-    redirectMacro = RedirectMacroConfig(false, None),
-    rootResponse = RootResponseConfig(false, 404),
-    cors = CORSConfig(-1.seconds),
+    cookieBounce     = CookieBounceConfig(false, "bounce", "new-nuid", None),
+    redirectMacro    = RedirectMacroConfig(false, None),
+    rootResponse     = RootResponseConfig(false, 404),
+    cors             = CORSConfig(-1.seconds),
     streams = StreamsConfig(
-      good = "good",
-      bad = "bad",
+      good                       = "good",
+      bad                        = "bad",
       useIpAddressAsPartitionKey = false,
       sink = Kinesis(
-        region = "us-east-1",
+        region         = "us-east-1",
         threadPoolSize = 12,
-        aws = AWSConfig("cpf", "cpf"),
-        backoffPolicy = KinesisBackoffPolicyConfig(3000L, 60000L),
+        aws            = AWSConfig("cpf", "cpf"),
+        backoffPolicy  = KinesisBackoffPolicyConfig(3000L, 60000L),
         customEndpoint = None,
-        sqsGoodBuffer = Some("good-buffer"),
-        sqsBadBuffer = Some("bad-buffer")
+        sqsGoodBuffer  = Some("good-buffer"),
+        sqsBadBuffer   = Some("bad-buffer")
       ),
       buffer = BufferConfig(4000000L, 500L, 60000L)
     ),
