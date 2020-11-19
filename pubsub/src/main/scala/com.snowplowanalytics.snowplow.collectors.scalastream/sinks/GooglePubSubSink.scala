@@ -41,20 +41,19 @@ object GooglePubSubSink {
       batching <- batchingSettings(bufferConfig).asRight
       retry = retrySettings(googlePubSubConfig.backoffPolicy)
       publisher <- createPublisher(googlePubSubConfig.googleProjectId, topicName, batching, retry)
-      _ <- topicExists(googlePubSubConfig.googleProjectId, topicName)
-        .flatMap { b =>
-          if (b) b.asRight
-          else new IllegalArgumentException(s"Google PubSub topic $topicName doesn't exist").asLeft
-        }
+      _ <- topicExists(googlePubSubConfig.googleProjectId, topicName).flatMap { b =>
+        if (b) b.asRight
+        else new IllegalArgumentException(s"Google PubSub topic $topicName doesn't exist").asLeft
+      }
     } yield new GooglePubSubSink(publisher, topicName)
 
   private val UserAgent = s"snowplow/stream-enrich-${generated.BuildInfo.version}"
 
   /**
-   * Instantiates a Publisher on an existing topic with the given configuration options.
-   * This can fail if the publisher can't be created.
-   * @return a PubSub publisher or an error
-   */
+    * Instantiates a Publisher on an existing topic with the given configuration options.
+    * This can fail if the publisher can't be created.
+    * @return a PubSub publisher or an error
+    */
   private def createPublisher(
     projectId: String,
     topicName: String,
@@ -104,30 +103,28 @@ object GooglePubSubSink {
 }
 
 /**
- * Google PubSub Sink for the Scala collector
- */
+  * Google PubSub Sink for the Scala collector
+  */
 class GooglePubSubSink private (publisher: Publisher, topicName: String) extends Sink {
 
   // maximum size of a pubsub message is 10MB
   override val MaxBytes: Int = 10000000
 
   /**
-   * Convert event bytes to a PubsubMessage to be published
-   * @param event Event to be converted
-   * @return a PubsubMessage
-   */
+    * Convert event bytes to a PubsubMessage to be published
+    * @param event Event to be converted
+    * @return a PubsubMessage
+    */
   private def eventToPubsubMessage(event: Array[Byte]): PubsubMessage =
-    PubsubMessage.newBuilder
-      .setData(ByteString.copyFrom(event))
-      .build()
+    PubsubMessage.newBuilder.setData(ByteString.copyFrom(event)).build()
 
   private val logExecutor = Executors.newSingleThreadExecutor()
 
   /**
-   * Store raw events in the PubSub topic
-   * @param events The list of events to send
-   * @param key Not used.
-   */
+    * Store raw events in the PubSub topic
+    * @param events The list of events to send
+    * @param key Not used.
+    */
   override def storeRawEvents(events: List[Array[Byte]], key: String): List[Array[Byte]] = {
     if (events.nonEmpty)
       log.debug(s"Writing ${events.size} Thrift records to Google PubSub topic ${topicName}")

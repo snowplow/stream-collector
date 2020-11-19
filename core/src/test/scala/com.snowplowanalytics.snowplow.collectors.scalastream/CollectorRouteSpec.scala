@@ -22,33 +22,34 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.model.DntCookieMatc
 import org.specs2.mutable.Specification
 
 class CollectorRouteSpec extends Specification with Specs2RouteTest {
-  val mkRoute = (withRedirects: Boolean) => new CollectorRoute {
-    override val collectorService = new Service {
-      def preflightResponse(req: HttpRequest): HttpResponse =
-        HttpResponse(200, entity = "preflight response")
-      def flashCrossDomainPolicy: HttpResponse = HttpResponse(200, entity = "flash cross domain")
-      def rootResponse: HttpResponse = HttpResponse(200, entity = "200 collector root")
-      def cookie(
-        queryString: Option[String],
-        body: Option[String],
-        path: String,
-        cookie: Option[HttpCookie],
-        userAgent: Option[String],
-        refererUri: Option[String],
-        hostname: String,
-        ip: RemoteAddress,
-        request: HttpRequest,
-        pixelExpected: Boolean,
-        doNotTrack: Boolean,
-        contentType: Option[ContentType] = None
-      ): (HttpResponse, List[Array[Byte]]) = (HttpResponse(200, entity = s"cookie"), List.empty)
-      def cookieName: Option[String] = Some("name")
-      def doNotTrackCookie: Option[DntCookieMatcher] = None
-      def determinePath(vendor: String, version: String): String = "/p1/p2"
-      def enableDefaultRedirect = withRedirects
+  val mkRoute = (withRedirects: Boolean) =>
+    new CollectorRoute {
+      override val collectorService = new Service {
+        def preflightResponse(req: HttpRequest): HttpResponse =
+          HttpResponse(200, entity = "preflight response")
+        def flashCrossDomainPolicy: HttpResponse = HttpResponse(200, entity = "flash cross domain")
+        def rootResponse: HttpResponse           = HttpResponse(200, entity = "200 collector root")
+        def cookie(
+          queryString: Option[String],
+          body: Option[String],
+          path: String,
+          cookie: Option[HttpCookie],
+          userAgent: Option[String],
+          refererUri: Option[String],
+          hostname: String,
+          ip: RemoteAddress,
+          request: HttpRequest,
+          pixelExpected: Boolean,
+          doNotTrack: Boolean,
+          contentType: Option[ContentType] = None
+        ): (HttpResponse, List[Array[Byte]])                       = (HttpResponse(200, entity = s"cookie"), List.empty)
+        def cookieName: Option[String]                             = Some("name")
+        def doNotTrackCookie: Option[DntCookieMatcher]             = None
+        def determinePath(vendor: String, version: String): String = "/p1/p2"
+        def enableDefaultRedirect                                  = withRedirects
+      }
     }
-  }
-  val route = mkRoute(true)
+  val route                 = mkRoute(true)
   val routeWithoutRedirects = mkRoute(false)
 
   "The collector route" should {
@@ -125,7 +126,9 @@ class CollectorRouteSpec extends Specification with Specs2RouteTest {
         route.queryString(None) shouldEqual None
       }
       "produce the query string when some of the values are URL encoded" in {
-        route.queryString(Some("/abc/def?schema=iglu%3Acom.acme%2Fcampaign%2Fjsonschema%2F1-0-0&aid=test")) shouldEqual Some("schema=iglu%3Acom.acme%2Fcampaign%2Fjsonschema%2F1-0-0&aid=test")
+        route.queryString(Some("/abc/def?schema=iglu%3Acom.acme%2Fcampaign%2Fjsonschema%2F1-0-0&aid=test")) shouldEqual Some(
+          "schema=iglu%3Acom.acme%2Fcampaign%2Fjsonschema%2F1-0-0&aid=test"
+        )
       }
     }
 
@@ -135,16 +138,16 @@ class CollectorRouteSpec extends Specification with Specs2RouteTest {
           route.cookieIfWanted(Some("abc")) { c =>
             complete(HttpResponse(200, entity = c.toString))
           } ~> check {
-            responseAs[String] shouldEqual "Some(abc=123)"
-          }
+          responseAs[String] shouldEqual "Some(abc=123)"
+        }
       }
       "return none if no cookie name is given" in {
         Get() ~> Cookie("abc" -> "123") ~>
           route.cookieIfWanted(None) { c =>
             complete(HttpResponse(200, entity = c.toString))
           } ~> check {
-            responseAs[String] shouldEqual "None"
-          }
+          responseAs[String] shouldEqual "None"
+        }
       }
     }
 
@@ -161,16 +164,16 @@ class CollectorRouteSpec extends Specification with Specs2RouteTest {
           route.doNotTrack(Some(DntCookieMatcher(name = "abc", value = "345"))) { dnt =>
             complete(dnt.toString)
           } ~> check {
-            responseAs[String] shouldEqual "false"
-          }
+          responseAs[String] shouldEqual "false"
+        }
       }
       "return true if there is a properly-valued dnt cookie" in {
         Get() ~> Cookie("abc" -> "123") ~>
           route.doNotTrack(Some(DntCookieMatcher(name = "abc", value = "123"))) { dnt =>
             complete(dnt.toString)
           } ~> check {
-            responseAs[String] shouldEqual "true"
-          }
+          responseAs[String] shouldEqual "true"
+        }
       }
       "return true if there is a properly-valued dnt cookie that matches a regex value" in {
         Get() ~> Cookie("abc" -> s"deleted-${System.currentTimeMillis()}") ~>

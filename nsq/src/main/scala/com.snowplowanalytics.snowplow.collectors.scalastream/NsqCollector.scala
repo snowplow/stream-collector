@@ -22,10 +22,10 @@ object NsqCollector extends Collector {
     val (collectorConf, akkaConf) = parseConfig(args)
     val sinks = {
       val goodStream = collectorConf.streams.good
-      val badStream = collectorConf.streams.bad
+      val badStream  = collectorConf.streams.bad
       val (good, bad) = collectorConf.streams.sink match {
         case nc: Nsq => (new NsqSink(nc, goodStream), new NsqSink(nc, badStream))
-        case _ => throw new IllegalArgumentException("Configured sink is not NSQ")
+        case _       => throw new IllegalArgumentException("Configured sink is not NSQ")
       }
       CollectorSinks(good, bad)
     }

@@ -23,7 +23,7 @@ object StdoutCollector extends Collector {
     val sinks = {
       val (good, bad) = collectorConf.streams.sink match {
         case Stdout => (new StdoutSink("out"), new StdoutSink("err"))
-        case _ => throw new IllegalArgumentException("Configured sink is not stdout")
+        case _      => throw new IllegalArgumentException("Configured sink is not stdout")
       }
       CollectorSinks(good, bad)
     }

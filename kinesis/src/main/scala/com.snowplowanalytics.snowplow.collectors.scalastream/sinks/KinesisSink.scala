@@ -27,11 +27,7 @@ import com.amazonaws.services.kinesis.model._
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
 import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClientBuilder}
 import com.amazonaws.services.sqs.{AmazonSQS, AmazonSQSClientBuilder}
-import com.amazonaws.services.sqs.model.{
-  MessageAttributeValue,
-  SendMessageBatchRequest,
-  SendMessageBatchRequestEntry
-}
+import com.amazonaws.services.sqs.model.{MessageAttributeValue, SendMessageBatchRequest, SendMessageBatchRequestEntry}
 import java.util.UUID
 
 import model._
@@ -46,10 +42,10 @@ object KinesisSink {
   case class SqsClientAndName(sqsClient: AmazonSQS, sqsBufferName: String)
 
   /**
-   * Create a KinesisSink and schedule a task to flush its EventStorage
-   * Exists so that no threads can get a reference to the KinesisSink
-   * during its construction
-   */
+    * Create a KinesisSink and schedule a task to flush its EventStorage
+    * Exists so that no threads can get a reference to the KinesisSink
+    * during its construction
+    */
   def createAndInitialize(
     kinesisConfig: Kinesis,
     bufferConfig: BufferConfig,
@@ -79,12 +75,14 @@ object KinesisSink {
         ks.scheduleFlush()
 
         // When the application is shut down try to send all stored events
-        Runtime.getRuntime.addShutdownHook(new Thread {
-          override def run(): Unit = {
-            ks.EventStorage.flush()
-            ks.shutdown()
-          }
-        })
+        Runtime
+          .getRuntime
+          .addShutdownHook(new Thread {
+            override def run(): Unit = {
+              ks.EventStorage.flush()
+              ks.shutdown()
+            }
+          })
         ks
     }
   }
@@ -92,8 +90,8 @@ object KinesisSink {
   /** Create an aws credentials provider through env variables and iam. */
   private def getProvider(awsConfig: AWSConfig): Either[Throwable, AWSCredentialsProvider] = {
     def isDefault(key: String): Boolean = key == "default"
-    def isIam(key: String): Boolean = key == "iam"
-    def isEnv(key: String): Boolean = key == "env"
+    def isIam(key: String): Boolean     = key == "iam"
+    def isEnv(key: String): Boolean     = key == "env"
 
     ((awsConfig.accessKey, awsConfig.secretKey) match {
       case (a, s) if isDefault(a) && isDefault(s) =>
@@ -116,12 +114,12 @@ object KinesisSink {
   }
 
   /**
-   * Creates a new Kinesis client.
-   * @param provider aws credentials provider
-   * @param endpoint kinesis endpoint where the stream resides
-   * @param region aws region where the stream resides
-   * @return the initialized AmazonKinesisClient
-   */
+    * Creates a new Kinesis client.
+    * @param provider aws credentials provider
+    * @param endpoint kinesis endpoint where the stream resides
+    * @param region aws region where the stream resides
+    * @return the initialized AmazonKinesisClient
+    */
   private def createKinesisClient(
     provider: AWSCredentialsProvider,
     endpoint: String,
@@ -132,40 +130,39 @@ object KinesisSink {
       .withCredentials(provider)
       .withEndpointConfiguration(new EndpointConfiguration(endpoint, region))
       .withClientConfiguration(
-        new ClientConfiguration()
-          .withRetryPolicy(
-            new RetryPolicy(
-              new RetryCondition {
-                override def shouldRetry(
-                  originalRequest: AmazonWebServiceRequest,
-                  exception: AmazonClientException,
-                  retriesAttempted: Int
-                ): Boolean =
-                  retriesAttempted < 10 &&
-                    (exception match {
-                      case _: ProvisionedThroughputExceededException => false
-                      case _ => true
-                    })
-              },
-              new PredefinedBackoffStrategies.FullJitterBackoffStrategy(1000, 5 * 3600),
-              10,
-              true,
-              true
-            )
+        new ClientConfiguration().withRetryPolicy(
+          new RetryPolicy(
+            new RetryCondition {
+              override def shouldRetry(
+                originalRequest: AmazonWebServiceRequest,
+                exception: AmazonClientException,
+                retriesAttempted: Int
+              ): Boolean =
+                retriesAttempted < 10 &&
+                  (exception match {
+                    case _: ProvisionedThroughputExceededException => false
+                    case _                                         => true
+                  })
+            },
+            new PredefinedBackoffStrategies.FullJitterBackoffStrategy(1000, 5 * 3600),
+            10,
+            true,
+            true
           )
+        )
       )
       .build()
 
   /**
-   * Check whether a Kinesis stream exists
-   *
-   * @param name Name of the stream
-   * @return Whether the stream exists
-   */
+    * Check whether a Kinesis stream exists
+    *
+    * @param name Name of the stream
+    * @return Whether the stream exists
+    */
   private def streamExists(client: AmazonKinesis, name: String): Boolean =
     try {
       val describeStreamResult = client.describeStream(name)
-      val status = describeStreamResult.getStreamDescription.getStreamStatus
+      val status               = describeStreamResult.getStreamDescription.getStreamStatus
       status == "ACTIVE" || status == "UPDATING"
     } catch {
       case _: ResourceNotFoundException => false
@@ -205,16 +202,15 @@ object KinesisSink {
   ): Either[Throwable, Option[SqsClientAndName]] =
     sqsBufferName match {
       case Some(name) =>
-        createSqsClient(provider, region)
-          .map(amazonSqs => Some(SqsClientAndName(amazonSqs, name)))
+        createSqsClient(provider, region).map(amazonSqs => Some(SqsClientAndName(amazonSqs, name)))
       case None => None.asRight
     }
 
 }
 
 /**
- * Kinesis Sink for the Scala collector.
- */
+  * Kinesis Sink for the Scala collector.
+  */
 class KinesisSink private (
   client: AmazonKinesis,
   kinesisConfig: Kinesis,
@@ -226,17 +222,17 @@ class KinesisSink private (
   // Records must not exceed MaxBytes - 1MB (for Kinesis)
   // When SQS buffer is enabled MaxBytes has to be 256k,
   // but we encode the message with Base64 for SQS, so the limit drops to 192k
-  val SqsLimit = 192000 // 256000 / 4 * 3
-  val KinesisLimit = 1000000
+  val SqsLimit          = 192000 // 256000 / 4 * 3
+  val KinesisLimit      = 1000000
   override val MaxBytes = if (maybeSqs.isDefined) SqsLimit else KinesisLimit
-  val BackoffTime = 3000L
+  val BackoffTime       = 3000L
 
-  val ByteThreshold = bufferConfig.byteLimit
+  val ByteThreshold   = bufferConfig.byteLimit
   val RecordThreshold = bufferConfig.recordLimit
-  val TimeThreshold = bufferConfig.timeLimit
+  val TimeThreshold   = bufferConfig.timeLimit
 
-  private val maxBackoff = kinesisConfig.backoffPolicy.maxBackoff
-  private val minBackoff = kinesisConfig.backoffPolicy.minBackoff
+  private val maxBackoff      = kinesisConfig.backoffPolicy.maxBackoff
+  private val minBackoff      = kinesisConfig.backoffPolicy.minBackoff
   private val randomGenerator = new java.util.Random()
 
   log.info("Creating thread pool of size " + kinesisConfig.threadPoolSize)
@@ -254,11 +250,11 @@ class KinesisSink private (
   implicit lazy val ec = concurrent.ExecutionContext.fromExecutorService(executorService)
 
   /**
-   * Recursively schedule a task to send everthing in EventStorage
-   * Even if the incoming event flow dries up, all stored events will eventually get sent
-   * Whenever TimeThreshold milliseconds have passed since the last call to flush, call flush.
-   * @param interval When to schedule the next flush
-   */
+    * Recursively schedule a task to send everthing in EventStorage
+    * Even if the incoming event flow dries up, all stored events will eventually get sent
+    * Whenever TimeThreshold milliseconds have passed since the last call to flush, call flush.
+    * @param interval When to schedule the next flush
+    */
   def scheduleFlush(interval: Long = TimeThreshold): Unit = {
     executorService.schedule(
       new Thread {
@@ -284,13 +280,13 @@ class KinesisSink private (
   case class Event(msg: ByteBuffer, key: String)
 
   object EventStorage {
-    private var storedEvents = List.empty[Event]
-    private var byteCount = 0L
+    private var storedEvents              = List.empty[Event]
+    private var byteCount                 = 0L
     @volatile private var lastFlushedTime = 0L
 
     def store(event: Array[Byte], key: String): Unit = {
       val eventBytes = ByteBuffer.wrap(event)
-      val eventSize = eventBytes.capacity
+      val eventSize  = eventBytes.capacity
       if (eventSize >= MaxBytes) {
         log.error(
           s"Record of size $eventSize bytes is too large - must be less than $MaxBytes bytes"
@@ -310,7 +306,7 @@ class KinesisSink private (
       val eventsToSend = synchronized {
         val evts = storedEvents.reverse
         storedEvents = Nil
-        byteCount = 0
+        byteCount    = 0
         evts
       }
       lastFlushedTime = System.currentTimeMillis()
@@ -335,31 +331,30 @@ class KinesisSink private (
   }
 
   /**
-   *  Max number of retries is unlimitted, so when Kinesis stream is under heavy load,
-   *  the events accumulate in collector memory for later retries. The fix for this is to use
-   *  sqs queue as a buffer and sqs2kinesis to move events back from sqs queue to kinesis stream.
-   *  Consider using sqs buffer in heavy load scenarios.
-   *
-   */
+    *  Max number of retries is unlimitted, so when Kinesis stream is under heavy load,
+    *  the events accumulate in collector memory for later retries. The fix for this is to use
+    *  sqs queue as a buffer and sqs2kinesis to move events back from sqs queue to kinesis stream.
+    *  Consider using sqs buffer in heavy load scenarios.
+    *
+    */
   def sendBatch(batch: List[Event], nextBackoff: Long = minBackoff): Unit =
     if (batch.nonEmpty) {
       log.info(s"Writing ${batch.size} Thrift records to Kinesis stream ${streamName}")
 
       multiPut(streamName, batch).onComplete {
         case Success(s) => {
-          val results = s.getRecords.asScala.toList
+          val results      = s.getRecords.asScala.toList
           val failurePairs = batch.zip(results).filter(_._2.getErrorMessage != null)
           log.info(
             s"Successfully wrote ${batch.size - failurePairs.size} out of ${batch.size} records"
           )
           if (failurePairs.nonEmpty) {
-            failurePairs.foreach(
-              f =>
-                log.error(
-                  s"Record failed with error code [${f._2.getErrorCode}] and message [${f._2.getErrorMessage}]"
-                )
+            failurePairs.foreach(f =>
+              log.error(
+                s"Record failed with error code [${f._2.getErrorCode}] and message [${f._2.getErrorMessage}]"
+              )
             )
-            val failures = failurePairs.map(_._1)
+            val failures      = failurePairs.map(_._1)
             val retryErrorMsg = s"Retrying all failed records in $nextBackoff milliseconds..."
             sendToSqsOrRetryToKinesis(failures, nextBackoff)(retryErrorMsg)
           }
@@ -397,37 +392,29 @@ class KinesisSink private (
     Future {
       log.info(s"Writing ${batch.size} messages to SQS queue: ${sqs.sqsBufferName}")
       val MaxSqsBatchSize = 10
-      batch
-        .map(toSqsBatchEntry)
-        .grouped(MaxSqsBatchSize)
-        .foreach { batchEntryGroup =>
-          sendToSqs(sqs, batchEntryGroup).transform {
-            case failure @ Failure(ex) =>
-              log.info(s"Sending to sqs failed with exception: $ex")
-              failure
-            case s @ Success(_) => s
-          }
+      batch.map(toSqsBatchEntry).grouped(MaxSqsBatchSize).foreach { batchEntryGroup =>
+        sendToSqs(sqs, batchEntryGroup).transform {
+          case failure @ Failure(ex) =>
+            log.info(s"Sending to sqs failed with exception: $ex")
+            failure
+          case s @ Success(_) => s
         }
+      }
     }
 
   private def toSqsBatchEntry(event: Event): SendMessageBatchRequestEntry = {
     val b64EncodedMsg = encode(event.msg)
     // The UUID is not used anywhere currently but is required by the constructor
-    new SendMessageBatchRequestEntry(UUID.randomUUID.toString, b64EncodedMsg)
-      .withMessageAttributes(
-        Map(
-          "kinesisKey" ->
-            new MessageAttributeValue()
-              .withDataType("String")
-              .withStringValue(event.key)
-        ).asJava
-      )
+    new SendMessageBatchRequestEntry(UUID.randomUUID.toString, b64EncodedMsg).withMessageAttributes(
+      Map(
+        "kinesisKey" ->
+          new MessageAttributeValue().withDataType("String").withStringValue(event.key)
+      ).asJava
+    )
   }
 
   private def createBatchRequest(queueUrl: String, batch: List[SendMessageBatchRequestEntry]) =
-    new SendMessageBatchRequest()
-      .withQueueUrl(queueUrl)
-      .withEntries(batch.asJava)
+    new SendMessageBatchRequest().withQueueUrl(queueUrl).withEntries(batch.asJava)
 
   private def sendToSqs(
     sqs: SqsClientAndName,
@@ -435,8 +422,8 @@ class KinesisSink private (
   ) =
     Future {
       val batchRequest = createBatchRequest(sqs.sqsBufferName, batchEntryGroup)
-      val res = sqs.sqsClient.sendMessageBatch(batchRequest)
-      val failed = res.getFailed().asScala
+      val res          = sqs.sqsClient.sendMessageBatch(batchRequest)
+      val failed       = res.getFailed().asScala
       if (failed.nonEmpty) {
         // It could be improved even more by storing events (that failed to be sent to SQS) to some persistance storage
         val errors = failed.map(_.toString).mkString(", ")
@@ -475,13 +462,12 @@ class KinesisSink private (
     }
 
   /**
-   * How long to wait before sending the next request
-   * @param lastBackoff The previous backoff time
-   * @return Minimum of maxBackoff and a random number between minBackoff and three times lastBackoff
-   */
+    * How long to wait before sending the next request
+    * @param lastBackoff The previous backoff time
+    * @return Minimum of maxBackoff and a random number between minBackoff and three times lastBackoff
+    */
   private def getNextBackoff(lastBackoff: Long): Long =
-    (minBackoff + randomGenerator.nextDouble() * (lastBackoff * 3 - minBackoff)).toLong
-      .min(maxBackoff)
+    (minBackoff + randomGenerator.nextDouble() * (lastBackoff * 3 - minBackoff)).toLong.min(maxBackoff)
 
   def shutdown(): Unit = {
     executorService.shutdown()

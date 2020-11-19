@@ -27,18 +27,18 @@ object GooglePubSubCollector extends Collector {
     val sinks: Either[Throwable, CollectorSinks] = for {
       pc <- collectorConf.streams.sink match {
         case pc: GooglePubSub => pc.asRight
-        case _ => new IllegalArgumentException("Configured sink is not PubSub").asLeft
+        case _                => new IllegalArgumentException("Configured sink is not PubSub").asLeft
       }
       goodStream = collectorConf.streams.good
-      badStream = collectorConf.streams.bad
+      badStream  = collectorConf.streams.bad
       bufferConf = collectorConf.streams.buffer
       good <- GooglePubSubSink.createAndInitialize(pc, bufferConf, goodStream)
-      bad <- GooglePubSubSink.createAndInitialize(pc, bufferConf, badStream)
+      bad  <- GooglePubSubSink.createAndInitialize(pc, bufferConf, badStream)
     } yield CollectorSinks(good, bad)
 
     sinks match {
       case Right(s) => run(collectorConf, akkaConf, s)
-      case Left(e) => throw e
+      case Left(e)  => throw e
     }
   }
 }

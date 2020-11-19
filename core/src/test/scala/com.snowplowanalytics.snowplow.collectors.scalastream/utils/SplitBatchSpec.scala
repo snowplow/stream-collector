@@ -29,20 +29,21 @@ class SplitBatchSpec extends Specification {
   "SplitBatch.split" should {
     "Batch a list of strings based on size" in {
       SplitBatch.split(List("a", "b", "c").map(Json.fromString), 9, 1) must_==
-        SplitBatchResult(
-          List(List("c"),List("b", "a")).map(_.map(Json.fromString)),
-          Nil)
+        SplitBatchResult(List(List("c"), List("b", "a")).map(_.map(Json.fromString)), Nil)
     }
 
     "Reject only those strings which are too big" in {
       SplitBatch.split(List("1234567", "1", "123").map(Json.fromString), 8, 0) must_==
-        SplitBatchResult(
-          List(List("123", "1").map(Json.fromString)),
-          List("1234567").map(Json.fromString))
+        SplitBatchResult(List(List("123", "1").map(Json.fromString)), List("1234567").map(Json.fromString))
     }
 
     "Batch a long list of strings" in {
-      SplitBatch.split(List("123456778901", "123456789", "12345678", "1234567", "123456", "12345", "1234", "123", "12", "1").map(Json.fromString), 13, 0) must_==
+      SplitBatch.split(
+        List("123456778901", "123456789", "12345678", "1234567", "123456", "12345", "1234", "123", "12", "1")
+          .map(Json.fromString),
+        13,
+        0
+      ) must_==
         SplitBatchResult(
           List(
             List("1", "12", "123"),
@@ -50,8 +51,10 @@ class SplitBatchSpec extends Specification {
             List("123456"),
             List("1234567"),
             List("12345678"),
-            List("123456789")).map(_.map(Json.fromString)),
-          List("123456778901").map(Json.fromString))
+            List("123456789")
+          ).map(_.map(Json.fromString)),
+          List("123456778901").map(Json.fromString)
+        )
     }
   }
 
@@ -67,7 +70,7 @@ class SplitBatchSpec extends Specification {
       val payload = new CollectorPayload()
       payload.setQuerystring("x" * 1000)
       val actual = SplitBatch.splitAndSerializePayload(payload, 100)
-      val res = parse(new String(actual.bad.head)).toOption.get
+      val res    = parse(new String(actual.bad.head)).toOption.get
       val badRow = res.as[BadRow].toOption.get
       badRow must beAnInstanceOf[BadRow.SizeViolation]
       val sizeViolation = badRow.asInstanceOf[BadRow.SizeViolation]
@@ -83,13 +86,15 @@ class SplitBatchSpec extends Specification {
       val payload = new CollectorPayload()
       payload.setBody("s" * 1000)
       val actual = SplitBatch.splitAndSerializePayload(payload, 100)
-      val res = parse(new String(actual.bad.head)).toOption.get
+      val res    = parse(new String(actual.bad.head)).toOption.get
       val badRow = res.as[BadRow].toOption.get
       badRow must beAnInstanceOf[BadRow.SizeViolation]
       val sizeViolation = badRow.asInstanceOf[BadRow.SizeViolation]
       sizeViolation.failure.maximumAllowedSizeBytes must_== 100
       sizeViolation.failure.actualSizeBytes must_== 1019
-      sizeViolation.failure.expectation must_== "oversized collector payload: cannot split POST requests which are not json expected json value got 'ssssss...' (line 1, column 1)"
+      sizeViolation
+        .failure
+        .expectation must_== "oversized collector payload: cannot split POST requests which are not json expected json value got 'ssssss...' (line 1, column 1)"
       sizeViolation.payload.line must_== "CollectorP"
       sizeViolation.processor shouldEqual Processor(generated.BuildInfo.name, generated.BuildInfo.version)
     }
@@ -107,14 +112,18 @@ class SplitBatchSpec extends Specification {
       payload.setPath("p" * 1000)
       val actual = SplitBatch.splitAndSerializePayload(payload, 1000)
       actual.bad.size must_== 1
-      val res = parse(new String(actual.bad.head)).toOption.get
+      val res    = parse(new String(actual.bad.head)).toOption.get
       val badRow = res.as[BadRow].toOption.get
       badRow must beAnInstanceOf[BadRow.SizeViolation]
       val sizeViolation = badRow.asInstanceOf[BadRow.SizeViolation]
       sizeViolation.failure.maximumAllowedSizeBytes must_== 1000
       sizeViolation.failure.actualSizeBytes must_== 1091
-      sizeViolation.failure.expectation must_== "oversized collector payload: cannot split POST requests which are not self-describing INVALID_IGLUURI"
-      sizeViolation.payload.line must_== "CollectorPayload(schema:null, ipAddress:null, timestamp:0, encoding:null, collector:null, path:ppppp"
+      sizeViolation
+        .failure
+        .expectation must_== "oversized collector payload: cannot split POST requests which are not self-describing INVALID_IGLUURI"
+      sizeViolation
+        .payload
+        .line must_== "CollectorPayload(schema:null, ipAddress:null, timestamp:0, encoding:null, collector:null, path:ppppp"
       sizeViolation.processor shouldEqual Processor(generated.BuildInfo.name, generated.BuildInfo.version)
     }
 

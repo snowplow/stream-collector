@@ -31,9 +31,9 @@ import model._
 import utils.SplitBatch
 
 /**
- * Service responding to HTTP requests, mainly setting a cookie identifying the user and storing
- * events
- */
+  * Service responding to HTTP requests, mainly setting a cookie identifying the user and storing
+  * events
+  */
 trait Service {
   def preflightResponse(req: HttpRequest): HttpResponse
   def flashCrossDomainPolicy: HttpResponse
@@ -60,8 +60,7 @@ trait Service {
 
 object CollectorService {
   // Contains an invisible pixel to return for `/i` requests.
-  val pixel = Base64.decodeBase64(
-    "R0lGODlhAQABAPAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==")
+  val pixel = Base64.decodeBase64("R0lGODlhAQABAPAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==")
 }
 
 class CollectorService(
@@ -74,14 +73,14 @@ class CollectorService(
   private val collector = s"${BuildInfo.shortName}-${BuildInfo.version}-" +
     config.streams.sink.getClass.getSimpleName.toLowerCase
 
-  override val cookieName = config.cookieName
-  override val doNotTrackCookie = config.doNotTrackHttpCookie
+  override val cookieName            = config.cookieName
+  override val doNotTrackCookie      = config.doNotTrackHttpCookie
   override val enableDefaultRedirect = config.enableDefaultRedirect
 
   /**
-   * Determines the path to be used in the response,
-   * based on whether a mapping can be found in the config for the original request path.
-   */
+    * Determines the path to be used in the response,
+    * based on whether a mapping can be found in the config for the original request path.
+    */
   override def determinePath(vendor: String, version: String): String = {
     val original = s"/$vendor/$version"
     config.paths.getOrElse(original, original)
@@ -107,7 +106,7 @@ class CollectorService(
 
     val redirect = path.startsWith("/r/")
 
-    val nuidOpt = networkUserId(request, cookie)
+    val nuidOpt  = networkUserId(request, cookie)
     val bouncing = queryParams.get(config.cookieBounce.name).isDefined
     // we bounce if it's enabled and we couldn't retrieve the nuid and we're not already bouncing
     val bounce = config.cookieBounce.enabled && nuidOpt.isEmpty && !bouncing &&
@@ -117,17 +116,12 @@ class CollectorService(
       else UUID.randomUUID().toString
     }
 
-    val ct = contentType.map(_.value.toLowerCase)
-    val event = buildEvent(
-      queryString, body, path, userAgent, refererUri, hostname, ipAddress, request, nuid, ct)
+    val ct    = contentType.map(_.value.toLowerCase)
+    val event = buildEvent(queryString, body, path, userAgent, refererUri, hostname, ipAddress, request, nuid, ct)
     // we don't store events in case we're bouncing
     val sinkResponses = if (!bounce && !doNotTrack) sinkEvent(event, partitionKey) else Nil
 
-    val headers = bounceLocationHeader(
-      queryParams,
-      request,
-      config.cookieBounce,
-      bounce) ++
+    val headers = bounceLocationHeader(queryParams, request, config.cookieBounce, bounce) ++
       cookieHeader(request, config.cookieConfig, nuid, doNotTrack) ++
       cacheControl(pixelExpected) ++
       List(
@@ -136,27 +130,28 @@ class CollectorService(
         `Access-Control-Allow-Credentials`(true)
       )
 
-    val (httpResponse, badRedirectResponses) = buildHttpResponse(
-      event, queryParams, headers.toList, redirect, pixelExpected, bounce, config.redirectMacro)
+    val (httpResponse, badRedirectResponses) =
+      buildHttpResponse(event, queryParams, headers.toList, redirect, pixelExpected, bounce, config.redirectMacro)
     (httpResponse, badRedirectResponses ++ sinkResponses)
   }
 
   /**
-   * Creates a response to the CORS preflight Options request
-   * @param request Incoming preflight Options request
-   * @return Response granting permissions to make the actual request
-   */
+    * Creates a response to the CORS preflight Options request
+    * @param request Incoming preflight Options request
+    * @return Response granting permissions to make the actual request
+    */
   override def preflightResponse(request: HttpRequest): HttpResponse =
     preflightResponse(request, config.cors)
 
   def preflightResponse(request: HttpRequest, corsConfig: CORSConfig): HttpResponse =
-    HttpResponse()
-      .withHeaders(List(
+    HttpResponse().withHeaders(
+      List(
         accessControlAllowOriginHeader(request),
         `Access-Control-Allow-Credentials`(true),
         `Access-Control-Allow-Headers`("Content-Type"),
         `Access-Control-Max-Age`(corsConfig.accessControlMaxAge.toSeconds)
-      ))
+      )
+    )
 
   override def flashCrossDomainPolicy: HttpResponse =
     flashCrossDomainPolicy(config.crossDomain)
@@ -167,13 +162,16 @@ class CollectorService(
       HttpResponse(entity = HttpEntity(
         contentType = ContentType(MediaTypes.`text/xml`, HttpCharsets.`ISO-8859-1`),
         string = """<?xml version="1.0"?>""" + "\n<cross-domain-policy>\n" +
-          config.domains.map(d => s"""  <allow-access-from domain=\"$d\" secure=\"${config.secure}\" />""").mkString("\n") +
+          config
+            .domains
+            .map(d => s"""  <allow-access-from domain=\"$d\" secure=\"${config.secure}\" />""")
+            .mkString("\n") +
           "\n</cross-domain-policy>"
-      ))
+      )
+      )
     } else {
       HttpResponse(404, entity = "404 not found")
     }
-
 
   override def rootResponse: HttpResponse =
     rootResponse(config.rootResponse)
@@ -209,11 +207,11 @@ class CollectorService(
     e.querystring = queryString.orNull
     body.foreach(e.body = _)
     e.path = path
-    userAgent.foreach(e.userAgent = _)
+    userAgent.foreach(e.userAgent   = _)
     refererUri.foreach(e.refererUri = _)
-    e.hostname = hostname
+    e.hostname      = hostname
     e.networkUserId = networkUserId
-    e.headers = (headers(request) ++ contentType).asJava
+    e.headers       = (headers(request) ++ contentType).asJava
     contentType.foreach(e.contentType = _)
     e
   }
@@ -252,12 +250,13 @@ class CollectorService(
   /** Builds the appropriate http response when not dealing with click redirects. */
   def buildUsualHttpResponse(pixelExpected: Boolean, bounce: Boolean): HttpResponse =
     (pixelExpected, bounce) match {
-      case (true, true)  => HttpResponse(StatusCodes.Found)
-      case (true, false) => HttpResponse(entity = HttpEntity(
-        contentType = ContentType(MediaTypes.`image/gif`),
-        bytes = CollectorService.pixel))
+      case (true, true) => HttpResponse(StatusCodes.Found)
+      case (true, false) =>
+        HttpResponse(entity =
+          HttpEntity(contentType = ContentType(MediaTypes.`image/gif`), bytes = CollectorService.pixel)
+        )
       // See https://github.com/snowplow/snowplow-javascript-tracker/issues/482
-      case _             => HttpResponse(entity = "ok")
+      case _ => HttpResponse(entity = "ok")
     }
 
   /** Builds the appropriate http response when dealing with click redirects. */
@@ -269,7 +268,7 @@ class CollectorService(
     queryParams.get("u") match {
       case Some(target) =>
         val canReplace = redirectMacroConfig.enabled && event.isSetNetworkUserId
-        val token = redirectMacroConfig.placeholder.getOrElse(s"$${SP_NUID}")
+        val token      = redirectMacroConfig.placeholder.getOrElse(s"$${SP_NUID}")
         val replacedTarget =
           if (canReplace) target.replaceAllLiterally(token, event.networkUserId)
           else target
@@ -278,12 +277,12 @@ class CollectorService(
     }
 
   /**
-   * Builds a cookie header with the network user id as value.
-   * @param cookieConfig cookie configuration extracted from the collector configuration
-   * @param networkUserId value of the cookie
-   * @param doNotTrack whether do not track is enabled or not
-   * @return the build cookie wrapped in a header
-   */
+    * Builds a cookie header with the network user id as value.
+    * @param cookieConfig cookie configuration extracted from the collector configuration
+    * @param networkUserId value of the cookie
+    * @param doNotTrack whether do not track is enabled or not
+    * @return the build cookie wrapped in a header
+    */
   def cookieHeader(
     request: HttpRequest,
     cookieConfig: Option[CookieConfig],
@@ -295,11 +294,11 @@ class CollectorService(
     } else {
       cookieConfig.map { config =>
         val responseCookie = HttpCookie(
-          name    = config.name,
-          value   = networkUserId,
-          expires = Some(DateTime.now + config.expiration.toMillis),
-          domain  = cookieDomain(request.headers, config.domains, config.fallbackDomain),
-          path    = Some("/"),
+          name      = config.name,
+          value     = networkUserId,
+          expires   = Some(DateTime.now + config.expiration.toMillis),
+          domain    = cookieDomain(request.headers, config.domains, config.fallbackDomain),
+          path      = Some("/"),
           secure    = config.secure,
           httpOnly  = config.httpOnly,
           extension = config.sameSite.map(value => s"SameSite=$value")
@@ -317,20 +316,18 @@ class CollectorService(
   ): Option[HttpHeader] =
     if (bounce) {
       val forwardedScheme = for {
-        headerName <- bounceConfig.forwardedProtocolHeader
-        headerValue <- request.headers
-          .find(_.lowercaseName == headerName.toLowerCase)
-          .map(_.value().toLowerCase())
-        scheme <-
-          if (Set("http", "https").contains(headerValue)) {
-            Some(headerValue)
-          } else {
-            logger.warn(s"Header $headerName contains invalid protocol value $headerValue.")
-            None
-          }
+        headerName  <- bounceConfig.forwardedProtocolHeader
+        headerValue <- request.headers.find(_.lowercaseName == headerName.toLowerCase).map(_.value().toLowerCase())
+        scheme <- if (Set("http", "https").contains(headerValue)) {
+          Some(headerValue)
+        } else {
+          logger.warn(s"Header $headerName contains invalid protocol value $headerValue.")
+          None
+        }
       } yield scheme
 
-      val redirectUri = request.uri
+      val redirectUri = request
+        .uri
         .withQuery(Uri.Query(queryParams + (bounceConfig.name -> "true")))
         .withScheme(forwardedScheme.getOrElse(request.uri.scheme))
 
@@ -351,19 +348,23 @@ class CollectorService(
     else Nil
 
   /**
-   * Determines the cookie domain to be used by inspecting the Origin header of the request
-   * and trying to find a match in the list of domains specified in the config file.
-   * @param headers The headers from the http request.
-   * @param domains The list of cookie domains from the configuration.
-   * @param fallbackDomain The fallback domain from the configuration.
-   * @return The domain to be sent back in the response, unless no cookie domains are configured.
-   * The Origin header may include multiple domains. The first matching domain is returned.
-   * If no match is found, the fallback domain is used if configured. Otherwise, the cookie domain is not set.
-   */
-  def cookieDomain(headers: Seq[HttpHeader], domains: Option[List[String]], fallbackDomain: Option[String]): Option[String] =
+    * Determines the cookie domain to be used by inspecting the Origin header of the request
+    * and trying to find a match in the list of domains specified in the config file.
+    * @param headers The headers from the http request.
+    * @param domains The list of cookie domains from the configuration.
+    * @param fallbackDomain The fallback domain from the configuration.
+    * @return The domain to be sent back in the response, unless no cookie domains are configured.
+    * The Origin header may include multiple domains. The first matching domain is returned.
+    * If no match is found, the fallback domain is used if configured. Otherwise, the cookie domain is not set.
+    */
+  def cookieDomain(
+    headers: Seq[HttpHeader],
+    domains: Option[List[String]],
+    fallbackDomain: Option[String]
+  ): Option[String] =
     (for {
       domainList <- domains
-      origins <- headers.collectFirst { case header: `Origin` => header.origins }
+      origins    <- headers.collectFirst { case header: `Origin` => header.origins }
       originHosts = extractHosts(origins)
       domainToUse <- domainList.find(domain => originHosts.exists(validMatch(_, domain)))
     } yield domainToUse).orElse(fallbackDomain)
@@ -373,24 +374,25 @@ class CollectorService(
     origins.map(origin => origin.host.host.address())
 
   /**
-   * Ensures a match is valid.
-   * We only want matches where:
-   * a.) the Origin host is exactly equal to the cookie domain from the config
-   * b.) the Origin host is a subdomain of the cookie domain from the config.
-   * But we want to avoid cases where the cookie domain from the config is randomly
-   * a substring of the Origin host, without any connection between them.
-   */
+    * Ensures a match is valid.
+    * We only want matches where:
+    * a.) the Origin host is exactly equal to the cookie domain from the config
+    * b.) the Origin host is a subdomain of the cookie domain from the config.
+    * But we want to avoid cases where the cookie domain from the config is randomly
+    * a substring of the Origin host, without any connection between them.
+    */
   def validMatch(host: String, domain: String): Boolean =
     host == domain || host.endsWith("." + domain)
 
   /**
-   * Gets the IP from a RemoteAddress. If ipAsPartitionKey is false, a UUID will be generated.
-   * @param remoteAddress Address extracted from an HTTP request
-   * @param ipAsPartitionKey Whether to use the ip as a partition key or a random UUID
-   * @return a tuple of ip (unknown if it couldn't be extracted) and partition key
-   */
+    * Gets the IP from a RemoteAddress. If ipAsPartitionKey is false, a UUID will be generated.
+    * @param remoteAddress Address extracted from an HTTP request
+    * @param ipAsPartitionKey Whether to use the ip as a partition key or a random UUID
+    * @return a tuple of ip (unknown if it couldn't be extracted) and partition key
+    */
   def ipAndPartitionKey(
-    remoteAddress: RemoteAddress, ipAsPartitionKey: Boolean
+    remoteAddress: RemoteAddress,
+    ipAsPartitionKey: Boolean
   ): (String, String) =
     remoteAddress.toOption.map(_.getHostAddress) match {
       case None     => ("unknown", UUID.randomUUID.toString)
@@ -398,27 +400,26 @@ class CollectorService(
     }
 
   /**
-   * Gets the network user id from the query string or the request cookie.
-   * @param request Http request made
-   * @param requestCookie cookie associated to the Http request
-   * @return a network user id
-   */
+    * Gets the network user id from the query string or the request cookie.
+    * @param request Http request made
+    * @param requestCookie cookie associated to the Http request
+    * @return a network user id
+    */
   def networkUserId(request: HttpRequest, requestCookie: Option[HttpCookie]): Option[String] =
-    request.uri.query().get("nuid")
-      .orElse(requestCookie.map(_.value))
+    request.uri.query().get("nuid").orElse(requestCookie.map(_.value))
 
   /**
-   * Creates an Access-Control-Allow-Origin header which specifically allows the domain which made
-   * the request
-   * @param request Incoming request
-   * @return Header allowing only the domain which made the request or everything
-   */
+    * Creates an Access-Control-Allow-Origin header which specifically allows the domain which made
+    * the request
+    * @param request Incoming request
+    * @return Header allowing only the domain which made the request or everything
+    */
   def accessControlAllowOriginHeader(request: HttpRequest): HttpHeader =
     `Access-Control-Allow-Origin`(request.headers.find {
       case `Origin`(_) => true
-      case _ => false
+      case _           => false
     } match {
       case Some(`Origin`(origin)) => HttpOriginRange.Default(origin)
-      case _ => HttpOriginRange.`*`
+      case _                      => HttpOriginRange.`*`
     })
 }

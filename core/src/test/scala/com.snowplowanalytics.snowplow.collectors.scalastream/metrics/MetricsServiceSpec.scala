@@ -30,10 +30,9 @@ class MetricsServiceSpec extends Specification {
 
       val report = metricsService.report()
 
-      report must contain(
-        """# HELP http_requests_total Total count of requests to http endpoint
-          |# TYPE http_requests_total counter
-          |http_requests_total{endpoint="/endpoint",method="POST",code="502",} 1.0""".stripMargin)
+      report must contain("""# HELP http_requests_total Total count of requests to http endpoint
+                            |# TYPE http_requests_total counter
+                            |http_requests_total{endpoint="/endpoint",method="POST",code="502",} 1.0""".stripMargin)
 
       report must contain(
         """# HELP http_request_duration_seconds Latency per endpoint
@@ -54,7 +53,8 @@ class MetricsServiceSpec extends Specification {
           |http_request_duration_seconds_bucket{endpoint="/endpoint",method="POST",code="502",le="10.0",} 1.0
           |http_request_duration_seconds_bucket{endpoint="/endpoint",method="POST",code="502",le="+Inf",} 1.0
           |http_request_duration_seconds_count{endpoint="/endpoint",method="POST",code="502",} 1.0
-          |http_request_duration_seconds_sum{endpoint="/endpoint",method="POST",code="502",} 3.0""".stripMargin)
+          |http_request_duration_seconds_sum{endpoint="/endpoint",method="POST",code="502",} 3.0""".stripMargin
+      )
     }
   }
 

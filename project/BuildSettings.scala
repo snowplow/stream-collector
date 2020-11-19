@@ -25,7 +25,7 @@ object BuildSettings {
     assemblyJarName in assembly := { s"${moduleName.value}-${version.value}.jar" },
     // merge strategy for fixing netty conflict
     assemblyMergeStrategy in assembly := {
-      case PathList("io", "netty", xs @ _*) => MergeStrategy.first
+      case PathList("io", "netty", xs @ _*)                => MergeStrategy.first
       case x if x.endsWith("io.netty.versions.properties") => MergeStrategy.discard
       case x =>
         val oldStrategy = (assemblyMergeStrategy in assembly).value
@@ -36,7 +36,7 @@ object BuildSettings {
   // Scalafmt plugin
   import org.scalafmt.sbt.ScalafmtPlugin.autoImport._
   lazy val formatting = Seq(
-    scalafmtConfig    := file(".scalafmt.conf"),
+    scalafmtConfig := file(".scalafmt.conf"),
     scalafmtOnCompile := true
   )
 }

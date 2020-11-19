@@ -64,10 +64,7 @@ lazy val allSettings = buildSettings ++
   Seq(libraryDependencies ++= commonDependencies) ++
   dockerSettings
 
-lazy val root = project
-  .in(file("."))
-  .settings(buildSettings)
-  .aggregate(core, kinesis, pubsub, kafka, nsq, stdout)
+lazy val root = project.in(file(".")).settings(buildSettings).aggregate(core, kinesis, pubsub, kafka, nsq, stdout)
 
 lazy val core = project
   .settings(moduleName := "snowplow-stream-collector-core")

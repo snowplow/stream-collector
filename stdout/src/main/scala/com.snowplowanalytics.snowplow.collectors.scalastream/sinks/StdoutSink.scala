@@ -27,11 +27,11 @@ class StdoutSink(streamName: String) extends Sink {
   def storeRawEvents(events: List[Array[Byte]], key: String) = {
     streamName match {
       case "out" =>
-        events foreach { e =>
+        events.foreach { e =>
           println(Base64.encodeBase64String(e))
         }
       case "err" =>
-        events foreach { e =>
+        events.foreach { e =>
           Console.err.println(Base64.encodeBase64String(e))
         }
     }
