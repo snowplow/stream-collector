@@ -36,7 +36,6 @@ object Dependencies {
     val config = "1.4.1"
     val prometheus = "0.9.0"
     val cbor = "2.9.10" // See snowplow/snowplow/issues/4266
-    val retry = "0.3.3"
     val jackson = "2.9.10.6" // force this version of lib from dependencies to mitigate secutiry vulnerabilities, TODO: update underlying libraries
     val thrift = "0.13.0" // force this version of lib from dependencies to mitigate secutiry vulnerabilities, TODO: update underlying libraries
     val commonsCodec = "1.13" // force this version of lib from dependencies to mitigate secutiry vulnerabilities, TODO: update underlying libraries
@@ -72,7 +71,6 @@ object Dependencies {
     val prometheus = "io.prometheus" % "simpleclient" % V.prometheus
     val prometheusCommon = "io.prometheus" % "simpleclient_common" % V.prometheus
     val cbor = "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % V.cbor
-    val retry = "com.softwaremill.retry" %% "retry" % V.retry
 
     // Scala
     val collectorPayload = "com.snowplowanalytics" % "collector-payload-1" % V.collectorPayload
