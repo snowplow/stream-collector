@@ -32,7 +32,7 @@ object Dependencies {
     val kafka = "2.2.1"
     val nsqClient = "1.3.0"
     val jodaTime = "2.10.8"
-    val slf4j = "1.7.26"
+    val slf4j = "1.7.30"
     val config = "1.3.4"
     val prometheus = "0.6.0"
     val cbor = "2.9.10" // See snowplow/snowplow/issues/4266
