@@ -1,3 +1,16 @@
+Release 2.0.1 (2020-11-19)
+--------------------------
+Increase number of Kinesis put retries when surge protection is on (#75)
+Bump scalafmt to 2.3.2 (#87)
+Bump akka to 2.5.32 (#86)
+Bump akka-http to 10.1.12 (#85)
+Bump prometheus-simpleclient to 0.9.0 (#82)
+Bump config to 1.4.1 (#81)
+Bump slf4j to 1.7.30 (#80)
+Bump joda-time to 2.10.8 (#79)
+Remove scalaz7 dependency (#84)
+Remove softwaremill-retry dependency (#83)
+
 Release 2.0.0 (2020-09-15)
 --------------------------
 Disable default redirect (#64)
