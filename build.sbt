@@ -28,7 +28,6 @@ lazy val commonDependencies = Seq(
   Dependencies.Libraries.prometheusCommon,
   // Scala
   Dependencies.Libraries.scopt,
-  Dependencies.Libraries.scalaz7,
   Dependencies.Libraries.akkaStream,
   Dependencies.Libraries.akkaHttp,
   Dependencies.Libraries.akkaStream,
