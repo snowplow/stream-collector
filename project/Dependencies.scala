@@ -42,7 +42,6 @@ object Dependencies {
     val grpcCore = "1.31.0" // force this version of lib from dependencies to mitigate secutiry vulnerabilities, TODO: update underlying libraries
     // Scala
     val collectorPayload = "0.0.0"
-    val scalaz7 = "7.0.9"
     val akkaHttp = "10.1.10"
     val akka = "2.5.23"
     val scopt = "3.6.0"
@@ -74,7 +73,6 @@ object Dependencies {
 
     // Scala
     val collectorPayload = "com.snowplowanalytics" % "collector-payload-1" % V.collectorPayload
-    val scalaz7 = "org.scalaz" %% "scalaz-core" % V.scalaz7
     val badRows = "com.snowplowanalytics" %% "snowplow-badrows" % V.badRows
     val scopt = "com.github.scopt" %% "scopt" % V.scopt
     val akkaHttp = "com.typesafe.akka" %% "akka-http" % V.akkaHttp
