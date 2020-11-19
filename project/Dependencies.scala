@@ -34,7 +34,7 @@ object Dependencies {
     val jodaTime = "2.10.8"
     val slf4j = "1.7.30"
     val config = "1.4.1"
-    val prometheus = "0.6.0"
+    val prometheus = "0.9.0"
     val cbor = "2.9.10" // See snowplow/snowplow/issues/4266
     val retry = "0.3.3"
     val jackson = "2.9.10.6" // force this version of lib from dependencies to mitigate secutiry vulnerabilities, TODO: update underlying libraries
