@@ -33,7 +33,7 @@ object Dependencies {
     val nsqClient = "1.3.0"
     val jodaTime = "2.10.8"
     val slf4j = "1.7.30"
-    val config = "1.3.4"
+    val config = "1.4.1"
     val prometheus = "0.6.0"
     val cbor = "2.9.10" // See snowplow/snowplow/issues/4266
     val retry = "0.3.3"
