@@ -54,7 +54,7 @@ lazy val buildSettings = Seq(
 
 lazy val dockerSettings = Seq(
   maintainer in Docker := "Snowplow Analytics Ltd. <support@snowplowanalytics.com>",
-  dockerBaseImage := "snowplow-docker-registry.bintray.io/snowplow/base-debian:0.1.0",
+  dockerBaseImage := "snowplow-docker-registry.bintray.io/snowplow/base-debian:0.1.1",
   daemonUser in Docker := "snowplow",
   dockerUpdateLatest := true
 )
