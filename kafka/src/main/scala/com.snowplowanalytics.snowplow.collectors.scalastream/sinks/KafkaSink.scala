@@ -15,8 +15,6 @@ package sinks
 
 import java.util.Properties
 
-import scala.collection.JavaConverters._
-
 import org.apache.kafka.clients.producer._
 
 import model._
@@ -46,15 +44,16 @@ class KafkaSink(
     log.info(s"Create Kafka Producer to brokers: ${kafkaConfig.brokers}")
 
     val props = new Properties()
-    props.put("bootstrap.servers", kafkaConfig.brokers)
-    props.put("acks", "all")
-    props.put("retries", kafkaConfig.retries.toString)
-    props.put("buffer.memory", bufferConfig.byteLimit.toString)
-    props.put("linger.ms", bufferConfig.timeLimit.toString)
-    props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
-    props.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer")
+    props.setProperty("bootstrap.servers", kafkaConfig.brokers)
+    props.setProperty("acks", "all")
+    props.setProperty("retries", kafkaConfig.retries.toString)
+    props.setProperty("buffer.memory", bufferConfig.byteLimit.toString)
+    props.setProperty("linger.ms", bufferConfig.timeLimit.toString)
+    props.setProperty("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
+    props.setProperty("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer")
 
-    props.putAll(kafkaConfig.producerConf.getOrElse(Map()).asJava)
+    // Can't use `putAll` in JDK 11 because of https://github.com/scala/bug/issues/10418
+    kafkaConfig.producerConf.getOrElse(Map()).foreach { case (k, v) => props.setProperty(k, v) }
 
     new KafkaProducer[String, Array[Byte]](props)
   }

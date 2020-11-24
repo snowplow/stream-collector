@@ -48,6 +48,7 @@ lazy val buildSettings = Seq(
   version := "2.0.1",
   description := "Scala Stream Collector for Snowplow raw events",
   scalaVersion := "2.12.10",
+  javacOptions := Seq("-source", "11", "-target", "11"),
   resolvers ++= Dependencies.resolutionRepos
 )
 
