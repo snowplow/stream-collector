@@ -1,6 +1,8 @@
 # Scala Stream Collector
+[![Build Status][build-image]][build-wf]
 [![Release][release-image]][releases]
 [![License][license-image]][license]
+
 
 ## Introduction
 
@@ -47,8 +49,11 @@ limitations under the License.
 [roadmap]: https://github.com/snowplow/snowplow/wiki/Scala-Stream-collector-roadmap
 [contributing]: https://github.com/snowplow/snowplow/wiki/Scala-Stream-collector-contributing
 
-[license-image]: http://img.shields.io/badge/license-Apache--2-blue.svg?style=flat
-[license]: http://www.apache.org/licenses/LICENSE-2.0
+[build-image]: https://github.com/snowplow/stream-collector/workflows/build/badge.svg
+[build-wf]: https://github.com/snowplow/stream-collector/actions?query=workflow%3Abuild
 
 [release-image]: http://img.shields.io/badge/release-2.0.1-blue.svg?style=flat
 [releases]: https://github.com/snowplow/stream-collector
+
+[license-image]: http://img.shields.io/badge/license-Apache--2-blue.svg?style=flat
+[license]: http://www.apache.org/licenses/LICENSE-2.0
