@@ -14,6 +14,8 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
+import java.net.InetAddress
+
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.testkit.Specs2RouteTest
@@ -22,7 +24,7 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.model.DntCookieMatc
 import org.specs2.mutable.Specification
 
 class CollectorRouteSpec extends Specification with Specs2RouteTest {
-  val mkRoute = (withRedirects: Boolean) =>
+  val mkRoute = (withRedirects: Boolean, spAnonymous: Option[String]) =>
     new CollectorRoute {
       override val collectorService = new Service {
         def preflightResponse(req: HttpRequest): HttpResponse =
@@ -41,16 +43,18 @@ class CollectorRouteSpec extends Specification with Specs2RouteTest {
           request: HttpRequest,
           pixelExpected: Boolean,
           doNotTrack: Boolean,
-          contentType: Option[ContentType] = None
+          contentType: Option[ContentType] = None,
+          spAnonymous: Option[String]      = spAnonymous
         ): (HttpResponse, List[Array[Byte]])                       = (HttpResponse(200, entity = s"cookie"), List.empty)
         def cookieName: Option[String]                             = Some("name")
         def doNotTrackCookie: Option[DntCookieMatcher]             = None
         def determinePath(vendor: String, version: String): String = "/p1/p2"
-        def enableDefaultRedirect                                  = withRedirects
+        def enableDefaultRedirect: Boolean                         = withRedirects
       }
     }
-  val route                 = mkRoute(true)
-  val routeWithoutRedirects = mkRoute(false)
+  val route                      = mkRoute(true, None)
+  val routeWithoutRedirects      = mkRoute(false, None)
+  val routeWithAnonymousTracking = mkRoute(true, Some("*"))
 
   "The collector route" should {
     "respond to the cors route with a preflight response" in {
@@ -182,6 +186,23 @@ class CollectorRouteSpec extends Specification with Specs2RouteTest {
           } ~> check {
           responseAs[String] shouldEqual "true"
         }
+      }
+    }
+
+    "have a directive to handle the IP address depending on whether SP-Anonymous header is present or not" in {
+      "SP-Anonymous present should obfuscate the IP address" in {
+        Get() ~> `X-Forwarded-For`(RemoteAddress.IP(InetAddress.getByName("127.0.0.1"))) ~> route.extractors(
+          Some("*")
+        ) { (_, ip, _) =>
+          complete(ip.toString)
+        } ~> check { responseAs[String] shouldEqual "unknown" }
+      }
+      "no SP-Anonymous present should extract the IP address" in {
+        Get() ~> `Remote-Address`(RemoteAddress.IP(InetAddress.getByName("127.0.0.1"))) ~> route.extractors(
+          None
+        ) { (_, ip, _) =>
+          complete(ip.toString)
+        } ~> check { responseAs[String] shouldEqual "127.0.0.1" }
       }
     }
   }
