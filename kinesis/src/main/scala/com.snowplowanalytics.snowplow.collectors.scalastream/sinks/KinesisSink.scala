@@ -56,8 +56,6 @@ object KinesisSink {
     val clients = for {
       credentials <- getProvider(kinesisConfig.aws)
       kinesisClient = createKinesisClient(credentials, kinesisConfig.endpoint, kinesisConfig.region)
-      _ <- if (streamExists(kinesisClient, streamName)) true.asRight
-      else new IllegalArgumentException(s"Kinesis stream $streamName doesn't exist").asLeft
       sqsClientAndName <- sqsBuffer(sqsBufferName, credentials, kinesisConfig.region)
     } yield (kinesisClient, sqsClientAndName)
 
@@ -138,35 +136,16 @@ object KinesisSink {
                 exception: AmazonClientException,
                 retriesAttempted: Int
               ): Boolean =
-                retriesAttempted < 10 &&
-                  (exception match {
-                    case _: ProvisionedThroughputExceededException => false
-                    case _                                         => true
-                  })
+                false
             },
             new PredefinedBackoffStrategies.FullJitterBackoffStrategy(1000, 5 * 3600),
-            10,
+            0,
             true,
             true
           )
         )
       )
       .build()
-
-  /**
-    * Check whether a Kinesis stream exists
-    *
-    * @param name Name of the stream
-    * @return Whether the stream exists
-    */
-  private def streamExists(client: AmazonKinesis, name: String): Boolean =
-    try {
-      val describeStreamResult = client.describeStream(name)
-      val status               = describeStreamResult.getStreamDescription.getStreamStatus
-      status == "ACTIVE" || status == "UPDATING"
-    } catch {
-      case _: ResourceNotFoundException => false
-    }
 
   private def createSqsClient(provider: AWSCredentialsProvider, region: String) =
     Either.catchNonFatal(
