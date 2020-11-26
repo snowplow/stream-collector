@@ -50,7 +50,8 @@ trait Service {
     request: HttpRequest,
     pixelExpected: Boolean,
     doNotTrack: Boolean,
-    contentType: Option[ContentType] = None
+    contentType: Option[ContentType] = None,
+    spAnonymous: Option[String]      = None
   ): (HttpResponse, List[Array[Byte]])
   def cookieName: Option[String]
   def doNotTrackCookie: Option[DntCookieMatcher]
@@ -98,7 +99,8 @@ class CollectorService(
     request: HttpRequest,
     pixelExpected: Boolean,
     doNotTrack: Boolean,
-    contentType: Option[ContentType] = None
+    contentType: Option[ContentType] = None,
+    spAnonymous: Option[String]
   ): (HttpResponse, List[Array[Byte]]) = {
     val queryParams = Uri.Query(queryString).toMap
 
@@ -116,13 +118,14 @@ class CollectorService(
       else UUID.randomUUID().toString
     }
 
-    val ct    = contentType.map(_.value.toLowerCase)
-    val event = buildEvent(queryString, body, path, userAgent, refererUri, hostname, ipAddress, request, nuid, ct)
+    val ct = contentType.map(_.value.toLowerCase)
+    val event =
+      buildEvent(queryString, body, path, userAgent, refererUri, hostname, ipAddress, request, nuid, ct, spAnonymous)
     // we don't store events in case we're bouncing
     val sinkResponses = if (!bounce && !doNotTrack) sinkEvent(event, partitionKey) else Nil
 
     val headers = bounceLocationHeader(queryParams, request, config.cookieBounce, bounce) ++
-      cookieHeader(request, config.cookieConfig, nuid, doNotTrack) ++
+      cookieHeader(request, config.cookieConfig, nuid, doNotTrack, spAnonymous) ++
       cacheControl(pixelExpected) ++
       List(
         RawHeader("P3P", "policyref=\"%s\", CP=\"%s\"".format(config.p3p.policyRef, config.p3p.CP)),
@@ -148,7 +151,7 @@ class CollectorService(
       List(
         accessControlAllowOriginHeader(request),
         `Access-Control-Allow-Credentials`(true),
-        `Access-Control-Allow-Headers`("Content-Type"),
+        `Access-Control-Allow-Headers`("Content-Type", "SP-Anonymous"),
         `Access-Control-Max-Age`(corsConfig.accessControlMaxAge.toSeconds)
       )
     )
@@ -195,7 +198,8 @@ class CollectorService(
     ipAddress: String,
     request: HttpRequest,
     networkUserId: String,
-    contentType: Option[String]
+    contentType: Option[String],
+    spAnonymous: Option[String]
   ): CollectorPayload = {
     val e = new CollectorPayload(
       "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0",
@@ -211,7 +215,7 @@ class CollectorService(
     refererUri.foreach(e.refererUri = _)
     e.hostname      = hostname
     e.networkUserId = networkUserId
-    e.headers       = (headers(request) ++ contentType).asJava
+    e.headers       = (headers(request, spAnonymous) ++ contentType).asJava
     contentType.foreach(e.contentType = _)
     e
   }
@@ -287,23 +291,28 @@ class CollectorService(
     request: HttpRequest,
     cookieConfig: Option[CookieConfig],
     networkUserId: String,
-    doNotTrack: Boolean
+    doNotTrack: Boolean,
+    spAnonymous: Option[String]
   ): Option[HttpHeader] =
     if (doNotTrack) {
       None
     } else {
-      cookieConfig.map { config =>
-        val responseCookie = HttpCookie(
-          name      = config.name,
-          value     = networkUserId,
-          expires   = Some(DateTime.now + config.expiration.toMillis),
-          domain    = cookieDomain(request.headers, config.domains, config.fallbackDomain),
-          path      = Some("/"),
-          secure    = config.secure,
-          httpOnly  = config.httpOnly,
-          extension = config.sameSite.map(value => s"SameSite=$value")
-        )
-        `Set-Cookie`(responseCookie)
+      spAnonymous match {
+        case Some(_) => None
+        case None =>
+          cookieConfig.map { config =>
+            val responseCookie = HttpCookie(
+              name      = config.name,
+              value     = networkUserId,
+              expires   = Some(DateTime.now + config.expiration.toMillis),
+              domain    = cookieDomain(request.headers, config.domains, config.fallbackDomain),
+              path      = Some("/"),
+              secure    = config.secure,
+              httpOnly  = config.httpOnly,
+              extension = config.sameSite.map(value => s"SameSite=$value")
+            )
+            `Set-Cookie`(responseCookie)
+          }
       }
     }
 
@@ -336,11 +345,24 @@ class CollectorService(
       None
     }
 
-  /** Retrieves all headers from the request except Remote-Address and Raw-Request-URI */
-  def headers(request: HttpRequest): Seq[String] = request.headers.flatMap {
-    case _: `Remote-Address` | _: `Raw-Request-URI` => None
-    case other => Some(other.toString)
-  }
+  /** If the SP-Anonymous header is not present, retrieves all headers
+    * from the request except Remote-Address and Raw-Request-URI.
+    * If the SP-Anonymous header is present, additionally filters out the
+    * X-Forwarded-For and X-Real-IP headers as well.
+    */
+  def headers(request: HttpRequest, spAnonymous: Option[String]): Seq[String] =
+    spAnonymous match {
+      case None =>
+        request.headers.flatMap {
+          case _: `Remote-Address` | _: `Raw-Request-URI` => None
+          case other => Some(other.toString)
+        }
+      case Some(_) =>
+        request.headers.flatMap {
+          case _: `Remote-Address` | _: `Raw-Request-URI` | _: `X-Forwarded-For` | _: `X-Real-Ip` => None
+          case other => Some(other.toString)
+        }
+    }
 
   /** If the pixel is requested, this attaches cache control headers to the response to prevent any caching. */
   def cacheControl(pixelExpected: Boolean): List[`Cache-Control`] =

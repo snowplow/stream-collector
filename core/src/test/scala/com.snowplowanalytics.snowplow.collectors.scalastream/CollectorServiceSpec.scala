@@ -43,7 +43,7 @@ class CollectorServiceSpec extends Specification {
   )
   val uuidRegex    = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}".r
   val event        = new CollectorPayload("iglu-schema", "ip", System.currentTimeMillis, "UTF-8", "collector")
-  val hs           = List(`Raw-Request-URI`("uri"))
+  val hs           = List(`Raw-Request-URI`("uri"), `X-Forwarded-For`(RemoteAddress(InetAddress.getByName("127.0.0.1"))))
   val serializer   = new TSerializer()
   val deserializer = new TDeserializer()
 
@@ -72,6 +72,7 @@ class CollectorServiceSpec extends Specification {
         )
         r.headers must contain(`Access-Control-Allow-Origin`(HttpOriginRange.`*`))
         r.headers must contain(`Access-Control-Allow-Credentials`(true))
+        r.headers.filter(_.toString.startsWith("Set-Cookie")) must have size 1
         l must have size 1
       }
       "not store stuff and provide no cookie if do not track is on" in {
@@ -98,6 +99,25 @@ class CollectorServiceSpec extends Specification {
         r.headers must contain(`Access-Control-Allow-Origin`(HttpOriginRange.`*`))
         r.headers must contain(`Access-Control-Allow-Credentials`(true))
         l must have size 0
+      }
+      "not set a cookie if SP-Anonymous is present" in {
+        val (r, _) = service.cookie(
+          Some("nuid=12"),
+          Some("b"),
+          "p",
+          None,
+          None,
+          None,
+          "h",
+          RemoteAddress.Unknown,
+          HttpRequest(),
+          false,
+          false,
+          None,
+          Some("*")
+        )
+
+        r.headers.filter(_.toString.startsWith("Set-Cookie")) must have size 0
       }
       "not store stuff if bouncing and provide a location header" in {
         val (r, l) = bouncingService.cookie(
@@ -147,7 +167,7 @@ class CollectorServiceSpec extends Specification {
           List(
             `Access-Control-Allow-Origin`(HttpOriginRange.`*`),
             `Access-Control-Allow-Credentials`(true),
-            `Access-Control-Allow-Headers`("Content-Type"),
+            `Access-Control-Allow-Headers`("Content-Type", "SP-Anonymous"),
             `Access-Control-Max-Age`(-1)
           )
         )
@@ -210,13 +230,46 @@ class CollectorServiceSpec extends Specification {
     }
 
     "buildEvent" in {
-      "fill the correct values" in {
+      "fill the correct values if SP-Anonymous is not present" in {
+        val l   = `Location`("l")
+        val xff = `X-Forwarded-For`(RemoteAddress(InetAddress.getByName("127.0.0.1")))
+        val ct  = Some("image/gif")
+        val r   = HttpRequest().withHeaders(l :: hs)
+        val e   = service.buildEvent(Some("q"), Some("b"), "p", Some("ua"), Some("ref"), "h", "ip", r, "nuid", ct, None)
+        e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
+        e.ipAddress shouldEqual "ip"
+        e.encoding shouldEqual "UTF-8"
+        e.collector shouldEqual s"${BuildInfo.shortName}-${BuildInfo.version}-kinesis"
+        e.querystring shouldEqual "q"
+        e.body shouldEqual "b"
+        e.path shouldEqual "p"
+        e.userAgent shouldEqual "ua"
+        e.refererUri shouldEqual "ref"
+        e.hostname shouldEqual "h"
+        e.networkUserId shouldEqual "nuid"
+        e.headers shouldEqual (List(l) ++ List(xff) ++ ct).map(_.toString).asJava
+        e.contentType shouldEqual ct.get
+      }
+      "fill the correct values if SP-Anonymous is present" in {
         val l  = `Location`("l")
         val ct = Some("image/gif")
         val r  = HttpRequest().withHeaders(l :: hs)
-        val e  = service.buildEvent(Some("q"), Some("b"), "p", Some("ua"), Some("ref"), "h", "ip", r, "nuid", ct)
+        val e =
+          service.buildEvent(
+            Some("q"),
+            Some("b"),
+            "p",
+            Some("ua"),
+            Some("ref"),
+            "h",
+            "unknown",
+            r,
+            "nuid",
+            ct,
+            Some("*")
+          )
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
-        e.ipAddress shouldEqual "ip"
+        e.ipAddress shouldEqual "unknown"
         e.encoding shouldEqual "UTF-8"
         e.collector shouldEqual s"${BuildInfo.shortName}-${BuildInfo.version}-kinesis"
         e.querystring shouldEqual "q"
@@ -233,9 +286,10 @@ class CollectorServiceSpec extends Specification {
         val l  = `Location`("l")
         val ct = Some("image/gif")
         val r  = HttpRequest().withHeaders(l :: hs)
-        val e  = service.buildEvent(None, Some("b"), "p", Some("ua"), Some("ref"), "h", "ip", r, "nuid", ct)
+        val e =
+          service.buildEvent(None, Some("b"), "p", Some("ua"), Some("ref"), "h", "unknown", r, "nuid", ct, Some("*"))
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
-        e.ipAddress shouldEqual "ip"
+        e.ipAddress shouldEqual "unknown"
         e.encoding shouldEqual "UTF-8"
         e.collector shouldEqual s"${BuildInfo.shortName}-${BuildInfo.version}-kinesis"
         e.querystring shouldEqual null
@@ -260,6 +314,7 @@ class CollectorServiceSpec extends Specification {
 
     "buildHttpResponse" in {
       val redirConf = TestUtils.testConf.redirectMacro
+
       "rely on buildRedirectHttpResponse if redirect is true" in {
         val (res, Nil) = service.buildHttpResponse(event, Map("u" -> "12"), hs, true, true, false, redirConf)
         res shouldEqual HttpResponse(302).withHeaders(`RawHeader`("Location", "12") :: hs)
@@ -348,7 +403,7 @@ class CollectorServiceSpec extends Specification {
           httpOnly = false,
           sameSite = None
         )
-        val Some(`Set-Cookie`(cookie)) = service.cookieHeader(HttpRequest(), Some(conf), nuid, false)
+        val Some(`Set-Cookie`(cookie)) = service.cookieHeader(HttpRequest(), Some(conf), nuid, false, None)
 
         cookie.name shouldEqual conf.name
         cookie.value shouldEqual nuid
@@ -361,7 +416,7 @@ class CollectorServiceSpec extends Specification {
         cookie.extension must beEmpty
       }
       "give back None if no configuration is given" in {
-        service.cookieHeader(HttpRequest(), None, "nuid", false) shouldEqual None
+        service.cookieHeader(HttpRequest(), None, "nuid", false, None) shouldEqual None
       }
       "give back None if doNoTrack is true" in {
         val conf = CookieConfig(
@@ -374,7 +429,20 @@ class CollectorServiceSpec extends Specification {
           httpOnly = false,
           sameSite = None
         )
-        service.cookieHeader(HttpRequest(), Some(conf), "nuid", true) shouldEqual None
+        service.cookieHeader(HttpRequest(), Some(conf), "nuid", true, None) shouldEqual None
+      }
+      "give back None if SP-Anonymous header is present" in {
+        val conf = CookieConfig(
+          true,
+          "name",
+          5.seconds,
+          Some(List("domain")),
+          None,
+          secure   = false,
+          httpOnly = false,
+          sameSite = None
+        )
+        service.cookieHeader(HttpRequest(), Some(conf), "nuid", true, Some("*")) shouldEqual None
       }
       "give back a cookie header with Secure, HttpOnly and SameSite=None" in {
         val nuid = "nuid"
@@ -389,11 +457,11 @@ class CollectorServiceSpec extends Specification {
           sameSite = Some("None")
         )
         val Some(`Set-Cookie`(cookie)) =
-          service.cookieHeader(HttpRequest(), Some(conf), networkUserId = nuid, doNotTrack = false)
+          service.cookieHeader(HttpRequest(), Some(conf), networkUserId = nuid, doNotTrack = false, spAnonymous = None)
         cookie.secure must beTrue
         cookie.httpOnly must beTrue
         cookie.extension must beSome("SameSite=None")
-        service.cookieHeader(HttpRequest(), Some(conf), nuid, true) shouldEqual None
+        service.cookieHeader(HttpRequest(), Some(conf), nuid, true, None) shouldEqual None
       }
     }
 
@@ -437,7 +505,7 @@ class CollectorServiceSpec extends Specification {
     }
 
     "headers" in {
-      "filter out the non Remote-Address and Raw-Request-URI headers" in {
+      "filter out the correct headers if SP-Anonymous is not present" in {
         val request = HttpRequest().withHeaders(
           List(
             `Location`("a"),
@@ -445,7 +513,19 @@ class CollectorServiceSpec extends Specification {
             `Raw-Request-URI`("uri")
           )
         )
-        service.headers(request) shouldEqual List(`Location`("a").toString)
+        service.headers(request, None) shouldEqual List(`Location`("a").toString)
+      }
+      "filter out the correct headers if SP-Anonymous is present" in {
+        val request = HttpRequest().withHeaders(
+          List(
+            `Location`("a"),
+            `Remote-Address`(RemoteAddress.Unknown),
+            `Raw-Request-URI`("uri"),
+            `X-Forwarded-For`(RemoteAddress(InetAddress.getByName("127.0.0.1"))),
+            `X-Real-Ip`(RemoteAddress(InetAddress.getByName("127.0.0.1")))
+          )
+        )
+        service.headers(request, Some("*")) shouldEqual List(`Location`("a").toString)
       }
     }
 

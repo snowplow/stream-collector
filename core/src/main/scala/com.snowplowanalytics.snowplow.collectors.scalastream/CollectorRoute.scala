@@ -18,7 +18,6 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.HttpCookiePair
 import akka.http.scaladsl.server.{Directive1, Route}
 import akka.http.scaladsl.server.Directives._
-
 import model.DntCookieMatcher
 import monitoring.BeanRegistry
 
@@ -27,9 +26,15 @@ trait CollectorRoute {
 
   private val headers = optionalHeaderValueByName("User-Agent") &
     optionalHeaderValueByName("Referer") &
-    optionalHeaderValueByName("Raw-Request-URI")
+    optionalHeaderValueByName("Raw-Request-URI") &
+    optionalHeaderValueByName("SP-Anonymous")
 
-  private val extractors = extractHost & extractClientIP & extractRequest
+  private[scalastream] def extractors(spAnonymous: Option[String]) =
+    spAnonymous match {
+      case Some(_) =>
+        extractHost & extractClientIP.map[RemoteAddress](_ => RemoteAddress.Unknown) & extractRequest
+      case _ => extractHost & extractClientIP & extractRequest
+    }
 
   def extractContentType: Directive1[ContentType] =
     extractRequestContext.map(_.request.entity.contentType)
@@ -46,9 +51,9 @@ trait CollectorRoute {
     doNotTrack(collectorService.doNotTrackCookie) { dnt =>
       cookieIfWanted(collectorService.cookieName) { reqCookie =>
         val cookie = reqCookie.map(_.toCookie)
-        headers { (userAgent, refererURI, rawRequestURI) =>
+        headers { (userAgent, refererURI, rawRequestURI, spAnonymous) =>
           val qs = queryString(rawRequestURI)
-          extractors { (host, ip, request) =>
+          extractors(spAnonymous) { (host, ip, request) =>
             // get the adapter vendor and version from the path
             path(Segment / Segment) { (vendor, version) =>
               val path = collectorService.determinePath(vendor, version)
@@ -67,7 +72,8 @@ trait CollectorRoute {
                       request,
                       pixelExpected = false,
                       doNotTrack    = dnt,
-                      Some(ct)
+                      Some(ct),
+                      spAnonymous
                     )
                     incrementRequests(r.status)
                     complete(r)
@@ -86,7 +92,9 @@ trait CollectorRoute {
                     ip,
                     request,
                     pixelExpected = true,
-                    doNotTrack    = dnt
+                    doNotTrack    = dnt,
+                    None,
+                    spAnonymous
                   )
                   incrementRequests(r.status)
                   complete(r)
@@ -105,7 +113,9 @@ trait CollectorRoute {
                     ip,
                     request,
                     pixelExpected = true,
-                    doNotTrack    = dnt
+                    doNotTrack    = dnt,
+                    None,
+                    spAnonymous
                   )
                   incrementRequests(r.status)
                   complete(r)
