@@ -23,8 +23,8 @@ object BuildSettings {
   import sbtassembly.AssemblyPlugin.autoImport._
   lazy val sbtAssemblySettings = Seq(
     assemblyJarName in assembly := { s"${moduleName.value}-${version.value}.jar" },
-    // merge strategy for fixing netty conflict
     assemblyMergeStrategy in assembly := {
+      // merge strategy for fixing netty conflict
       case PathList("io", "netty", xs @ _*)                => MergeStrategy.first
       case x if x.endsWith("io.netty.versions.properties") => MergeStrategy.discard
       case x if x.endsWith("module-info.class")            => MergeStrategy.first
