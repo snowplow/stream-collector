@@ -14,9 +14,7 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 package sinks
 
 import java.nio.ByteBuffer
-
 import java.util.concurrent.ScheduledExecutorService
-
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -27,14 +25,20 @@ import com.amazonaws.services.kinesis.model._
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
 import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClientBuilder}
 import com.amazonaws.services.sqs.{AmazonSQS, AmazonSQSClientBuilder}
-import com.amazonaws.services.sqs.model.{MessageAttributeValue, SendMessageBatchRequest, SendMessageBatchRequestEntry}
-import java.util.UUID
+import com.amazonaws.services.sqs.model.{
+  MessageAttributeValue,
+  QueueDoesNotExistException,
+  SendMessageBatchRequest,
+  SendMessageBatchRequestEntry
+}
 
+import java.util.UUID
 import model._
 import KinesisSink.SqsClientAndName
 import com.amazonaws.{AmazonClientException, AmazonWebServiceRequest, ClientConfiguration}
 import com.amazonaws.retry.RetryPolicy.RetryCondition
 import com.amazonaws.retry.{PredefinedBackoffStrategies, RetryPolicy}
+import org.slf4j.LoggerFactory
 
 /** KinesisSink companion object with factory method */
 object KinesisSink {
@@ -56,9 +60,8 @@ object KinesisSink {
     val clients = for {
       credentials <- getProvider(kinesisConfig.aws)
       kinesisClient = createKinesisClient(credentials, kinesisConfig.endpoint, kinesisConfig.region)
-      _ <- if (streamExists(kinesisClient, streamName)) true.asRight
-      else new IllegalArgumentException(s"Kinesis stream $streamName doesn't exist").asLeft
       sqsClientAndName <- sqsBuffer(sqsBufferName, credentials, kinesisConfig.region)
+      _ = runChecks(kinesisClient, streamName, sqsClientAndName)
     } yield (kinesisClient, sqsClientAndName)
 
     clients.map {
@@ -206,6 +209,40 @@ object KinesisSink {
       case None => None.asRight
     }
 
+  /**
+    * Check whether an SQS queue (buffer) exists
+    * @param name Name of the queue
+    * @return Whether the queue exists
+    */
+  private def sqsQueueExists(client: AmazonSQS, name: String): Boolean =
+    try {
+      client.getQueueUrl(name)
+      true
+    } catch {
+      case _: QueueDoesNotExistException => false
+    }
+
+  private def runChecks(
+    kinesisClient: AmazonKinesis,
+    streamName: String,
+    sqs: Option[SqsClientAndName]
+  ): Unit = {
+    lazy val log = LoggerFactory.getLogger(getClass())
+    val kExists  = streamExists(kinesisClient, streamName)
+
+    if (!kExists) log.error(s"Kinesis stream $streamName doesn't exist or isn't available.")
+
+    // format: off
+    sqs match {
+      case Some(clientAndName) =>
+        if (sqsQueueExists(clientAndName.sqsClient, clientAndName.sqsBufferName)) ()
+        else log.error(s"SQS queue ${clientAndName.sqsBufferName} is defined in config file, but does not exist or isn't available.")
+      case None =>
+        if (kExists) ()
+        else log.error(s"SQS buffer is not configured.")
+    }
+    // format: on
+  }
 }
 
 /**
@@ -239,7 +276,7 @@ class KinesisSink private (
   maybeSqs match {
     case Some(sqs) =>
       log.info(
-        s"SQS buffer for failed Kinesis stream '$streamName' is set up as: ${sqs.sqsBufferName}."
+        s"SQS buffer for '$streamName' Kinesis sink is set up as: ${sqs.sqsBufferName}."
       )
     case None =>
       log.warn(
