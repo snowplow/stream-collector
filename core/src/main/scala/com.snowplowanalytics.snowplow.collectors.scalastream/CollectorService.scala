@@ -15,20 +15,23 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import java.util.UUID
-
 import scala.collection.JavaConverters._
-
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model.headers.CacheDirectives._
-
+import cats.data.NonEmptyList
+import cats.implicits._
 import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
+import com.snowplowanalytics.snowplow.badrows._
 import org.apache.commons.codec.binary.Base64
 import org.slf4j.LoggerFactory
-
 import generated.BuildInfo
+import io.circe.syntax.EncoderOps
 import model._
 import utils.SplitBatch
+
+import java.nio.charset.StandardCharsets.UTF_8
+import java.time.Instant
 
 /**
   * Service responding to HTTP requests, mainly setting a cookie identifying the user and storing
@@ -102,41 +105,66 @@ class CollectorService(
     contentType: Option[ContentType] = None,
     spAnonymous: Option[String]
   ): (HttpResponse, List[Array[Byte]]) = {
-    val queryParams = Uri.Query(queryString).toMap
-
     val (ipAddress, partitionKey) = ipAndPartitionKey(ip, config.streams.useIpAddressAsPartitionKey)
 
-    val redirect = path.startsWith("/r/")
+    extractQueryParams(queryString) match {
+      case Right(params) =>
+        val redirect = path.startsWith("/r/")
 
-    val nuidOpt  = networkUserId(request, cookie)
-    val bouncing = queryParams.get(config.cookieBounce.name).isDefined
-    // we bounce if it's enabled and we couldn't retrieve the nuid and we're not already bouncing
-    val bounce = config.cookieBounce.enabled && nuidOpt.isEmpty && !bouncing &&
-      pixelExpected && !redirect
-    val nuid = nuidOpt.getOrElse {
-      if (bouncing) config.cookieBounce.fallbackNetworkUserId
-      else UUID.randomUUID().toString
+        val nuidOpt  = networkUserId(request, cookie)
+        val bouncing = params.contains(config.cookieBounce.name)
+        // we bounce if it's enabled and we couldn't retrieve the nuid and we're not already bouncing
+        val bounce = config.cookieBounce.enabled && nuidOpt.isEmpty && !bouncing &&
+          pixelExpected && !redirect
+        val nuid = nuidOpt.getOrElse {
+          if (bouncing) config.cookieBounce.fallbackNetworkUserId
+          else UUID.randomUUID().toString
+        }
+
+        val ct = contentType.map(_.value.toLowerCase)
+        val event =
+          buildEvent(
+            queryString,
+            body,
+            path,
+            userAgent,
+            refererUri,
+            hostname,
+            ipAddress,
+            request,
+            nuid,
+            ct,
+            spAnonymous
+          )
+        // we don't store events in case we're bouncing
+        val sinkResponses = if (!bounce && !doNotTrack) sinkEvent(event, partitionKey) else Nil
+
+        val headers = bounceLocationHeader(params, request, config.cookieBounce, bounce) ++
+          cookieHeader(request, config.cookieConfig, nuid, doNotTrack, spAnonymous) ++
+          cacheControl(pixelExpected) ++
+          List(
+            RawHeader("P3P", "policyref=\"%s\", CP=\"%s\"".format(config.p3p.policyRef, config.p3p.CP)),
+            accessControlAllowOriginHeader(request),
+            `Access-Control-Allow-Credentials`(true)
+          )
+
+        val (httpResponse, badRedirectResponses) =
+          buildHttpResponse(event, params, headers.toList, redirect, pixelExpected, bounce, config.redirectMacro)
+        (httpResponse, badRedirectResponses ++ sinkResponses)
+
+      case Left(error) =>
+        val badRow = BadRow.GenericError(
+          Processor(generated.BuildInfo.name, generated.BuildInfo.version),
+          Failure.GenericFailure(Instant.now(), NonEmptyList.one(error.getMessage)),
+          Payload.RawPayload(queryString.getOrElse(""))
+        )
+        // We cannot return 400 to the JS tracker, as that will lead to the event getting eternally stuck in the client cache.
+        (HttpResponse(StatusCodes.OK), sinkBad(badRow, partitionKey))
     }
-
-    val ct = contentType.map(_.value.toLowerCase)
-    val event =
-      buildEvent(queryString, body, path, userAgent, refererUri, hostname, ipAddress, request, nuid, ct, spAnonymous)
-    // we don't store events in case we're bouncing
-    val sinkResponses = if (!bounce && !doNotTrack) sinkEvent(event, partitionKey) else Nil
-
-    val headers = bounceLocationHeader(queryParams, request, config.cookieBounce, bounce) ++
-      cookieHeader(request, config.cookieConfig, nuid, doNotTrack, spAnonymous) ++
-      cacheControl(pixelExpected) ++
-      List(
-        RawHeader("P3P", "policyref=\"%s\", CP=\"%s\"".format(config.p3p.policyRef, config.p3p.CP)),
-        accessControlAllowOriginHeader(request),
-        `Access-Control-Allow-Credentials`(true)
-      )
-
-    val (httpResponse, badRedirectResponses) =
-      buildHttpResponse(event, queryParams, headers.toList, redirect, pixelExpected, bounce, config.redirectMacro)
-    (httpResponse, badRedirectResponses ++ sinkResponses)
   }
+
+  def extractQueryParams(qs: Option[String]): Either[IllegalUriException, Map[String, String]] =
+    Either.catchOnly[IllegalUriException] { Uri.Query(qs).toMap }
 
   /**
     * Creates a response to the CORS preflight Options request
@@ -232,6 +260,12 @@ class CollectorService(
     val sinkResponseBad  = sinks.bad.storeRawEvents(eventSplit.bad, partitionKey)
     // Sink Responses for Test Sink
     sinkResponseGood ++ sinkResponseBad
+  }
+
+  /** Sinks a bad row generated by an illegal querystring. */
+  def sinkBad(badRow: BadRow, partitionKey: String): List[Array[Byte]] = {
+    val toSink = List(badRow.asJson.noSpaces.getBytes(UTF_8))
+    sinks.bad.storeRawEvents(toSink, partitionKey)
   }
 
   /** Builds the final http response from  */

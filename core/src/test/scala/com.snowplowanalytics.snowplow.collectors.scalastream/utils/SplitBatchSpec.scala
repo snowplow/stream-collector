@@ -77,7 +77,7 @@ class SplitBatchSpec extends Specification {
       sizeViolation.failure.maximumAllowedSizeBytes must_== 100
       sizeViolation.failure.actualSizeBytes must_== 1019
       sizeViolation.failure.expectation must_== "oversized collector payload: GET requests cannot be split"
-      sizeViolation.payload.line must_== "CollectorP"
+      sizeViolation.payload.event must_== "CollectorP"
       sizeViolation.processor shouldEqual Processor(generated.BuildInfo.name, generated.BuildInfo.version)
       actual.good must_== Nil
     }
@@ -95,7 +95,7 @@ class SplitBatchSpec extends Specification {
       sizeViolation
         .failure
         .expectation must_== "oversized collector payload: cannot split POST requests which are not json expected json value got 'ssssss...' (line 1, column 1)"
-      sizeViolation.payload.line must_== "CollectorP"
+      sizeViolation.payload.event must_== "CollectorP"
       sizeViolation.processor shouldEqual Processor(generated.BuildInfo.name, generated.BuildInfo.version)
     }
 
@@ -120,10 +120,10 @@ class SplitBatchSpec extends Specification {
       sizeViolation.failure.actualSizeBytes must_== 1091
       sizeViolation
         .failure
-        .expectation must_== "oversized collector payload: cannot split POST requests which are not self-describing INVALID_IGLUURI"
+        .expectation must_== "oversized collector payload: cannot split POST requests which are not self-describing Invalid Iglu URI: s, code: INVALID_IGLUURI"
       sizeViolation
         .payload
-        .line must_== "CollectorPayload(schema:null, ipAddress:null, timestamp:0, encoding:null, collector:null, path:ppppp"
+        .event must_== "CollectorPayload(schema:null, ipAddress:null, timestamp:0, encoding:null, collector:null, path:ppppp"
       sizeViolation.processor shouldEqual Processor(generated.BuildInfo.name, generated.BuildInfo.version)
     }
 

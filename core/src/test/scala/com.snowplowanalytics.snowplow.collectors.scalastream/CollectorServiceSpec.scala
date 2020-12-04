@@ -15,22 +15,25 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import java.net.InetAddress
-
 import scala.collection.immutable.Seq
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
-
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model.headers.CacheDirectives._
-
+import cats.data.NonEmptyList
 import org.apache.thrift.{TDeserializer, TSerializer}
-
 import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
+import com.snowplowanalytics.snowplow.badrows.{BadRow, Failure, Payload, Processor}
 import org.specs2.mutable.Specification
-
 import generated.BuildInfo
+import io.circe._
+import io.circe.parser._
+import io.circe.syntax.EncoderOps
 import model._
+
+import java.nio.charset.StandardCharsets
+import java.time.Instant
 
 class CollectorServiceSpec extends Specification {
   val service = new CollectorService(
@@ -158,6 +161,48 @@ class CollectorServiceSpec extends Specification {
         val newEvent = new CollectorPayload("iglu-schema", "ip", System.currentTimeMillis, "UTF-8", "collector")
         deserializer.deserialize(newEvent, l.head)
         newEvent.networkUserId shouldEqual "new-nuid"
+      }
+      "respond with a 200 OK and a bad row in case of illegal querystring" in {
+        val (r, l) = service.cookie(
+          Some("a b"),
+          None,
+          "p",
+          None,
+          None,
+          None,
+          "h",
+          RemoteAddress.Unknown,
+          HttpRequest(),
+          false,
+          false
+        )
+
+        val brJson  = parse(new String(l.head, StandardCharsets.UTF_8)).getOrElse(Json.Null)
+        val failure = brJson.hcursor.downField("failure").downField("errors").downArray.as[String]
+        val payload = brJson.hcursor.downField("payload").as[String]
+
+        r.status mustEqual StatusCodes.OK
+        l must have size 1
+        failure must beRight(
+          "Illegal query: Invalid input ' ', expected '+', '=', query-char, 'EOI', '&' or pct-encoded (line 1, column 2): a b\n ^"
+        )
+        payload must beRight("a b")
+      }
+    }
+
+    "extractQueryParams" in {
+      "extract the parameters from a valid querystring" in {
+        val qs = Some("a=b&c=d")
+        val r  = service.extractQueryParams(qs)
+
+        r shouldEqual Right(Map("a" -> "b", "c" -> "d"))
+      }
+
+      "fail on invalid querystring" in {
+        val qs = Some("a=b&c=d a")
+        val r  = service.extractQueryParams(qs)
+
+        r should beLeft
       }
     }
 
@@ -309,6 +354,20 @@ class CollectorServiceSpec extends Specification {
         val l = service.sinkEvent(event, "key")
         l must have size 1
         l.head.zip(serializer.serialize(event)).forall { case (a, b) => a mustEqual b }
+      }
+    }
+
+    "sinkBad" in {
+      "write out the generated bad row" in {
+        val br = BadRow.GenericError(
+          Processor(generated.BuildInfo.name, generated.BuildInfo.version),
+          Failure.GenericFailure(Instant.now(), NonEmptyList.one("IllegalQueryString")),
+          Payload.RawPayload("")
+        )
+        val l = service.sinkBad(br, "key")
+
+        l must have size 1
+        l.head.zip(br.asJson.noSpaces).forall { case (a, b) => a mustEqual b }
       }
     }
 
