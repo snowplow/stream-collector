@@ -240,7 +240,7 @@ collector {
       threadPoolSize = ${?COLLECTOR_STREAMS_SINK_THREAD_POOL_SIZE}
 
       # Optional SQS buffer for good and bad events (respectively).
-      # When messages can't be sent to Kinesiss, they will be sent to SQS.
+      # When messages can't be sent to Kinesis, they will be sent to SQS.
       # If not configured, sending to Kinesis will be retried. 
       sqsGoodBuffer = {{sqsGoodBuffer}}
       sqsGoodBuffer = ${?COLLECTOR_STREAMS_SINK_SQS_GOOD_BUFFER}
