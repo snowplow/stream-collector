@@ -69,7 +69,7 @@ lazy val root = project.in(file(".")).settings(buildSettings).aggregate(core, ki
 
 lazy val core = project
   .settings(moduleName := "snowplow-stream-collector-core")
-  .settings(buildSettings)
+  .settings(buildSettings ++ BuildSettings.sbtAssemblySettings)
   .settings(libraryDependencies ++= commonDependencies)
   .enablePlugins(BuildInfoPlugin)
   .settings(
