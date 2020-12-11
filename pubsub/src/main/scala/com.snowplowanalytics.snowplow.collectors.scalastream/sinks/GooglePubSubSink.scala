@@ -14,10 +14,6 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 package sinks
 
 import java.util.concurrent.Executors
-
-import scala.collection.JavaConverters._
-
-import cats.syntax.either._
 import com.google.api.core.{ApiFutureCallback, ApiFutures}
 import com.google.api.gax.batching.BatchingSettings
 import com.google.api.gax.retrying.RetrySettings
@@ -27,8 +23,12 @@ import com.google.pubsub.v1.{ProjectName, ProjectTopicName, PubsubMessage}
 import com.google.protobuf.ByteString
 import org.threeten.bp.Duration
 
-import model._
-import util._
+import scala.collection.JavaConverters._
+import scala.util._
+
+import cats.syntax.either._
+
+import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 
 /** GooglePubSubSink companion object with factory method */
 object GooglePubSubSink {

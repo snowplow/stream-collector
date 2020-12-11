@@ -18,6 +18,7 @@ import java.time.Duration
 
 import akka.http.scaladsl.model.{HttpMethod, StatusCode, Uri}
 import akka.http.scaladsl.testkit.Specs2RouteTest
+
 import org.specs2.mutable.Specification
 
 class MetricsRouteSpec extends Specification with Specs2RouteTest {

@@ -16,12 +16,13 @@ package com.snowplowanalytics.snowplow.collectors.scalastream.metrics
 
 import java.time.Duration
 
+import scala.language.reflectiveCalls
+
 import akka.http.scaladsl.model.{HttpMethod, StatusCode, Uri}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.testkit.Specs2RouteTest
-import org.specs2.mutable.Specification
 
-import scala.language.reflectiveCalls
+import org.specs2.mutable.Specification
 
 class MetricsDirectivesSpec extends Specification with Specs2RouteTest {
 

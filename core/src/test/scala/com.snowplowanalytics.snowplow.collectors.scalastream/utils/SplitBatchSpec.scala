@@ -15,15 +15,16 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 package utils
 
-import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
-import com.snowplowanalytics.snowplow.badrows._
-import io.circe.Json
-import io.circe.parser._
-import io.circe.syntax._
 import org.apache.thrift.TDeserializer
 import org.specs2.mutable.Specification
 
-import model.SplitBatchResult
+import io.circe.Json
+import io.circe.parser._
+import io.circe.syntax._
+
+import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
+import com.snowplowanalytics.snowplow.badrows._
+import com.snowplowanalytics.snowplow.collectors.scalastream.model.SplitBatchResult
 
 class SplitBatchSpec extends Specification {
   "SplitBatch.split" should {

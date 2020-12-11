@@ -16,8 +16,8 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import cats.syntax.either._
 
-import model._
-import sinks.GooglePubSubSink
+import com.snowplowanalytics.snowplow.collectors.scalastream.model._
+import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.GooglePubSubSink
 
 object GooglePubSubCollector extends Collector {
 

@@ -18,8 +18,9 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.HttpCookiePair
 import akka.http.scaladsl.server.{Directive1, Route}
 import akka.http.scaladsl.server.Directives._
-import model.DntCookieMatcher
-import monitoring.BeanRegistry
+
+import com.snowplowanalytics.snowplow.collectors.scalastream.model.DntCookieMatcher
+import com.snowplowanalytics.snowplow.collectors.scalastream.monitoring.BeanRegistry
 
 trait CollectorRoute {
   def collectorService: Service

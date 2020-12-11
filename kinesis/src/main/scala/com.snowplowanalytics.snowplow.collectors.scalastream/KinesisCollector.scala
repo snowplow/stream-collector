@@ -18,8 +18,8 @@ import java.util.concurrent.ScheduledThreadPoolExecutor
 
 import cats.syntax.either._
 
-import model._
-import sinks.KinesisSink
+import com.snowplowanalytics.snowplow.collectors.scalastream.model._
+import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink
 
 object KinesisCollector extends Collector {
 

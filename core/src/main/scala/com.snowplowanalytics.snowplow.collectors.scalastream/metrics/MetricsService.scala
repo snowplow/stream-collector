@@ -19,13 +19,13 @@ import java.io.StringWriter
 import java.time.Duration
 
 import akka.http.scaladsl.model.{HttpMethod, StatusCode, Uri}
-import io.prometheus.client.exporter.common.TextFormat
 import io.prometheus.client.{CollectorRegistry, Counter, Gauge, Histogram}
+import io.prometheus.client.exporter.common.TextFormat
 
-import generated.BuildInfo
-import PrometheusMetricsService.Metrics._
-import PrometheusMetricsService.NanosecondsInSecond
-import model.PrometheusMetricsConfig
+import com.snowplowanalytics.snowplow.collectors.scalastream.generated.BuildInfo
+import com.snowplowanalytics.snowplow.collectors.scalastream.metrics.PrometheusMetricsService.Metrics._
+import com.snowplowanalytics.snowplow.collectors.scalastream.metrics.PrometheusMetricsService.NanosecondsInSecond
+import com.snowplowanalytics.snowplow.collectors.scalastream.model.PrometheusMetricsConfig
 
 /**
   * Service which is used to keep track of processed http requests

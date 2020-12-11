@@ -15,15 +15,14 @@ package sinks
 
 import java.nio.ByteBuffer
 import java.util.concurrent.ScheduledExecutorService
-import scala.collection.JavaConverters._
-import scala.concurrent.Future
-import scala.concurrent.duration._
-import scala.util.{Failure, Success}
-import cats.syntax.either._
+import java.util.UUID
+import com.amazonaws.{AmazonClientException, AmazonWebServiceRequest, ClientConfiguration}
 import com.amazonaws.auth._
-import com.amazonaws.services.kinesis.model._
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
+import com.amazonaws.retry.RetryPolicy.RetryCondition
+import com.amazonaws.retry.{PredefinedBackoffStrategies, RetryPolicy}
 import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClientBuilder}
+import com.amazonaws.services.kinesis.model._
 import com.amazonaws.services.sqs.{AmazonSQS, AmazonSQSClientBuilder}
 import com.amazonaws.services.sqs.model.{
   MessageAttributeValue,
@@ -31,14 +30,17 @@ import com.amazonaws.services.sqs.model.{
   SendMessageBatchRequest,
   SendMessageBatchRequestEntry
 }
-
-import java.util.UUID
-import model._
-import KinesisSink.SqsClientAndName
-import com.amazonaws.{AmazonClientException, AmazonWebServiceRequest, ClientConfiguration}
-import com.amazonaws.retry.RetryPolicy.RetryCondition
-import com.amazonaws.retry.{PredefinedBackoffStrategies, RetryPolicy}
 import org.slf4j.LoggerFactory
+
+import scala.collection.JavaConverters._
+import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
+
+import cats.syntax.either._
+
+import com.snowplowanalytics.snowplow.collectors.scalastream.model._
+import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink.SqsClientAndName
 
 /** KinesisSink companion object with factory method */
 object KinesisSink {

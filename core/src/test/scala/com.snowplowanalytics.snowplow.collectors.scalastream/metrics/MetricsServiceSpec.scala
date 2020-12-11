@@ -17,7 +17,9 @@ package com.snowplowanalytics.snowplow.collectors.scalastream.metrics
 import java.time.Duration
 
 import akka.http.scaladsl.model.{HttpMethods, StatusCodes, Uri}
+
 import com.snowplowanalytics.snowplow.collectors.scalastream.model.PrometheusMetricsConfig
+
 import org.specs2.mutable.Specification
 
 class MetricsServiceSpec extends Specification {

@@ -16,7 +16,7 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import scala.concurrent.duration._
 
-import model._
+import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 
 object TestUtils {
   val testConf = CollectorConfig(

@@ -15,25 +15,28 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import java.net.InetAddress
+import java.nio.charset.StandardCharsets
+import java.time.Instant
+import org.apache.thrift.{TDeserializer, TSerializer}
+
 import scala.collection.immutable.Seq
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
+
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model.headers.CacheDirectives._
 import cats.data.NonEmptyList
-import org.apache.thrift.{TDeserializer, TSerializer}
-import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
-import com.snowplowanalytics.snowplow.badrows.{BadRow, Failure, Payload, Processor}
-import org.specs2.mutable.Specification
-import generated.BuildInfo
 import io.circe._
 import io.circe.parser._
 import io.circe.syntax.EncoderOps
-import model._
 
-import java.nio.charset.StandardCharsets
-import java.time.Instant
+import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
+import com.snowplowanalytics.snowplow.badrows.{BadRow, Failure, Payload, Processor}
+import com.snowplowanalytics.snowplow.collectors.scalastream.generated.BuildInfo
+import com.snowplowanalytics.snowplow.collectors.scalastream.model._
+
+import org.specs2.mutable.Specification
 
 class CollectorServiceSpec extends Specification {
   val service = new CollectorService(
