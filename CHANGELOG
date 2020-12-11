@@ -1,3 +1,18 @@
+Release 2.1.0 (2020-12-11)
+--------------------------
+Do not set cookie if request has SP-Anonymous header (#90)
+Generate BadRow if querystring cannot be parsed (#73)
+Don't crash but warn if Kinesis stream and SQS queue don't exist (#100)
+Bump sbt to 1.4.4 (#105)
+Bump specs2-core to 4.10.5 (#106)
+Migrate from Travis to GH actions (#91)
+Bump to JDK 11 (#92)
+Bump base-debian to 0.2.1 (#72)
+Integrate coursier cache action (#93)
+Fix assembly merge strategy (#97)
+Reorganise imports (#104)
+Update copyright to 2020 (#95)
+
 Release 2.0.1 (2020-11-19)
 --------------------------
 Increase number of Kinesis put retries when surge protection is on (#75)
