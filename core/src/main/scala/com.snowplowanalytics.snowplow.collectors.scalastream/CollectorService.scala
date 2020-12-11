@@ -14,24 +14,26 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
+import java.nio.charset.StandardCharsets.UTF_8
+import java.time.Instant
 import java.util.UUID
+import org.apache.commons.codec.binary.Base64
+import org.slf4j.LoggerFactory
+
 import scala.collection.JavaConverters._
+
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model.headers.CacheDirectives._
 import cats.data.NonEmptyList
 import cats.implicits._
-import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
-import com.snowplowanalytics.snowplow.badrows._
-import org.apache.commons.codec.binary.Base64
-import org.slf4j.LoggerFactory
-import generated.BuildInfo
 import io.circe.syntax.EncoderOps
-import model._
-import utils.SplitBatch
 
-import java.nio.charset.StandardCharsets.UTF_8
-import java.time.Instant
+import com.snowplowanalytics.snowplow.badrows._
+import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
+import com.snowplowanalytics.snowplow.collectors.scalastream.generated.BuildInfo
+import com.snowplowanalytics.snowplow.collectors.scalastream.model._
+import com.snowplowanalytics.snowplow.collectors.scalastream.utils.SplitBatch
 
 /**
   * Service responding to HTTP requests, mainly setting a cookie identifying the user and storing

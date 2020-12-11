@@ -18,7 +18,7 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
-import sinks.Sink
+import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.Sink
 
 // Allow the testing framework to test collection events using the
 // same methods from AbstractSink as the other sinks.

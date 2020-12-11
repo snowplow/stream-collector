@@ -22,8 +22,7 @@ package sinks
 import scala.collection.JavaConverters._
 
 import com.snowplowanalytics.client.nsq.NSQProducer
-
-import model._
+import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 
 /**
   * NSQ Sink for the Scala collector

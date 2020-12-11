@@ -17,6 +17,7 @@ package monitoring
 
 import java.lang.management.ManagementFactory
 import javax.management.{MBeanServer, ObjectName}
+
 import scala.beans.BeanProperty
 
 trait SnowplowMXBean {

@@ -17,7 +17,7 @@ import java.util.Properties
 
 import org.apache.kafka.clients.producer._
 
-import model._
+import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 
 /**
   * Kafka Sink for the Scala collector

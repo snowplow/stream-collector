@@ -15,18 +15,21 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import javax.net.ssl.SSLContext
+
 import scala.concurrent.duration.FiniteDuration
+
 import akka.actor.ActorSystem
-import akka.stream.TLSClientAuth
 import akka.http.scaladsl.ConnectionContext
 import akka.http.scaladsl.model.headers.HttpCookiePair
+import akka.stream.TLSClientAuth
 import com.typesafe.sslconfig.akka.AkkaSSLConfig
 import com.typesafe.sslconfig.akka.util.AkkaLoggerFactory
-import com.typesafe.sslconfig.ssl.ConfigSSLContextBuilder
 import com.typesafe.sslconfig.ssl.{ClientAuth => SslClientAuth}
+import com.typesafe.sslconfig.ssl.ConfigSSLContextBuilder
+
 import io.circe.Json
 
-import sinks.Sink
+import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.Sink
 
 package model {
 

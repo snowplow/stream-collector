@@ -14,8 +14,8 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
-import model._
-import sinks.KafkaSink
+import com.snowplowanalytics.snowplow.collectors.scalastream.model._
+import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KafkaSink
 
 object KafkaCollector extends Collector {
   def main(args: Array[String]): Unit = {

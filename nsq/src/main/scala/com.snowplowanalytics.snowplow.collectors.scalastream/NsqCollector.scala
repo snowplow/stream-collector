@@ -14,8 +14,8 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
-import model._
-import sinks.NsqSink
+import com.snowplowanalytics.snowplow.collectors.scalastream.model._
+import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.NsqSink
 
 object NsqCollector extends Collector {
   def main(args: Array[String]): Unit = {
