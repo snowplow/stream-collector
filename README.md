@@ -52,7 +52,7 @@ limitations under the License.
 [build-image]: https://github.com/snowplow/stream-collector/workflows/build/badge.svg
 [build-wf]: https://github.com/snowplow/stream-collector/actions?query=workflow%3Abuild
 
-[release-image]: http://img.shields.io/badge/release-2.0.1-blue.svg?style=flat
+[release-image]: http://img.shields.io/badge/release-2.1.0-blue.svg?style=flat
 [releases]: https://github.com/snowplow/stream-collector
 
 [license-image]: http://img.shields.io/badge/license-Apache--2-blue.svg?style=flat
