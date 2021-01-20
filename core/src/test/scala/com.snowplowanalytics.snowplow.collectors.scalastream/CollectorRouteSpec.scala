@@ -120,6 +120,11 @@ class CollectorRouteSpec extends Specification with Specs2RouteTest {
         responseAs[String] shouldEqual "404 not found"
       }
     }
+    "respond to robots.txt with a disallow rule" in {
+      Get("/robots.txt") ~> route.collectorRoute ~> check {
+        responseAs[String] shouldEqual "User-agent: *\nDisallow: /"
+      }
+    }
 
     "extract a query string" in {
       "produce the query string if present" in {
