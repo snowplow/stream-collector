@@ -125,7 +125,7 @@ trait CollectorRoute {
           }
         }
       }
-    } ~ corsRoute ~ healthRoute ~ crossDomainRoute ~ rootRoute ~ {
+    } ~ corsRoute ~ healthRoute ~ crossDomainRoute ~ rootRoute ~ robotsRoute ~ {
       BeanRegistry.collectorBean.incrementFailedRequests()
       complete(HttpResponse(404, entity = "404 not found"))
     }
@@ -185,6 +185,12 @@ trait CollectorRoute {
   private def rootRoute: Route = get {
     pathSingleSlash {
       complete(collectorService.rootResponse)
+    }
+  }
+
+  private def robotsRoute: Route = get {
+    path("robots.txt".r) { _ =>
+      complete(HttpResponse(200, entity = "User-agent: *\nDisallow: /"))
     }
   }
 
