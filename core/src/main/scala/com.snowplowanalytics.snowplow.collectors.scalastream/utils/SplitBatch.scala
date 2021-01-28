@@ -142,8 +142,7 @@ object SplitBatch {
         Failure.SizeViolation(Instant.now(), maxSize, size, s"oversized collector payload: $msg"),
         Payload.RawPayload(event.toString().take(maxSize / 10))
       )
-      .asJson
-      .noSpaces
+      .compact
       .getBytes(UTF_8)
 
   private def getSize(a: Array[Byte]): Int = ByteBuffer.wrap(a).capacity
