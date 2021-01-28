@@ -29,7 +29,6 @@ import akka.http.scaladsl.model.headers.CacheDirectives._
 import cats.data.NonEmptyList
 import io.circe._
 import io.circe.parser._
-import io.circe.syntax.EncoderOps
 
 import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
 import com.snowplowanalytics.snowplow.badrows.{BadRow, Failure, Payload, Processor}
@@ -181,8 +180,8 @@ class CollectorServiceSpec extends Specification {
         )
 
         val brJson  = parse(new String(l.head, StandardCharsets.UTF_8)).getOrElse(Json.Null)
-        val failure = brJson.hcursor.downField("failure").downField("errors").downArray.as[String]
-        val payload = brJson.hcursor.downField("payload").as[String]
+        val failure = brJson.hcursor.downField("data").downField("failure").downField("errors").downArray.as[String]
+        val payload = brJson.hcursor.downField("data").downField("payload").as[String]
 
         r.status mustEqual StatusCodes.OK
         l must have size 1
@@ -370,7 +369,7 @@ class CollectorServiceSpec extends Specification {
         val l = service.sinkBad(br, "key")
 
         l must have size 1
-        l.head.zip(br.asJson.noSpaces).forall { case (a, b) => a mustEqual b }
+        l.head.zip(br.compact).forall { case (a, b) => a mustEqual b }
       }
     }
 
