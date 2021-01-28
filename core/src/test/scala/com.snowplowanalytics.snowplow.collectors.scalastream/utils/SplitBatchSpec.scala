@@ -15,13 +15,13 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 package utils
 
+import com.snowplowanalytics.iglu.core.SelfDescribingData
 import org.apache.thrift.TDeserializer
 import org.specs2.mutable.Specification
-
 import io.circe.Json
 import io.circe.parser._
 import io.circe.syntax._
-
+import com.snowplowanalytics.iglu.core.circe.implicits._
 import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
 import com.snowplowanalytics.snowplow.badrows._
 import com.snowplowanalytics.snowplow.collectors.scalastream.model.SplitBatchResult
@@ -70,9 +70,10 @@ class SplitBatchSpec extends Specification {
     "Reject an oversized GET CollectorPayload" in {
       val payload = new CollectorPayload()
       payload.setQuerystring("x" * 1000)
-      val actual = SplitBatch.splitAndSerializePayload(payload, 100)
-      val res    = parse(new String(actual.bad.head)).toOption.get
-      val badRow = res.as[BadRow].toOption.get
+      val actual   = SplitBatch.splitAndSerializePayload(payload, 100)
+      val res      = parse(new String(actual.bad.head)).toOption.get
+      val selfDesc = SelfDescribingData.parse(res).toOption.get
+      val badRow   = selfDesc.data.as[BadRow].toOption.get
       badRow must beAnInstanceOf[BadRow.SizeViolation]
       val sizeViolation = badRow.asInstanceOf[BadRow.SizeViolation]
       sizeViolation.failure.maximumAllowedSizeBytes must_== 100
@@ -86,9 +87,10 @@ class SplitBatchSpec extends Specification {
     "Reject an oversized POST CollectorPayload with an unparseable body" in {
       val payload = new CollectorPayload()
       payload.setBody("s" * 1000)
-      val actual = SplitBatch.splitAndSerializePayload(payload, 100)
-      val res    = parse(new String(actual.bad.head)).toOption.get
-      val badRow = res.as[BadRow].toOption.get
+      val actual   = SplitBatch.splitAndSerializePayload(payload, 100)
+      val res      = parse(new String(actual.bad.head)).toOption.get
+      val selfDesc = SelfDescribingData.parse(res).toOption.get
+      val badRow   = selfDesc.data.as[BadRow].toOption.get
       badRow must beAnInstanceOf[BadRow.SizeViolation]
       val sizeViolation = badRow.asInstanceOf[BadRow.SizeViolation]
       sizeViolation.failure.maximumAllowedSizeBytes must_== 100
@@ -113,8 +115,9 @@ class SplitBatchSpec extends Specification {
       payload.setPath("p" * 1000)
       val actual = SplitBatch.splitAndSerializePayload(payload, 1000)
       actual.bad.size must_== 1
-      val res    = parse(new String(actual.bad.head)).toOption.get
-      val badRow = res.as[BadRow].toOption.get
+      val res      = parse(new String(actual.bad.head)).toOption.get
+      val selfDesc = SelfDescribingData.parse(res).toOption.get
+      val badRow   = selfDesc.data.as[BadRow].toOption.get
       badRow must beAnInstanceOf[BadRow.SizeViolation]
       val sizeViolation = badRow.asInstanceOf[BadRow.SizeViolation]
       sizeViolation.failure.maximumAllowedSizeBytes must_== 1000
