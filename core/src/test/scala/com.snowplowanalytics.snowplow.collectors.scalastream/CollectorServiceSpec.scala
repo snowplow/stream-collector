@@ -124,6 +124,48 @@ class CollectorServiceSpec extends Specification {
 
         r.headers.filter(_.toString.startsWith("Set-Cookie")) must have size 0
       }
+      "not set a network_userid from cookie if SP-Anonymous is present" in {
+        val (_, l) = service.cookie(
+          None,
+          Some("b"),
+          "p",
+          Some(HttpCookie("sp","cookie-nuid")),
+          None,
+          None,
+          "h",
+          RemoteAddress.Unknown,
+          HttpRequest(),
+          false,
+          false,
+          None,
+          Some("*")
+        )
+        l must have size 1
+        val newEvent = new CollectorPayload("iglu-schema", "ip", System.currentTimeMillis, "UTF-8", "collector")
+        deserializer.deserialize(newEvent, l.head)
+        newEvent.networkUserId shouldEqual ""
+      }
+      "network_userid from cookie should persist if SP-Anonymous is not present" in {
+        val (_, l) = service.cookie(
+          None,
+          Some("b"),
+          "p",
+          Some(HttpCookie("sp","cookie-nuid")),
+          None,
+          None,
+          "h",
+          RemoteAddress.Unknown,
+          HttpRequest(),
+          false,
+          false,
+          None,
+          None
+        )
+        l must have size 1
+        val newEvent = new CollectorPayload("iglu-schema", "ip", System.currentTimeMillis, "UTF-8", "collector")
+        deserializer.deserialize(newEvent, l.head)
+        newEvent.networkUserId shouldEqual "cookie-nuid"
+      }
       "not store stuff if bouncing and provide a location header" in {
         val (r, l) = bouncingService.cookie(
           None,
@@ -325,7 +367,7 @@ class CollectorServiceSpec extends Specification {
         e.userAgent shouldEqual "ua"
         e.refererUri shouldEqual "ref"
         e.hostname shouldEqual "h"
-        e.networkUserId shouldEqual "nuid"
+        e.networkUserId shouldEqual ""
         e.headers shouldEqual (List(l) ++ ct).map(_.toString).asJava
         e.contentType shouldEqual ct.get
       }
@@ -345,9 +387,25 @@ class CollectorServiceSpec extends Specification {
         e.userAgent shouldEqual "ua"
         e.refererUri shouldEqual "ref"
         e.hostname shouldEqual "h"
-        e.networkUserId shouldEqual "nuid"
+        e.networkUserId shouldEqual ""
         e.headers shouldEqual (List(l) ++ ct).map(_.toString).asJava
         e.contentType shouldEqual ct.get
+      }
+      "have an empty nuid if SP-Anonymous is present" in {
+        val l  = `Location`("l")
+        val ct = Some("image/gif")
+        val r  = HttpRequest().withHeaders(l :: hs)
+        val e =
+          service.buildEvent(None, Some("b"), "p", Some("ua"), Some("ref"), "h", "unknown", r, "nuid", ct, Some("*"))
+        e.networkUserId shouldEqual ""
+      }
+      "have a nuid if SP-Anonymous is not present" in {
+        val l  = `Location`("l")
+        val ct = Some("image/gif")
+        val r  = HttpRequest().withHeaders(l :: hs)
+        val e =
+          service.buildEvent(None, Some("b"), "p", Some("ua"), Some("ref"), "h", "ip", r, "nuid", ct, None)
+        e.networkUserId shouldEqual "nuid"
       }
     }
 
