@@ -97,6 +97,18 @@ lazy val kinesis = project
   .enablePlugins(JavaAppPackaging, DockerPlugin)
   .dependsOn(core)
 
+lazy val sqs = project
+  .settings(moduleName := "snowplow-stream-collector-sqs")
+  .settings(allSettings)
+  .settings(packageName in Docker := "snowplow/scala-stream-collector-sqs")
+  .settings(
+    libraryDependencies ++= Seq(
+      Dependencies.Libraries.sqs
+    )
+  )
+  .enablePlugins(JavaAppPackaging, DockerPlugin)
+  .dependsOn(core)
+
 lazy val pubsub = project
   .settings(moduleName := "snowplow-stream-collector-google-pubsub")
   .settings(allSettings)

@@ -95,6 +95,7 @@ package model {
   final case class CrossDomainConfig(enabled: Boolean, domains: List[String], secure: Boolean)
   final case class CORSConfig(accessControlMaxAge: FiniteDuration)
   final case class KinesisBackoffPolicyConfig(minBackoff: Long, maxBackoff: Long)
+  final case class SqsBackoffPolicyConfig(minBackoff: Long, maxBackoff: Long)
   final case class GooglePubSubBackoffPolicyConfig(
     minBackoff: Long,
     maxBackoff: Long,
@@ -117,6 +118,8 @@ package model {
       case _                 => s"https://kinesis.$region.amazonaws.com"
     })
   }
+  final case class Sqs(region: String, threadPoolSize: Int, aws: AWSConfig, backoffPolicy: SqsBackoffPolicyConfig)
+      extends SinkConfig
   final case class GooglePubSub(
     googleProjectId: String,
     backoffPolicy: GooglePubSubBackoffPolicyConfig

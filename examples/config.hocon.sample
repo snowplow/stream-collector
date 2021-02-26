@@ -209,7 +209,10 @@ collector {
     good = {{good}}
     good = ${?COLLECTOR_STREAMS_GOOD}
 
-    # Events that are too big (w.r.t Kinesis 1MB limit) will be stored in the bad stream/topic
+    # Bad rows (https://docs.snowplowanalytics.com/docs/try-snowplow/recipes/recipe-understanding-bad-data/) will be stored in the bad stream/topic.
+    # The collector can currently produce two flavours of bad row:
+    #  - a size_violation if an event is larger that the Kinesis (1MB) or SQS (256KB) limits;
+    #  - a generic_error if a request's querystring cannot be parsed because of illegal characters
     bad = {{bad}}
     bad = ${?COLLECTOR_STREAMS_BAD}
 
@@ -220,14 +223,14 @@ collector {
 
     # Enable the chosen sink by uncommenting the appropriate configuration
     sink {
-      # Choose between kinesis, google-pub-sub, kafka, nsq, or stdout.
+      # Choose between kinesis, sqs, google-pub-sub, kafka, nsq, or stdout.
       # To use stdout, comment or remove everything in the "collector.streams.sink" section except
       # "enabled" which should be set to "stdout".
-      enabled = kinesis
+      enabled = kinesis # or sqs
       enabled = ${?COLLECTOR_STREAMS_SINK_ENABLED}
 
       # Region where the streams are located
-      region = {{kinesisRegion}}
+      region = {{kinesisRegion}} # or {{sqsRegion}}
       region = ${?COLLECTOR_STREAMS_SINK_REGION}
 
       ## Optional endpoint url configuration to override aws kinesis endpoints,
@@ -235,20 +238,22 @@ collector {
       # customEndpoint = {{kinesisEndpoint}}
       # customEndpoint = ${?COLLECTOR_STREAMS_SINK_CUSTOM_ENDPOINT}
 
-      # Thread pool size for Kinesis API requests
+      # Thread pool size for Kinesis and SQS API requests
       threadPoolSize = 10
       threadPoolSize = ${?COLLECTOR_STREAMS_SINK_THREAD_POOL_SIZE}
 
       # Optional SQS buffer for good and bad events (respectively).
       # When messages can't be sent to Kinesis, they will be sent to SQS.
-      # If not configured, sending to Kinesis will be retried. 
+      # If not configured, sending to Kinesis will be retried.
+      # This should only be set up for the Kinesis sink, where it acts as a failsafe.
+      # For the SQS sink, the good and bad queue should be specified under streams.good and streams.bad, respectively and these settings should be ignored.
       sqsGoodBuffer = {{sqsGoodBuffer}}
       sqsGoodBuffer = ${?COLLECTOR_STREAMS_SINK_SQS_GOOD_BUFFER}
 
       sqsBadBuffer = {{sqsBadBuffer}}
       sqsBadBuffer = ${?COLLECTOR_STREAMS_SINK_SQS_BAD_BUFFER}
 
-      # The following are used to authenticate for the Amazon Kinesis sink.
+      # The following are used to authenticate for the Amazon Kinesis and SQS sinks.
       # If both are set to 'default', the default provider chain is used
       # (see http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/auth/DefaultAWSCredentialsProviderChain.html)
       # If both are set to 'iam', use AWS IAM Roles to provision credentials.
