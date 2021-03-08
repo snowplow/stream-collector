@@ -1,3 +1,8 @@
+Release 2.2.0 (2021-03-08)
+--------------------------
+Add SQS collector module (#120)
+Serve robots.txt file (#109)
+
 Release 2.1.2 (2021-02-18)
 --------------------------
 Prevent network_userid being captured when SP-Anonymous header is set (#117)
