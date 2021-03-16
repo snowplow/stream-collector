@@ -143,7 +143,7 @@ class CollectorServiceSpec extends Specification {
         l must have size 1
         val newEvent = new CollectorPayload("iglu-schema", "ip", System.currentTimeMillis, "UTF-8", "collector")
         deserializer.deserialize(newEvent, l.head)
-        newEvent.networkUserId shouldEqual ""
+        newEvent.networkUserId shouldEqual "00000000-0000-0000-0000-000000000000"
       }
       "network_userid from cookie should persist if SP-Anonymous is not present" in {
         val (_, l) = service.cookie(
@@ -367,7 +367,7 @@ class CollectorServiceSpec extends Specification {
         e.userAgent shouldEqual "ua"
         e.refererUri shouldEqual "ref"
         e.hostname shouldEqual "h"
-        e.networkUserId shouldEqual ""
+        e.networkUserId shouldEqual "00000000-0000-0000-0000-000000000000"
         e.headers shouldEqual (List(l) ++ ct).map(_.toString).asJava
         e.contentType shouldEqual ct.get
       }
@@ -387,7 +387,7 @@ class CollectorServiceSpec extends Specification {
         e.userAgent shouldEqual "ua"
         e.refererUri shouldEqual "ref"
         e.hostname shouldEqual "h"
-        e.networkUserId shouldEqual ""
+        e.networkUserId shouldEqual "00000000-0000-0000-0000-000000000000"
         e.headers shouldEqual (List(l) ++ ct).map(_.toString).asJava
         e.contentType shouldEqual ct.get
       }
@@ -397,7 +397,7 @@ class CollectorServiceSpec extends Specification {
         val r  = HttpRequest().withHeaders(l :: hs)
         val e =
           service.buildEvent(None, Some("b"), "p", Some("ua"), Some("ref"), "h", "unknown", r, "nuid", ct, Some("*"))
-        e.networkUserId shouldEqual ""
+        e.networkUserId shouldEqual "00000000-0000-0000-0000-000000000000"
       }
       "have a nuid if SP-Anonymous is not present" in {
         val l  = `Location`("l")

@@ -243,7 +243,7 @@ class CollectorService(
     userAgent.foreach(e.userAgent   = _)
     refererUri.foreach(e.refererUri = _)
     e.hostname      = hostname
-    e.networkUserId = spAnonymous.fold(networkUserId)(_ => "")
+    e.networkUserId = spAnonymous.fold(networkUserId)(_ => "00000000-0000-0000-0000-000000000000")
     e.headers       = (headers(request, spAnonymous) ++ contentType).asJava
     contentType.foreach(e.contentType = _)
     e
