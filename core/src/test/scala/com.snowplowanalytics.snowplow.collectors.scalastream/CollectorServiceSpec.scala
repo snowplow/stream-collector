@@ -129,7 +129,7 @@ class CollectorServiceSpec extends Specification {
           None,
           Some("b"),
           "p",
-          Some(HttpCookie("sp","cookie-nuid")),
+          Some(HttpCookie("sp", "cookie-nuid")),
           None,
           None,
           "h",
@@ -143,14 +143,14 @@ class CollectorServiceSpec extends Specification {
         l must have size 1
         val newEvent = new CollectorPayload("iglu-schema", "ip", System.currentTimeMillis, "UTF-8", "collector")
         deserializer.deserialize(newEvent, l.head)
-        newEvent.networkUserId shouldEqual ""
+        newEvent.networkUserId shouldEqual "00000000-0000-0000-0000-000000000000"
       }
       "network_userid from cookie should persist if SP-Anonymous is not present" in {
         val (_, l) = service.cookie(
           None,
           Some("b"),
           "p",
-          Some(HttpCookie("sp","cookie-nuid")),
+          Some(HttpCookie("sp", "cookie-nuid")),
           None,
           None,
           "h",
@@ -340,9 +340,10 @@ class CollectorServiceSpec extends Specification {
         e.contentType shouldEqual ct.get
       }
       "fill the correct values if SP-Anonymous is present" in {
-        val l  = `Location`("l")
-        val ct = Some("image/gif")
-        val r  = HttpRequest().withHeaders(l :: hs)
+        val l    = `Location`("l")
+        val ct   = Some("image/gif")
+        val r    = HttpRequest().withHeaders(l :: hs)
+        val nuid = service.networkUserId(r, None, Some("*")).get
         val e =
           service.buildEvent(
             Some("q"),
@@ -353,7 +354,7 @@ class CollectorServiceSpec extends Specification {
             "h",
             "unknown",
             r,
-            "nuid",
+            nuid,
             ct,
             Some("*")
           )
@@ -367,16 +368,29 @@ class CollectorServiceSpec extends Specification {
         e.userAgent shouldEqual "ua"
         e.refererUri shouldEqual "ref"
         e.hostname shouldEqual "h"
-        e.networkUserId shouldEqual ""
+        e.networkUserId shouldEqual "00000000-0000-0000-0000-000000000000"
         e.headers shouldEqual (List(l) ++ ct).map(_.toString).asJava
         e.contentType shouldEqual ct.get
       }
       "have a null queryString if it's None" in {
-        val l  = `Location`("l")
-        val ct = Some("image/gif")
-        val r  = HttpRequest().withHeaders(l :: hs)
+        val l    = `Location`("l")
+        val ct   = Some("image/gif")
+        val r    = HttpRequest().withHeaders(l :: hs)
+        val nuid = service.networkUserId(r, None, Some("*")).get
         val e =
-          service.buildEvent(None, Some("b"), "p", Some("ua"), Some("ref"), "h", "unknown", r, "nuid", ct, Some("*"))
+          service.buildEvent(
+            None,
+            Some("b"),
+            "p",
+            Some("ua"),
+            Some("ref"),
+            "h",
+            "unknown",
+            r,
+            nuid,
+            ct,
+            Some("*")
+          )
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
         e.ipAddress shouldEqual "unknown"
         e.encoding shouldEqual "UTF-8"
@@ -387,17 +401,30 @@ class CollectorServiceSpec extends Specification {
         e.userAgent shouldEqual "ua"
         e.refererUri shouldEqual "ref"
         e.hostname shouldEqual "h"
-        e.networkUserId shouldEqual ""
+        e.networkUserId shouldEqual "00000000-0000-0000-0000-000000000000"
         e.headers shouldEqual (List(l) ++ ct).map(_.toString).asJava
         e.contentType shouldEqual ct.get
       }
       "have an empty nuid if SP-Anonymous is present" in {
-        val l  = `Location`("l")
-        val ct = Some("image/gif")
-        val r  = HttpRequest().withHeaders(l :: hs)
+        val l    = `Location`("l")
+        val ct   = Some("image/gif")
+        val r    = HttpRequest().withHeaders(l :: hs)
+        val nuid = service.networkUserId(r, None, Some("*")).get
         val e =
-          service.buildEvent(None, Some("b"), "p", Some("ua"), Some("ref"), "h", "unknown", r, "nuid", ct, Some("*"))
-        e.networkUserId shouldEqual ""
+          service.buildEvent(
+            None,
+            Some("b"),
+            "p",
+            Some("ua"),
+            Some("ref"),
+            "h",
+            "unknown",
+            r,
+            nuid,
+            ct,
+            Some("*")
+          )
+        e.networkUserId shouldEqual "00000000-0000-0000-0000-000000000000"
       }
       "have a nuid if SP-Anonymous is not present" in {
         val l  = `Location`("l")
@@ -671,17 +698,42 @@ class CollectorServiceSpec extends Specification {
     }
 
     "netwokUserId" in {
-      "give back the nuid query param if present" in {
-        service.networkUserId(
-          HttpRequest().withUri(Uri().withRawQueryString("nuid=12")),
-          Some(HttpCookie("nuid", "13"))
-        ) shouldEqual Some("12")
+      "with SP-Anonymous header not present" in {
+        "give back the nuid query param if present" in {
+          service.networkUserId(
+            HttpRequest().withUri(Uri().withRawQueryString("nuid=12")),
+            Some(HttpCookie("nuid", "13")),
+            None
+          ) shouldEqual Some("12")
+        }
+        "give back the request cookie if there no nuid query param" in {
+          service.networkUserId(HttpRequest(), Some(HttpCookie("nuid", "13")), None) shouldEqual Some("13")
+        }
+        "give back none otherwise" in {
+          service.networkUserId(HttpRequest(), None, None) shouldEqual None
+        }
       }
-      "give back the request cookie if there no nuid query param" in {
-        service.networkUserId(HttpRequest(), Some(HttpCookie("nuid", "13"))) shouldEqual Some("13")
-      }
-      "give back none otherwise" in {
-        service.networkUserId(HttpRequest(), None) shouldEqual None
+
+      "with SP-Anonymous header present" in {
+        "give back the dummy nuid" in {
+          "if query param is present" in {
+            service.networkUserId(
+              HttpRequest().withUri(Uri().withRawQueryString("nuid=12")),
+              Some(HttpCookie("nuid", "13")),
+              Some("*")
+            ) shouldEqual Some("00000000-0000-0000-0000-000000000000")
+          }
+          "if the request cookie can be used in place of a missing nuid query param" in {
+            service.networkUserId(HttpRequest(), Some(HttpCookie("nuid", "13")), Some("*")) shouldEqual Some(
+              "00000000-0000-0000-0000-000000000000"
+            )
+          }
+          "in any other case" in {
+            service.networkUserId(HttpRequest(), None, Some("*")) shouldEqual Some(
+              "00000000-0000-0000-0000-000000000000"
+            )
+          }
+        }
       }
     }
 
