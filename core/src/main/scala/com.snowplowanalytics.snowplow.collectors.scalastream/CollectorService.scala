@@ -82,6 +82,8 @@ class CollectorService(
   override val doNotTrackCookie      = config.doNotTrackHttpCookie
   override val enableDefaultRedirect = config.enableDefaultRedirect
 
+  private val spAnonymousNuid = "00000000-0000-0000-0000-000000000000"
+
   /**
     * Determines the path to be used in the response,
     * based on whether a mapping can be found in the config for the original request path.
@@ -112,7 +114,7 @@ class CollectorService(
       case Right(params) =>
         val redirect = path.startsWith("/r/")
 
-        val nuidOpt  = networkUserId(request, cookie)
+        val nuidOpt  = networkUserId(request, cookie, spAnonymous)
         val bouncing = params.contains(config.cookieBounce.name)
         // we bounce if it's enabled and we couldn't retrieve the nuid and we're not already bouncing
         val bounce = config.cookieBounce.enabled && nuidOpt.isEmpty && !bouncing &&
@@ -243,7 +245,7 @@ class CollectorService(
     userAgent.foreach(e.userAgent   = _)
     refererUri.foreach(e.refererUri = _)
     e.hostname      = hostname
-    e.networkUserId = spAnonymous.fold(networkUserId)(_ => "")
+    e.networkUserId = networkUserId
     e.headers       = (headers(request, spAnonymous) ++ contentType).asJava
     contentType.foreach(e.contentType = _)
     e
@@ -457,8 +459,15 @@ class CollectorService(
     * @param requestCookie cookie associated to the Http request
     * @return a network user id
     */
-  def networkUserId(request: HttpRequest, requestCookie: Option[HttpCookie]): Option[String] =
-    request.uri.query().get("nuid").orElse(requestCookie.map(_.value))
+  def networkUserId(
+    request: HttpRequest,
+    requestCookie: Option[HttpCookie],
+    spAnonymous: Option[String]
+  ): Option[String] =
+    spAnonymous match {
+      case Some(_) => Some(spAnonymousNuid)
+      case None    => request.uri.query().get("nuid").orElse(requestCookie.map(_.value))
+    }
 
   /**
     * Creates an Access-Control-Allow-Origin header which specifically allows the domain which made
