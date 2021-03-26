@@ -1,3 +1,8 @@
+Release 2.2.1 (2021-03-26)
+--------------------------
+Respect SQS batch request limit (#125)
+Set network_userid to empty UUID in anonymous mode to prevent collector_payload_format_violation (#126)
+
 Release 2.2.0 (2021-03-08)
 --------------------------
 Add SQS collector module (#120)
