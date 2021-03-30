@@ -1,3 +1,7 @@
+Release 2.1.3 (2021-03-30) [MAINTENANCE]
+--------------------------
+Set network_userid to empty UUID in anonymous mode to prevent collector_payload_format_violation (#126)
+
 Release 2.1.2 (2021-02-18)
 --------------------------
 Prevent network_userid being captured when SP-Anonymous header is set (#117)
