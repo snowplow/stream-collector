@@ -52,6 +52,7 @@ class CollectorRouteSpec extends Specification with Specs2RouteTest {
         def doNotTrackCookie: Option[DntCookieMatcher]             = None
         def determinePath(vendor: String, version: String): String = "/p1/p2"
         def enableDefaultRedirect: Boolean                         = withRedirects
+        def sinksHealthy: Boolean                                  = true
       }
     }
   val route                      = mkRoute(true, None)
