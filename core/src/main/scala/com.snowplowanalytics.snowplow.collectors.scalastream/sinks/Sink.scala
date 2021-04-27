@@ -29,5 +29,6 @@ trait Sink {
 
   lazy val log = LoggerFactory.getLogger(getClass())
 
+  def isHealthy: Boolean = true
   def storeRawEvents(events: List[Array[Byte]], key: String): List[Array[Byte]]
 }

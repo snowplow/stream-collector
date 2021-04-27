@@ -25,7 +25,7 @@ import com.snowplowanalytics.client.nsq.NSQProducer
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 
 /**
-  * NSQ Sink for the Scala collector
+  * NSQ Sink for the Scala Stream Collector
   * @param nsqConfig Configuration for Nsq
   * @param topicName Nsq topic name
   */
