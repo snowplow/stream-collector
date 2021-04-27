@@ -15,7 +15,6 @@ package com.snowplowanalytics.snowplow.collectors.scalastream.sinks
 import java.nio.ByteBuffer
 import java.util.UUID
 import java.util.concurrent.ScheduledExecutorService
-
 import com.amazonaws.auth.{
   AWSCredentialsProvider,
   AWSStaticCredentialsProvider,
@@ -36,10 +35,10 @@ import scala.concurrent.{ExecutionContextExecutorService, Future}
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.MILLISECONDS
 import scala.util.{Failure, Random, Success}
-
 import cats.syntax.either._
-
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
+
+import scala.collection.mutable.ListBuffer
 
 /**
   *  SQS sink for the Scala Stream Collector
@@ -51,6 +50,8 @@ class SqsSink private (
   queueName: String,
   executorService: ScheduledExecutorService
 ) extends Sink {
+  import SqsSink._
+
   // Records must not exceed 256K when writing to SQS.
   // Since messages can be base64-encoded, they must meet that limit after encoding.
   override val MaxBytes = 192000 // 256000 / 4 * 3
@@ -63,61 +64,61 @@ class SqsSink private (
   private val minBackoff: Long        = sqsConfig.backoffPolicy.minBackoff
   private val randomGenerator: Random = new java.util.Random()
 
+  private val MaxSqsBatchSizeN = 10
+  private val MaxRetries       = 3 // TODO: make this configurable
+
   implicit lazy val ec: ExecutionContextExecutorService =
     concurrent.ExecutionContext.fromExecutorService(executorService)
 
-  def storeRawEvents(events: List[Array[Byte]], key: String): List[Array[Byte]] = {
-    events.foreach(e => EventBuffer.store(e))
+  // Is the collector detecting an outage downstream
+  @volatile private var outage: Boolean = false
+  override def isHealthy: Boolean       = !outage
+
+  override def storeRawEvents(events: List[Array[Byte]], key: String): List[Array[Byte]] = {
+    events.foreach(e => EventStorage.store(e))
     Nil
   }
 
-  object EventBuffer {
-    type Event = Array[Byte]
-
-    private var storedEvents              = List.empty[ByteBuffer]
+  object EventStorage {
+    private val storedEvents              = ListBuffer.empty[Events]
     private var byteCount                 = 0L
     @volatile private var lastFlushedTime = 0L
 
-    def store(event: Event): Unit = {
+    def store(event: Events): Unit = {
       val eventBytes = ByteBuffer.wrap(event)
       val eventSize  = eventBytes.capacity
-      if (eventSize >= MaxBytes) {
-        log.error(
-          s"Message of size $eventSize bytes is too large. It must be less than $MaxBytes bytes."
-        )
-      } else {
-        synchronized {
-          if (storedEvents.size + 1 > RecordThreshold || byteCount + eventSize > ByteThreshold) {
-            flush()
-          }
-          storedEvents = eventBytes :: storedEvents
-          byteCount += eventSize
+
+      synchronized {
+        if (storedEvents.size + 1 > RecordThreshold || byteCount + eventSize > ByteThreshold) {
+          flush()
         }
+        storedEvents += eventBytes.array()
+        byteCount += eventSize
       }
     }
 
     def flush(): Unit = {
       val eventsToSend = synchronized {
-        val evts = storedEvents.reverse
-        storedEvents = Nil
-        byteCount    = 0
-        evts.map(_.array())
+        val evts = storedEvents.result
+        storedEvents.clear()
+        byteCount = 0
+        evts
       }
       lastFlushedTime = System.currentTimeMillis()
-      sendBatch(eventsToSend)
+      sinkBatch(eventsToSend)(MaxRetries)
     }
 
     def getLastFlushTime: Long = lastFlushedTime
 
     /**
-      * Recursively schedule a task to flush the EventBuffer.
-      * Even if the incoming event flow dries up, all buffered events will eventually get sent.
+      * Recursively schedule a task to send everything in EventStorage.
+      * Even if the incoming event flow dries up, all stored events will eventually get sent.
       * Whenever TimeThreshold milliseconds have passed since the last call to flush, call flush.
       * @param interval When to schedule the next flush
       */
     def scheduleFlush(interval: Long = TimeThreshold): Unit = {
       executorService.schedule(
-        new Thread {
+        new Runnable {
           override def run(): Unit = {
             val lastFlushed = getLastFlushTime
             val currentTime = System.currentTimeMillis()
@@ -136,38 +137,43 @@ class SqsSink private (
     }
   }
 
-  def sendBatch(batch: List[EventBuffer.Event], nextBackoff: Long = minBackoff): Unit =
+  def sinkBatch(batch: List[Events], nextBackoff: Long = minBackoff)(maxRetries: Int = MaxRetries): Unit =
     if (batch.nonEmpty) {
-      log.info(s"Writing ${batch.size} Thrift records to SQS queue ${queueName}")
+      log.info(s"Writing ${batch.size} Thrift records to SQS queue $queueName.")
 
-      multiPut(batch).onComplete {
+      writeBatchToSqs(batch).onComplete {
         case Success(s) =>
-          log.info(s"Successfully wrote ${batch.size - s.size} out of ${batch.size} messages.")
+          outage = false
+          log.info(s"Successfully wrote ${batch.size - s.size} out of ${batch.size} messages to SQS queue $queueName.")
           if (s.nonEmpty) {
             s.foreach { f =>
               log.error(
-                s"Message failed with error code [${f._2.code}] and message [${f._2.message}]"
+                s"Failed writing message to SQS queue $queueName, with error code [${f._2.code}] and message [${f._2.message}]."
               )
             }
-            log.error(s"Retrying in $nextBackoff milliseconds...")
-            scheduleBatch(s.map(_._1), nextBackoff)
+            log.error(
+              s"Retrying all messages that could not be written to SQS queue $queueName in $nextBackoff milliseconds..."
+            )
+            scheduleWrite(s.map(_._1), nextBackoff)(MaxRetries)
           }
         case Failure(f) =>
-          log.error("Writing failed.", f)
-          log.error(s"Retrying in $nextBackoff milliseconds...")
-          scheduleBatch(batch, nextBackoff)
+          log.error("Writing failed with error:", f)
+
+          if (maxRetries <= 1) outage = true
+          log.error(s"Retrying writing batch to SQS queue $queueName in $nextBackoff milliseconds...")
+
+          scheduleWrite(batch, nextBackoff)(maxRetries - 1)
       }
     }
 
-  /** @return Empty list in case of success, non-empty list of Events to be retried and the reasons why they failed to be inserted in case of problem. */
-  def multiPut(batch: List[EventBuffer.Event]): Future[List[(EventBuffer.Event, BatchResultErrorInfo)]] =
+  /**
+    * @return Empty list if all events were successfully inserted;
+    *         otherwise a non-empty list of Events to be retried and the reasons why they failed.
+    */
+  def writeBatchToSqs(batch: List[Events]): Future[List[(Events, BatchResultErrorInfo)]] =
     Future {
-      val MaxSqsBatchSize = 10 // SQS limit
-      batch
-        .map { e =>
-          (e, toSqsMessage(e))
-        }
-        .grouped(MaxSqsBatchSize)
+      toSqsMessages(batch)
+        .grouped(MaxSqsBatchSizeN)
         .flatMap { msgGroup =>
           val entries = msgGroup.map(_._2)
           val batchRequest =
@@ -190,47 +196,54 @@ class SqsSink private (
         .toList
     }
 
-  def toSqsMessage(event: EventBuffer.Event): SendMessageBatchRequestEntry =
-    new SendMessageBatchRequestEntry(UUID.randomUUID.toString, b64Encode(event))
+  def toSqsMessages(events: List[Events]): List[(Events, SendMessageBatchRequestEntry)] =
+    events.map(e => (e, new SendMessageBatchRequestEntry(UUID.randomUUID.toString, b64Encode(e))))
 
-  def b64Encode(e: EventBuffer.Event): String = {
+  def b64Encode(e: Events): String = {
     val buffer = java.util.Base64.getEncoder.encode(e)
     new String(buffer)
   }
 
-  def scheduleBatch(batch: List[EventBuffer.Event], lastBackoff: Long = minBackoff): Unit = {
+  def scheduleWrite(batch: List[Events], lastBackoff: Long = minBackoff)(maxRetries: Int): Unit = {
     val nextBackoff = getNextBackoff(lastBackoff)
-    executorService.schedule(new Thread {
-      override def run(): Unit =
-        sendBatch(batch, nextBackoff)
-    }, lastBackoff, MILLISECONDS)
+    executorService.schedule(
+      new Runnable {
+        override def run(): Unit =
+          if (maxRetries > 0) sinkBatch(batch, nextBackoff)(maxRetries)
+          else sinkBatch(batch, nextBackoff)(MaxRetries)
+      },
+      lastBackoff,
+      MILLISECONDS
+    )
     ()
   }
 
   /**
     * How long to wait before sending the next request
     * @param lastBackoff The previous backoff time
-    * @return Minimum of maxBackoff and a random number between minBackoff and three times lastBackoff
+    * @return Maximum of two-thirds of lastBackoff and a random number between minBackoff and maxBackoff
     */
-  private def getNextBackoff(lastBackoff: Long): Long =
-    (minBackoff + randomGenerator.nextDouble() * (lastBackoff * 3 - minBackoff)).toLong.min(maxBackoff)
+  private def getNextBackoff(lastBackoff: Long): Long = {
+    val diff = (maxBackoff - minBackoff + 1).toInt
+    (minBackoff + randomGenerator.nextInt(diff)).max(lastBackoff / 3 * 2)
+  }
 
   def shutdown(): Unit = {
     executorService.shutdown()
     executorService.awaitTermination(10000, MILLISECONDS)
     ()
   }
-
-  case class BatchResultErrorInfo private (code: String, message: String)
 }
 
-/**
-  *  SqsSink companion object with factory method
-  */
+/** SqsSink companion object with factory method */
 object SqsSink {
+  type Events = Array[Byte]
+
+  // Details about why messages failed to be written to SQS.
+  final case class BatchResultErrorInfo(code: String, message: String)
 
   /**
-    * Create an SqsSink and schedule a task to flush its EventBuffer.
+    * Create an SqsSink and schedule a task to flush its EventStorage.
     * Exists so that no threads can get a reference to the SqsSink
     * during its construction.
     */
@@ -248,39 +261,18 @@ object SqsSink {
 
     client.map { c =>
       val sqsSink = new SqsSink(c, sqsConfig, bufferConfig, queueName, executorService)
-      sqsSink.EventBuffer.scheduleFlush()
+      sqsSink.EventStorage.scheduleFlush()
 
-      // When the application is shut down try to send all buffered events.
+      // When the application is shut down try to send all stored events.
       Runtime
         .getRuntime
         .addShutdownHook(new Thread {
           override def run(): Unit = {
-            sqsSink.EventBuffer.flush()
+            sqsSink.EventStorage.flush()
             sqsSink.shutdown()
           }
         })
       sqsSink
-    }
-  }
-
-  private def createSqsClient(provider: AWSCredentialsProvider, region: String) =
-    Either.catchNonFatal(
-      AmazonSQSClientBuilder.standard().withRegion(region).withCredentials(provider).build
-    )
-
-  /**
-    * Check whether an SQS queue exists
-    * @param name Name of the queue
-    * @return Whether the queue exists
-    */
-  private def sqsQueueExists(client: AmazonSQS, name: String): Unit = {
-    lazy val log = LoggerFactory.getLogger(getClass)
-    try {
-      client.getQueueUrl(name)
-      ()
-    } catch {
-      case _: QueueDoesNotExistException => log.error(s"SQS queue $name does not exist.")
-      case t: Throwable                  => log.error(t.getMessage)
     }
   }
 
@@ -308,5 +300,26 @@ object SqsSink {
           new BasicAWSCredentials(awsConfig.accessKey, awsConfig.secretKey)
         ).asRight
     }).leftMap(new IllegalArgumentException(_))
+  }
+
+  private def createSqsClient(provider: AWSCredentialsProvider, region: String): Either[Throwable, AmazonSQS] =
+    Either.catchNonFatal(
+      AmazonSQSClientBuilder.standard().withRegion(region).withCredentials(provider).build
+    )
+
+  /**
+    * Check whether an SQS queue exists
+    * @param name Name of the queue
+    * @return Whether the queue exists
+    */
+  private def sqsQueueExists(client: AmazonSQS, name: String): Unit = {
+    lazy val log = LoggerFactory.getLogger(getClass)
+    try {
+      client.getQueueUrl(name)
+      ()
+    } catch {
+      case _: QueueDoesNotExistException => log.error(s"SQS queue $name does not exist.")
+      case t: Throwable                  => log.error(t.getMessage)
+    }
   }
 }

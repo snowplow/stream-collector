@@ -23,8 +23,9 @@ import org.apache.commons.codec.binary.Base64
 
 class StdoutSink(streamName: String) extends Sink {
   override val MaxBytes = Int.MaxValue
+
   // Print a Base64-encoded event.
-  def storeRawEvents(events: List[Array[Byte]], key: String) = {
+  override def storeRawEvents(events: List[Array[Byte]], key: String): List[Array[Byte]] = {
     streamName match {
       case "out" =>
         events.foreach { e =>

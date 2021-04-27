@@ -25,7 +25,7 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.Sink
 class TestSink extends Sink {
 
   // Effectively no limit to the record size
-  val MaxBytes = Int.MaxValue
+  override val MaxBytes = Int.MaxValue
 
-  def storeRawEvents(events: List[Array[Byte]], key: String) = events
+  override def storeRawEvents(events: List[Array[Byte]], key: String): List[Array[Byte]] = events
 }
