@@ -125,7 +125,7 @@ trait CollectorRoute {
           }
         }
       }
-    } ~ corsRoute ~ healthRoute ~ crossDomainRoute ~ rootRoute ~ robotsRoute ~ {
+    } ~ corsRoute ~ healthRoute ~ sinkHealthRoute ~ crossDomainRoute ~ rootRoute ~ robotsRoute ~ {
       BeanRegistry.collectorBean.incrementFailedRequests()
       complete(HttpResponse(404, entity = "404 not found"))
     }
@@ -173,6 +173,18 @@ trait CollectorRoute {
   private def healthRoute: Route = get {
     path("health".r) { _ =>
       complete(HttpResponse(200, entity = "OK"))
+    }
+  }
+
+  private def sinkHealthRoute: Route = get {
+    path("sink-health".r) { _ =>
+      complete(
+        if (collectorService.sinksHealthy) {
+          HttpResponse(200, entity = "OK")
+        } else {
+          HttpResponse(503, entity = "Service Unavailable")
+        }
+      )
     }
   }
 

@@ -61,6 +61,7 @@ trait Service {
   def doNotTrackCookie: Option[DntCookieMatcher]
   def determinePath(vendor: String, version: String): String
   def enableDefaultRedirect: Boolean
+  def sinksHealthy: Boolean
 }
 
 object CollectorService {
@@ -81,6 +82,7 @@ class CollectorService(
   override val cookieName            = config.cookieName
   override val doNotTrackCookie      = config.doNotTrackHttpCookie
   override val enableDefaultRedirect = config.enableDefaultRedirect
+  override def sinksHealthy          = sinks.good.isHealthy
 
   private val spAnonymousNuid = "00000000-0000-0000-0000-000000000000"
 
@@ -153,7 +155,12 @@ class CollectorService(
 
         val (httpResponse, badRedirectResponses) =
           buildHttpResponse(event, params, headers.toList, redirect, pixelExpected, bounce, config.redirectMacro)
-        (httpResponse, badRedirectResponses ++ sinkResponses)
+
+        if (sinksHealthy) {
+          (httpResponse, badRedirectResponses ++ sinkResponses)
+        } else {
+          (HttpResponse(StatusCodes.ServiceUnavailable), badRedirectResponses ++ sinkResponses)
+        }
 
       case Left(error) =>
         val badRow = BadRow.GenericError(
@@ -161,8 +168,9 @@ class CollectorService(
           Failure.GenericFailure(Instant.now(), NonEmptyList.one(error.getMessage)),
           Payload.RawPayload(queryString.getOrElse(""))
         )
-        // We cannot return 400 to the JS tracker, as that will lead to the event getting eternally stuck in the client cache.
-        (HttpResponse(StatusCodes.OK), sinkBad(badRow, partitionKey))
+
+        if (sinks.bad.isHealthy) (HttpResponse(StatusCodes.OK), sinkBad(badRow, partitionKey))
+        else (HttpResponse(StatusCodes.OK), Nil) // if bad sink is unhealthy, we don't want to try storing the bad rows
     }
   }
 

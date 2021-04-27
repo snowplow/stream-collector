@@ -30,6 +30,65 @@ import cats.syntax.either._
 
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 
+/**
+  * Google PubSub Sink for the Scala Stream Collector
+  */
+class GooglePubSubSink private (publisher: Publisher, topicName: String) extends Sink {
+  private val logExecutor = Executors.newSingleThreadExecutor()
+
+  // maximum size of a pubsub message is 10MB
+  override val MaxBytes: Int = 10000000
+
+  // Is the collector detecting an outage downstream
+  @volatile private var outage: Boolean = false
+  override def isHealthy: Boolean       = !outage
+
+  /**
+    * Store raw events in the PubSub topic
+    * @param events The list of events to send
+    * @param key Not used.
+    */
+  override def storeRawEvents(events: List[Array[Byte]], key: String): List[Array[Byte]] = {
+    if (events.nonEmpty)
+      log.debug(s"Writing ${events.size} Thrift records to Google PubSub topic $topicName.")
+    events.foreach { event =>
+      publisher.asRight.map { p =>
+        val future = p.publish(eventToPubsubMessage(event))
+        ApiFutures.addCallback(
+          future,
+          new ApiFutureCallback[String]() {
+            override def onSuccess(messageId: String): Unit = {
+              outage = false
+              log.debug(s"Successfully published event with id $messageId to $topicName.")
+            }
+
+            override def onFailure(throwable: Throwable): Unit = {
+              outage = true
+              throwable match {
+                case apiEx: ApiException =>
+                  log.error(
+                    s"Publishing message to $topicName failed with code ${apiEx.getStatusCode}: ${apiEx.getMessage} This error is retryable: ${apiEx.isRetryable}."
+                  )
+                case t => log.error(s"Publishing message to $topicName failed with ${t.getMessage}.")
+              }
+            }
+          },
+          logExecutor
+        )
+      }
+    }
+    Nil
+  }
+
+  /**
+    * Convert event bytes to a PubsubMessage to be published
+    * @param event Event to be converted
+    * @return a PubsubMessage
+    */
+  private def eventToPubsubMessage(event: Array[Byte]): PubsubMessage =
+    PubsubMessage.newBuilder.setData(ByteString.copyFrom(event)).build()
+}
+
 /** GooglePubSubSink companion object with factory method */
 object GooglePubSubSink {
   def createAndInitialize(
@@ -100,55 +159,4 @@ object GooglePubSubSink {
       exists = topics.map(_.getName).exists(_.contains(topicName))
       _ <- Either.catchNonFatal(topicAdminClient.close())
     } yield exists
-}
-
-/**
-  * Google PubSub Sink for the Scala collector
-  */
-class GooglePubSubSink private (publisher: Publisher, topicName: String) extends Sink {
-
-  // maximum size of a pubsub message is 10MB
-  override val MaxBytes: Int = 10000000
-
-  /**
-    * Convert event bytes to a PubsubMessage to be published
-    * @param event Event to be converted
-    * @return a PubsubMessage
-    */
-  private def eventToPubsubMessage(event: Array[Byte]): PubsubMessage =
-    PubsubMessage.newBuilder.setData(ByteString.copyFrom(event)).build()
-
-  private val logExecutor = Executors.newSingleThreadExecutor()
-
-  /**
-    * Store raw events in the PubSub topic
-    * @param events The list of events to send
-    * @param key Not used.
-    */
-  override def storeRawEvents(events: List[Array[Byte]], key: String): List[Array[Byte]] = {
-    if (events.nonEmpty)
-      log.debug(s"Writing ${events.size} Thrift records to Google PubSub topic ${topicName}")
-    events.foreach { event =>
-      publisher.asRight.map { p =>
-        val future = p.publish(eventToPubsubMessage(event))
-        ApiFutures.addCallback(
-          future,
-          new ApiFutureCallback[String]() {
-            override def onSuccess(messageId: String): Unit =
-              log.debug(s"Successfully published event with id $messageId to $topicName")
-            override def onFailure(throwable: Throwable): Unit = throwable match {
-              case apiEx: ApiException =>
-                log.error(
-                  s"Publishing message to $topicName failed with code ${apiEx.getStatusCode}: " +
-                    apiEx.getMessage
-                )
-              case t => log.error(s"Publishing message to $topicName failed with ${t.getMessage}")
-            }
-          },
-          logExecutor
-        )
-      }
-    }
-    Nil
-  }
 }
