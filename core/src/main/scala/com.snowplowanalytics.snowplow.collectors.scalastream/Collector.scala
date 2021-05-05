@@ -66,7 +66,7 @@ trait Collector {
       System.exit(1)
     }
 
-    (loadConfigOrThrow[CollectorConfig](conf.getConfig("collector")), conf)
+    (ConfigSource.fromConfig(conf.getConfig("collector")).loadOrThrow[CollectorConfig], conf)
   }
 
   def run(collectorConf: CollectorConfig, akkaConf: Config, sinks: CollectorSinks): Unit = {
