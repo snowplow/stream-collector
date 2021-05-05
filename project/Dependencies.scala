@@ -43,7 +43,7 @@ object Dependencies {
     val collectorPayload = "0.0.0"
     val akkaHttp         = "10.1.12"
     val akka             = "2.5.32"
-    val scopt            = "3.6.0"
+    val scopt            = "4.0.1"
     val pureconfig       = "0.15.0"
     val json4s           = "3.6.11"
     val badRows          = "2.1.0"
