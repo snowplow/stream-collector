@@ -22,14 +22,14 @@ object BuildSettings {
   // sbt-assembly settings for building an executable
   import sbtassembly.AssemblyPlugin.autoImport._
   lazy val sbtAssemblySettings = Seq(
-    assemblyJarName in assembly := { s"${moduleName.value}-${version.value}.jar" },
-    assemblyMergeStrategy in assembly := {
+    assembly / assemblyJarName := { s"${moduleName.value}-${version.value}.jar" },
+    assembly / assemblyMergeStrategy := {
       // merge strategy for fixing netty conflict
       case PathList("io", "netty", xs @ _*)                => MergeStrategy.first
       case x if x.endsWith("io.netty.versions.properties") => MergeStrategy.discard
       case x if x.endsWith("module-info.class")            => MergeStrategy.first
       case x =>
-        val oldStrategy = (assemblyMergeStrategy in assembly).value
+        val oldStrategy = (assembly / assemblyMergeStrategy).value
         oldStrategy(x)
     }
   )
