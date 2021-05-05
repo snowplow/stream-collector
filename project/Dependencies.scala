@@ -44,7 +44,7 @@ object Dependencies {
     val akkaHttp         = "10.1.12"
     val akka             = "2.5.32"
     val scopt            = "3.6.0"
-    val pureconfig       = "0.11.1"
+    val pureconfig       = "0.15.0"
     val json4s           = "3.6.11"
     val badRows          = "2.1.0"
     // Scala (test only)
