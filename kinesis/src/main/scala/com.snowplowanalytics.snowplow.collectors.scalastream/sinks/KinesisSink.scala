@@ -22,6 +22,7 @@ import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClientBuilder
 import com.amazonaws.services.kinesis.model._
 import com.amazonaws.services.sqs.{AmazonSQS, AmazonSQSClientBuilder}
 import com.amazonaws.services.sqs.model.{
+  MessageAttributeValue,
   QueueDoesNotExistException,
   SendMessageBatchRequest,
   SendMessageBatchRequestEntry
@@ -292,7 +293,17 @@ class KinesisSink private (
     }
 
   def toSqsMessages(events: List[Events]): List[(Events, SendMessageBatchRequestEntry)] =
-    events.map(e => (e, new SendMessageBatchRequestEntry(UUID.randomUUID.toString, b64Encode(e.payloads))))
+    events.map(e =>
+      (
+        e,
+        new SendMessageBatchRequestEntry(UUID.randomUUID.toString, b64Encode(e.payloads)).withMessageAttributes(
+          Map(
+            "kinesisKey" ->
+              new MessageAttributeValue().withDataType("String").withStringValue(e.key)
+          ).asJava
+        )
+      )
+    )
 
   def b64Encode(msg: Array[Byte]): String = {
     val buffer = java.util.Base64.getEncoder.encode(msg)
