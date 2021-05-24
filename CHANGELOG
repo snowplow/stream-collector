@@ -1,3 +1,23 @@
+Release 2.3.0 (2021-05-25)
+--------------------------
+Add outage protection features to Kinesis, SQS and Pubsub sinks (#132)
+Pass Kinesis partitioning key as SQS message attribute (#146)
+Fix typo in PubSub sink useragent string (#147)
+Use base image from DockerHub (#107)
+Attach jar files to Github releases (#108)
+Remove Bintray from resolutionRepos (#144)
+Bump scopt to 4.0.1 (#143)
+Bump pureconfig to 0.15.0 (#142)
+Bump jackson-databind to 2.9.10.8 (#141)
+Bump json4s-jackson to 3.6.11 (#140)
+Bump specs2-core to 4.11.0 (#139)
+Bump sbt-scalafmt to 2.4.2 (#138)
+Bump sbt-tpolecat to 0.1.17 (#137)
+Bump sbt-buildinfo to 0.10.0 (#136)
+Bump sbt-assembly to 0.15.0 (#135)
+Bump sbt to 1.5.1 (#134)
+Add link to Snowplow's public roadmap in README (#145)
+
 Release 2.2.1 (2021-03-26)
 --------------------------
 Respect SQS batch request limit (#125)
