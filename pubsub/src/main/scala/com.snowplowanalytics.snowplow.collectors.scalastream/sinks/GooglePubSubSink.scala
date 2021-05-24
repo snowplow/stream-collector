@@ -106,7 +106,7 @@ object GooglePubSubSink {
       }
     } yield new GooglePubSubSink(publisher, topicName)
 
-  private val UserAgent = s"snowplow/stream-enrich-${generated.BuildInfo.version}"
+  private val UserAgent = s"snowplow/stream-collector-${generated.BuildInfo.version}"
 
   /**
     * Instantiates a Publisher on an existing topic with the given configuration options.
