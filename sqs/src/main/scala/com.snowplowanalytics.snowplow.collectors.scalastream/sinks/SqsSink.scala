@@ -25,6 +25,7 @@ import com.amazonaws.auth.{
 }
 import com.amazonaws.services.sqs.{AmazonSQS, AmazonSQSClientBuilder}
 import com.amazonaws.services.sqs.model.{
+  MessageAttributeValue,
   QueueDoesNotExistException,
   SendMessageBatchRequest,
   SendMessageBatchRequestEntry
@@ -75,7 +76,7 @@ class SqsSink private (
   override def isHealthy: Boolean       = !outage
 
   override def storeRawEvents(events: List[Array[Byte]], key: String): List[Array[Byte]] = {
-    events.foreach(e => EventStorage.store(e))
+    events.foreach(e => EventStorage.store(e, key))
     Nil
   }
 
@@ -84,7 +85,7 @@ class SqsSink private (
     private var byteCount                 = 0L
     @volatile private var lastFlushedTime = 0L
 
-    def store(event: Events): Unit = {
+    def store(event: Array[Byte], key: String): Unit = {
       val eventBytes = ByteBuffer.wrap(event)
       val eventSize  = eventBytes.capacity
 
@@ -92,7 +93,7 @@ class SqsSink private (
         if (storedEvents.size + 1 > RecordThreshold || byteCount + eventSize > ByteThreshold) {
           flush()
         }
-        storedEvents += eventBytes.array()
+        storedEvents += Events(eventBytes.array(), key)
         byteCount += eventSize
       }
     }
@@ -197,9 +198,19 @@ class SqsSink private (
     }
 
   def toSqsMessages(events: List[Events]): List[(Events, SendMessageBatchRequestEntry)] =
-    events.map(e => (e, new SendMessageBatchRequestEntry(UUID.randomUUID.toString, b64Encode(e))))
+    events.map(e =>
+      (
+        e,
+        new SendMessageBatchRequestEntry(UUID.randomUUID.toString, b64Encode(e.payloads)).withMessageAttributes(
+          Map(
+            "kinesisKey" ->
+              new MessageAttributeValue().withDataType("String").withStringValue(e.key)
+          ).asJava
+        )
+      )
+    )
 
-  def b64Encode(e: Events): String = {
+  def b64Encode(e: Array[Byte]): String = {
     val buffer = java.util.Base64.getEncoder.encode(e)
     new String(buffer)
   }
@@ -237,7 +248,15 @@ class SqsSink private (
 
 /** SqsSink companion object with factory method */
 object SqsSink {
-  type Events = Array[Byte]
+
+  /**
+    * Events to be written to SQS.
+    * @param payloads Serialized events extracted from a CollectorPayload.
+    *                 The size of this collection is limited by MaxBytes.
+    *                 Not to be confused with a 'batch' events to sink.
+    * @param key Partition key for Kinesis, when events are ultimately re-routed there
+    */
+  final case class Events(payloads: Array[Byte], key: String)
 
   // Details about why messages failed to be written to SQS.
   final case class BatchResultErrorInfo(code: String, message: String)
