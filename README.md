@@ -14,10 +14,10 @@ events to [Amazon Kinesis][kinesis] and [NSQ][nsq], and is built on top of [akka
 
 ## Find out more
 
-| Technical Docs             | Setup Guide          | Roadmap & Contributing |
-|----------------------------|----------------------|------------------------|
-| ![i1][techdocs-image]      | ![i2][setup-image]   | ![i3][roadmap-image]   |
-| [Technical Docs][techdocs] | [Setup Guide][setup] | _coming soon_          |
+| Technical Docs             | Setup Guide          | Roadmap                     | Contributing              |
+|----------------------------|----------------------|-----------------------------|---------------------------|
+| ![i1][techdocs-image]      | ![i2][setup-image]   | ![i3][roadmap-image]        | ![i4][contributing-image] |
+| [Technical Docs][techdocs] | [Setup Guide][setup] | [Snowplow Roadmap][roadmap] | _coming soon_             |
 
 ## Copyright and license
 
@@ -46,7 +46,7 @@ limitations under the License.
 
 [techdocs]: https://github.com/snowplow/snowplow/wiki/Scala-Stream-collector
 [setup]: https://github.com/snowplow/snowplow/wiki/Setting-up-the-Scala-Stream-collector
-[roadmap]: https://github.com/snowplow/snowplow/wiki/Scala-Stream-collector-roadmap
+[roadmap]: https://github.com/snowplow/snowplow/projects/7
 [contributing]: https://github.com/snowplow/snowplow/wiki/Scala-Stream-collector-contributing
 
 [build-image]: https://github.com/snowplow/stream-collector/workflows/build/badge.svg
