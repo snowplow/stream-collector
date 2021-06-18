@@ -193,6 +193,14 @@ collector {
     # request can be cached. -1 seconds disables the cache. Chromium max is 10m, Firefox is 24h.
     accessControlMaxAge = 5 seconds
     accessControlMaxAge = ${?COLLECTOR_CORS_ACCESS_CONTROL_MAX_AGE}
+
+    # Whether or not the value in `restrictDomainsTo` is respected. Optional, defaults to true.
+    doRestrictDomains = false
+    doRestrictDomains = ${?COLLECTOR_CORS_ACCESS_CONTROL_DO_RESTRICT_DOMAINS}
+    # An optional list of domains to return the Access-Control-Allow-Origin header for. The header will
+    # not be returned for other domains. If this is not provided, it will be provided for all domains.
+    restrictDomainsTo = [ "example.com" ]
+    restrictDomainsTo = [ ${?COLLECTOR_CORS_RESTRICT_DOMAINS_TO} ]
   }
 
   # Configuration of prometheus http metrics

@@ -147,11 +147,9 @@ class CollectorService(
         val headers = bounceLocationHeader(params, request, config.cookieBounce, bounce) ++
           cookieHeader(request, config.cookieConfig, nuid, doNotTrack, spAnonymous) ++
           cacheControl(pixelExpected) ++
-          List(
-            RawHeader("P3P", "policyref=\"%s\", CP=\"%s\"".format(config.p3p.policyRef, config.p3p.CP)),
-            accessControlAllowOriginHeader(request),
-            `Access-Control-Allow-Credentials`(true)
-          )
+          List(RawHeader("P3P", "policyref=\"%s\", CP=\"%s\"".format(config.p3p.policyRef, config.p3p.CP))) ++
+          accessControlAllowOriginHeader(request, config.cors.restrictDomainsToConfig) ++
+          List(`Access-Control-Allow-Credentials`(true))
 
         val (httpResponse, badRedirectResponses) =
           buildHttpResponse(event, params, headers.toList, redirect, pixelExpected, bounce, config.redirectMacro)
@@ -183,8 +181,8 @@ class CollectorService(
 
   def preflightResponse(request: HttpRequest, corsConfig: CORSConfig): HttpResponse =
     HttpResponse().withHeaders(
+      accessControlAllowOriginHeader(request, corsConfig.restrictDomainsToConfig) ++
       List(
-        accessControlAllowOriginHeader(request),
         `Access-Control-Allow-Credentials`(true),
         `Access-Control-Allow-Headers`("Content-Type", "SP-Anonymous"),
         `Access-Control-Max-Age`(corsConfig.accessControlMaxAge.toSeconds)
@@ -477,14 +475,25 @@ class CollectorService(
     * Creates an Access-Control-Allow-Origin header which specifically allows the domain which made
     * the request
     * @param request Incoming request
-    * @return Header allowing only the domain which made the request or everything
+    * @param domainRestriction A list of domains which the ACAO header will only be served for, or `None`
+    * if there are no restrictions.
+    * @return A singleton list containing the specified header. If it violates the restrictions, the list
+    * will be empty. If the request had no `Origin` header, the response header will permit every domain.
     */
-  def accessControlAllowOriginHeader(request: HttpRequest): HttpHeader =
-    `Access-Control-Allow-Origin`(request.headers.find {
-      case `Origin`(_) => true
-      case _           => false
+  def accessControlAllowOriginHeader(
+    request: HttpRequest,
+    restrictDomainsTo: Option[List[String]],
+  ): List[HttpHeader] =
+    request.headers.collectFirst {
+      case `Origin`(origins) => origins
     } match {
-      case Some(`Origin`(origin)) => HttpOriginRange.Default(origin)
-      case _                      => HttpOriginRange.`*`
-    })
+      case None         => List(`Access-Control-Allow-Origin`(HttpOriginRange.`*`))
+      case Some(origins) => {
+        val hosts: Seq[String] = origins.map(_.host.value)
+        if (restrictDomainsTo.forall(hosts.intersect(_).nonEmpty))
+          List(`Access-Control-Allow-Origin`(HttpOriginRange.Default(origins)))
+        else
+          Nil
+      }
+    }
 }

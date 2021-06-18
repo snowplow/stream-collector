@@ -738,16 +738,35 @@ class CollectorServiceSpec extends Specification {
     }
 
     "accessControlAllowOriginHeader" in {
+      val origin1 = HttpOrigin("http", Host("origin1"))
       "give a restricted ACAO header if there is an Origin header in the request" in {
-        val origin  = HttpOrigin("http", Host("origin"))
-        val request = HttpRequest().withHeaders(`Origin`(origin))
-        service.accessControlAllowOriginHeader(request) shouldEqual
-          `Access-Control-Allow-Origin`(HttpOriginRange.Default(List(origin)))
+        val request = HttpRequest().withHeaders(`Origin`(origin1))
+        val header = `Access-Control-Allow-Origin`(HttpOriginRange.Default(List(origin1)))
+        "and no domain restrictions" in {
+          service.accessControlAllowOriginHeader(request, None) shouldEqual List(header)
+        }
+        "and a domain restriction which permits that origin" in {
+          service.accessControlAllowOriginHeader(request, Some(List("origin2", "origin1"))) shouldEqual List(header)
+        }
       }
       "give an open ACAO header if there are no Origin headers in the request" in {
         val request = HttpRequest()
-        service.accessControlAllowOriginHeader(request) shouldEqual
-          `Access-Control-Allow-Origin`(HttpOriginRange.`*`)
+        val header = `Access-Control-Allow-Origin`(HttpOriginRange.`*`)
+        "and no domain restrictions" in {
+          service.accessControlAllowOriginHeader(request, None) shouldEqual List(header)
+        }
+        "and any domain restrictions" in {
+          service.accessControlAllowOriginHeader(request, Some(Nil)) shouldEqual List(header)
+        }
+      }
+      "give no ACAO header if the request's has an Origin header" in {
+        val request = HttpRequest().withHeaders(`Origin`(origin1))
+        "but it does not meet the restrictions" in {
+          service.accessControlAllowOriginHeader(request, Some(List("origin2"))) shouldEqual Nil
+        }
+        "but the restrictions exclude all domains" in {
+          service.accessControlAllowOriginHeader(request, Some(Nil)) shouldEqual Nil
+        }
       }
     }
 
