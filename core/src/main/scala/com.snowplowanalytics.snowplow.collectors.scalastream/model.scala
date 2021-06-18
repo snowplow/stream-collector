@@ -93,7 +93,13 @@ package model {
   )
   final case class P3PConfig(policyRef: String, CP: String)
   final case class CrossDomainConfig(enabled: Boolean, domains: List[String], secure: Boolean)
-  final case class CORSConfig(accessControlMaxAge: FiniteDuration)
+  final case class CORSConfig(
+    accessControlMaxAge: FiniteDuration,
+    doRestrictDomains: Boolean              = true,
+    restrictDomainsTo: Option[List[String]] = None,
+  ) {
+    val restrictDomainsToConfig = if (doRestrictDomains) restrictDomainsTo else None
+  }
   final case class KinesisBackoffPolicyConfig(minBackoff: Long, maxBackoff: Long)
   final case class SqsBackoffPolicyConfig(minBackoff: Long, maxBackoff: Long)
   final case class GooglePubSubBackoffPolicyConfig(
