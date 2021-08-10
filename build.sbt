@@ -18,7 +18,6 @@ lazy val commonDependencies = Seq(
   // Java
   Dependencies.Libraries.jackson,
   Dependencies.Libraries.thrift,
-  Dependencies.Libraries.commonsCodec,
   Dependencies.Libraries.grpcCore,
   Dependencies.Libraries.jodaTime,
   Dependencies.Libraries.slf4j,
@@ -42,6 +41,10 @@ lazy val commonDependencies = Seq(
   Dependencies.Libraries.specs2
 )
 
+lazy val commonExclusions = Seq(
+  "org.apache.tomcat.embed" % "tomcat-embed-core" // exclude for security vulnerabilities introduced by libthrift
+)
+
 lazy val buildSettings = Seq(
   organization := "com.snowplowanalytics",
   name := "snowplow-stream-collector",
@@ -63,6 +66,7 @@ lazy val allSettings = buildSettings ++
   BuildSettings.sbtAssemblySettings ++
   BuildSettings.formatting ++
   Seq(libraryDependencies ++= commonDependencies) ++
+  Seq(excludeDependencies ++= commonExclusions) ++
   dockerSettings
 
 lazy val root = project.in(file(".")).settings(buildSettings).aggregate(core, kinesis, pubsub, kafka, nsq, stdout)
@@ -71,6 +75,7 @@ lazy val core = project
   .settings(moduleName := "snowplow-stream-collector-core")
   .settings(buildSettings ++ BuildSettings.sbtAssemblySettings)
   .settings(libraryDependencies ++= commonDependencies)
+  .settings(excludeDependencies ++= commonExclusions)
   .enablePlugins(BuildInfoPlugin)
   .settings(
     buildInfoKeys := Seq[BuildInfoKey](
