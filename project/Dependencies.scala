@@ -33,7 +33,6 @@ object Dependencies {
     val config       = "1.4.1"
     val prometheus   = "0.9.0"
     val cbor         = "2.9.10" // See snowplow/snowplow/issues/4266
-    val jackson      = "2.9.10.8" // force this version to mitigate security vulnerabilities
     val thrift       = "0.14.1" // force this version to mitigate security vulnerabilities
     val grpcCore     = "1.31.0" // force this version to mitigate security vulnerabilities
     // Scala
@@ -43,14 +42,13 @@ object Dependencies {
     val scopt            = "4.0.1"
     val pureconfig       = "0.15.0"
     val json4s           = "3.6.11"
-    val badRows          = "2.1.0"
+    val badRows          = "2.1.1-M2"
     // Scala (test only)
     val specs2 = "4.11.0"
   }
 
   object Libraries {
     // Java
-    val jackson          = "com.fasterxml.jackson.core"       % "jackson-databind"        % V.jackson
     val thrift           = "org.apache.thrift"                % "libthrift"               % V.thrift
     val grpcCore         = "io.grpc"                          % "grpc-core"               % V.grpcCore
     val kinesis          = "com.amazonaws"                    % "aws-java-sdk-kinesis"    % V.awsSdk
