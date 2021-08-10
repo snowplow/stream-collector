@@ -107,7 +107,8 @@ lazy val sqs = project
   .settings(Docker / packageName := "snowplow/scala-stream-collector-sqs")
   .settings(
     libraryDependencies ++= Seq(
-      Dependencies.Libraries.sqs
+      Dependencies.Libraries.sqs,
+      Dependencies.Libraries.cbor
     )
   )
   .enablePlugins(JavaAppPackaging, DockerPlugin)
