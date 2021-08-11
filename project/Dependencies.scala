@@ -25,7 +25,7 @@ object Dependencies {
   object V {
     // Java
     val awsSdk       = "1.11.822"
-    val pubsub       = "1.108.0"
+    val pubsub       = "1.113.7"
     val kafka        = "2.2.1"
     val nsqClient    = "1.3.0"
     val jodaTime     = "2.10.8"
@@ -35,7 +35,6 @@ object Dependencies {
     val cbor         = "2.11.4" // See snowplow/snowplow/issues/4266
     val jackson      = "2.10.5.1" // force this version to mitigate security vulnerabilities (nsq only)
     val thrift       = "0.14.1" // force this version to mitigate security vulnerabilities
-    val grpcCore     = "1.31.0" // force this version to mitigate security vulnerabilities
     // Scala
     val collectorPayload = "0.0.0"
     val akkaHttp         = "10.1.12"
@@ -51,7 +50,6 @@ object Dependencies {
     // Java
     val jackson          = "com.fasterxml.jackson.core"       % "jackson-databind"        % V.jackson // nsq only
     val thrift           = "org.apache.thrift"                % "libthrift"               % V.thrift
-    val grpcCore         = "io.grpc"                          % "grpc-core"               % V.grpcCore
     val kinesis          = "com.amazonaws"                    % "aws-java-sdk-kinesis"    % V.awsSdk
     val sqs              = "com.amazonaws"                    % "aws-java-sdk-sqs"        % V.awsSdk
     val pubsub           = "com.google.cloud"                 % "google-cloud-pubsub"     % V.pubsub
