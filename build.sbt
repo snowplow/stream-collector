@@ -134,7 +134,10 @@ lazy val nsq = project
   .settings(moduleName := "snowplow-stream-collector-nsq")
   .settings(allSettings)
   .settings(Docker / packageName := "snowplow/scala-stream-collector-nsq")
-  .settings(libraryDependencies ++= Seq(Dependencies.Libraries.nsqClient))
+  .settings(libraryDependencies ++= Seq(
+    Dependencies.Libraries.nsqClient,
+    Dependencies.Libraries.jackson
+  ))
   .enablePlugins(JavaAppPackaging, DockerPlugin)
   .dependsOn(core)
 
