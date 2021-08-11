@@ -114,8 +114,9 @@ package model {
     sqsBadBuffer: Option[String]
   ) extends SinkConfig {
     val endpoint = customEndpoint.getOrElse(region match {
-      case cn @ "cn-north-1" => s"https://kinesis.$cn.amazonaws.com.cn"
-      case _                 => s"https://kinesis.$region.amazonaws.com"
+      case cn @ "cn-north-1"     => s"https://kinesis.$cn.amazonaws.com.cn"
+      case cn @ "cn-northwest-1" => s"https://kinesis.$cn.amazonaws.com.cn"
+      case _                     => s"https://kinesis.$region.amazonaws.com"
     })
   }
   final case class Sqs(region: String, threadPoolSize: Int, aws: AWSConfig, backoffPolicy: SqsBackoffPolicyConfig)
