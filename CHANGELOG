@@ -1,3 +1,12 @@
+Release 2.3.1 (2021-08-12)
+--------------------------
+Bump pubsub to 2.113.7 (#158)
+Bump jackson-databind to 2.10.5.1 on nsq module (#157)
+Add cn-northwest-1 to list of custom endpoints (#152)
+Bump jackson-dataformat-cbor to 2.11.4 (#155)
+Bump snowplow-badrows to 2.1.1 (#154)
+Bump libthrift to 0.14.1 (#153)
+
 Release 2.3.0 (2021-05-25)
 --------------------------
 Add outage protection features to Kinesis, SQS and Pubsub sinks (#132)
