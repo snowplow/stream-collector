@@ -52,6 +52,7 @@ object Dependencies {
     val thrift           = "org.apache.thrift"                % "libthrift"               % V.thrift
     val kinesis          = "com.amazonaws"                    % "aws-java-sdk-kinesis"    % V.awsSdk
     val sqs              = "com.amazonaws"                    % "aws-java-sdk-sqs"        % V.awsSdk
+    val sts              = "com.amazonaws"                    % "aws-java-sdk-sts"        % V.awsSdk
     val pubsub           = "com.google.cloud"                 % "google-cloud-pubsub"     % V.pubsub
     val kafkaClients     = "org.apache.kafka"                 % "kafka-clients"           % V.kafka
     val nsqClient        = "com.snowplowanalytics"            % "nsq-java-client"         % V.nsqClient

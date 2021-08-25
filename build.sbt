@@ -56,7 +56,9 @@ lazy val buildSettings = Seq(
 lazy val dockerSettings = Seq(
   Docker / maintainer := "Snowplow Analytics Ltd. <support@snowplowanalytics.com>",
   dockerBaseImage := "snowplow/base-debian:0.2.2",
+  Docker / daemonUserUid := None, 
   Docker / daemonUser := "snowplow",
+  Docker / defaultLinuxInstallLocation := "/snowplow",
   dockerUpdateLatest := true
 )
 
@@ -93,6 +95,7 @@ lazy val kinesis = project
   .settings(
     libraryDependencies ++= Seq(
       Dependencies.Libraries.kinesis,
+      Dependencies.Libraries.sts,
       Dependencies.Libraries.cbor,
       Dependencies.Libraries.sqs
     )
@@ -107,6 +110,7 @@ lazy val sqs = project
   .settings(
     libraryDependencies ++= Seq(
       Dependencies.Libraries.sqs,
+      Dependencies.Libraries.sts,
       Dependencies.Libraries.cbor
     )
   )
