@@ -40,7 +40,12 @@ lazy val commonDependencies = Seq(
 )
 
 lazy val commonExclusions = Seq(
-  "org.apache.tomcat.embed" % "tomcat-embed-core" // exclude for security vulnerabilities introduced by libthrift
+  // Exclude for security vulnerabilities introduced by libthrift:
+  "org.apache.tomcat.embed" % "tomcat-embed-core",
+
+  // Avoid duplicate .proto files brought in by akka and google-cloud-pubsub.
+  // We don't need any akka serializers because collector runs in a single JVM.
+  "com.typesafe.akka" % "akka-protobuf-v3_2.12"
 )
 
 lazy val buildSettings = Seq(
