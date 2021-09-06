@@ -37,7 +37,7 @@ object Dependencies {
     val thrift       = "0.14.1" // force this version to mitigate security vulnerabilities
     // Scala
     val collectorPayload = "0.0.0"
-    val akkaHttp         = "10.1.12"
+    val akkaHttp         = "10.2.6"
     val akka             = "2.6.16"
     val scopt            = "4.0.1"
     val pureconfig       = "0.15.0"
