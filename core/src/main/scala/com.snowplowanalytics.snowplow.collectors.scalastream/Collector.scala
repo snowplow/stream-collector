@@ -22,7 +22,6 @@ import akka.http.scaladsl.{ConnectionContext, Http}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.Directives._
-import akka.stream.ActorMaterializer
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.sslconfig.akka.AkkaSSLConfig
 import pureconfig._
@@ -72,7 +71,6 @@ trait Collector {
   def run(collectorConf: CollectorConfig, akkaConf: Config, sinks: CollectorSinks): Unit = {
 
     implicit val system           = ActorSystem.create("scala-stream-collector", akkaConf)
-    implicit val materializer     = ActorMaterializer()
     implicit val executionContext = system.dispatcher
 
     val collectorRoute = new CollectorRoute {
