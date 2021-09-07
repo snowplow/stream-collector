@@ -51,7 +51,6 @@ lazy val commonExclusions = Seq(
 lazy val buildSettings = Seq(
   organization := "com.snowplowanalytics",
   name := "snowplow-stream-collector",
-  version := "2.3.1",
   description := "Scala Stream Collector for Snowplow raw events",
   scalaVersion := "2.12.10",
   javacOptions := Seq("-source", "11", "-target", "11"),
@@ -67,14 +66,20 @@ lazy val dockerSettings = Seq(
   Docker / defaultLinuxInstallLocation := "/opt/snowplow"
 )
 
+lazy val dynVerSettings = Seq(
+  ThisBuild / dynverVTagPrefix := false, // Otherwise git tags required to have v-prefix
+  ThisBuild / dynverSeparator := "-" // to be compatible with docker
+)
+
 lazy val allSettings = buildSettings ++
   BuildSettings.sbtAssemblySettings ++
   BuildSettings.formatting ++
   Seq(libraryDependencies ++= commonDependencies) ++
   Seq(excludeDependencies ++= commonExclusions) ++
-  dockerSettings
+  dockerSettings ++
+  dynVerSettings
 
-lazy val root = project.in(file(".")).settings(buildSettings).aggregate(core, kinesis, pubsub, kafka, nsq, stdout, sqs)
+lazy val root = project.in(file(".")).settings(buildSettings ++ dynVerSettings).aggregate(core, kinesis, pubsub, kafka, nsq, stdout, sqs)
 
 lazy val core = project
   .settings(moduleName := "snowplow-stream-collector-core")

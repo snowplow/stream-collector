@@ -12,15 +12,10 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 11
-      - name: Get current version
-        id: ver
-        run: |
-          export PROJECT_VERSION=$(sbt "project core" version -Dsbt.log.noformat=true | perl -ne 'print "$1\n" if /info.*(\d+\.\d+\.\d+[^\r\n]*)/' | tail -n 1 | tr -d '\n')
-          echo "::set-output name=project_version::$PROJECT_VERSION"
       - name: Publish Docker image
-        run: sbt 'project stdout' docker:publishLocal
+        run: sbt 'project stdout; set Docker / version := "0.0.0"' docker:publishLocal
       - name: Run Docker image
-        run: docker run -d -v "$PWD"/.github/workflows/ssc-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-stdout:"${{ steps.ver.outputs.project_version }}" --config /snowplow/config/config.hocon
+        run: docker run -d -v "$PWD"/.github/workflows/ssc-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-stdout:0.0.0 --config /snowplow/config/config.hocon
       - name: Allow time for collector to start
         run: sleep 30
       - name: Test non-anonymous tracking
