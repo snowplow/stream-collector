@@ -15,21 +15,23 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import java.io.File
+import javax.net.ssl.SSLContext
 import org.slf4j.LoggerFactory
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.{ConnectionContext, Http}
+import akka.http.scaladsl.{ConnectionContext, Http, ServerBuilder}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.Directives._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.typesafe.sslconfig.akka.AkkaSSLConfig
 import pureconfig._
 import pureconfig.generic.auto._
 import pureconfig.generic.{FieldCoproductHint, ProductHint}
 
 import com.snowplowanalytics.snowplow.collectors.scalastream.metrics._
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
+
+import scala.concurrent.Future
 
 // Main entry point of the Scala collector.
 trait Collector {
@@ -102,14 +104,12 @@ trait Collector {
         }
       }
 
-    def bind(
-      rs: Route,
-      interface: String,
-      port: Int,
-      connectionContext: ConnectionContext = ConnectionContext.noEncryption()
-    ) =
-      Http()
-        .bindAndHandle(rs, interface, port, connectionContext)
+    def bindRoutes(
+      builder: ServerBuilder,
+      rs: Route
+    ): Future[Unit] =
+      builder
+        .bind(rs)
         .map { binding =>
           log.info(s"REST interface bound to ${binding.localAddress}")
         }
@@ -122,15 +122,19 @@ trait Collector {
             )
         }
 
-    lazy val secureEndpoint =
-      bind(
-        routes,
-        collectorConf.interface,
-        collectorConf.ssl.port,
-        SSLConfig.secureConnectionContext(system, AkkaSSLConfig())
+    lazy val secureEndpoint: Future[Unit] =
+      bindRoutes(
+        Http()
+          .newServerAt(collectorConf.interface, collectorConf.ssl.port)
+          .enableHttps(ConnectionContext.httpsServer(SSLContext.getDefault)),
+        routes
       )
 
-    lazy val unsecureEndpoint = (routes: Route) => bind(routes, collectorConf.interface, collectorConf.port)
+    def unsecureEndpoint(routes: Route): Future[Unit] =
+      bindRoutes(
+        Http().newServerAt(collectorConf.interface, collectorConf.port),
+        routes
+      )
 
     collectorConf.ssl match {
       case SSLConfig(true, true, _) =>
