@@ -1,0 +1,85 @@
+collector {
+  interface = "0.0.0.0"
+  port = 9191
+  ssl {
+    enable = true
+    redirect = false
+    port = 9092
+  }
+  paths {}
+  p3p {
+    policyRef = "/w3c/p3p.xml"
+    CP = "NOI DSP COR NID PSA OUR IND COM NAV STA"
+  }
+  crossDomain {
+    enabled = false
+    domains = [ "*" ]
+    secure = true
+  }
+  cookie {
+    enabled = true
+    expiration = 365 days
+    name = "mycookiename"
+    domains = [ ]
+    secure = false
+    httpOnly = false
+  }
+  doNotTrackCookie {
+    enabled = false
+    name = mydntcname
+    value = mydntcvalue
+  }
+  cookieBounce {
+    enabled = false
+    name = "n3pc"
+    fallbackNetworkUserId = "00000000-0000-4000-A000-000000000000"
+    forwardedProtocolHeader = "X-Forwarded-Proto"
+  }
+  enableDefaultRedirect = false
+  redirectMacro {
+    enabled = false
+    placeholder = "[TOKEN]"
+  }
+  rootResponse {
+    enabled = false
+    statusCode = 302
+    headers = {
+      Location = "https://127.0.0.1/",
+      X-Custom = "something"
+    }
+    body = "302, redirecting"
+  }
+  cors {
+    accessControlMaxAge = 5 seconds
+  }
+  prometheusMetrics {
+    enabled = false
+  }
+  streams {
+    good = mygood
+    bad = mybad
+    useIpAddressAsPartitionKey = false
+    sink {
+      enabled = stdout
+    }
+    buffer {
+      byteLimit = 1
+      recordLimit = 1
+      timeLimit = 1
+    }
+  }
+}
+
+akka {
+  loglevel = DEBUG
+  loggers = ["akka.event.slf4j.Slf4jLogger"]
+  http.server {
+    remote-address-header = on
+    raw-request-uri-header = on
+    parsing {
+      max-uri-length = 32768
+      uri-parsing-mode = relaxed
+    }
+  }
+ }
+

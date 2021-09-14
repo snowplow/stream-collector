@@ -33,14 +33,18 @@ object Dependencies {
     val config       = "1.4.1"
     val prometheus   = "0.9.0"
     val cbor         = "2.11.4" // See snowplow/snowplow/issues/4266
-    val jackson      = "2.10.5.1" // force this version to mitigate security vulnerabilities (nsq only)
+    val jackson      = "2.10.5.1" // force this version to mitigate security vulnerabilities
     val thrift       = "0.14.1" // force this version to mitigate security vulnerabilities
+    val commonsCodec = "1.13" // force this version to mitigate security vulnerabilities
+    val grpcCore     = "1.31.0" // force this version to mitigate security vulnerabilities
     // Scala
     val collectorPayload = "0.0.0"
+    val tracker          = "1.0.0"
     val akkaHttp         = "10.2.6"
     val akka             = "2.6.16"
     val scopt            = "4.0.1"
     val pureconfig       = "0.15.0"
+    val json4s           = "3.6.11"
     val badRows          = "2.1.1"
     // Scala (test only)
     val specs2 = "4.11.0"
@@ -65,13 +69,16 @@ object Dependencies {
     val cbor             = "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % V.cbor
 
     // Scala
-    val collectorPayload = "com.snowplowanalytics" % "collector-payload-1" % V.collectorPayload
-    val badRows          = "com.snowplowanalytics" %% "snowplow-badrows"   % V.badRows
-    val scopt            = "com.github.scopt"      %% "scopt"              % V.scopt
-    val akkaHttp         = "com.typesafe.akka"     %% "akka-http"          % V.akkaHttp
-    val akkaStream       = "com.typesafe.akka"     %% "akka-stream"        % V.akka
-    val akkaSlf4j        = "com.typesafe.akka"     %% "akka-slf4j"         % V.akka
-    val pureconfig       = "com.github.pureconfig" %% "pureconfig"         % V.pureconfig
+    val collectorPayload = "com.snowplowanalytics" % "collector-payload-1"                % V.collectorPayload
+    val badRows          = "com.snowplowanalytics" %% "snowplow-badrows"                  % V.badRows
+    val trackerCore      = "com.snowplowanalytics" %% "snowplow-scala-tracker-core"       % V.tracker
+    val trackerEmitterId = "com.snowplowanalytics" %% "snowplow-scala-tracker-emitter-id" % V.tracker
+    val scopt            = "com.github.scopt"      %% "scopt"                             % V.scopt
+    val akkaHttp         = "com.typesafe.akka"     %% "akka-http"                         % V.akkaHttp
+    val akkaStream       = "com.typesafe.akka"     %% "akka-stream"                       % V.akka
+    val akkaSlf4j        = "com.typesafe.akka"     %% "akka-slf4j"                        % V.akka
+    val json4sJackson    = "org.json4s"            %% "json4s-jackson"                    % V.json4s
+    val pureconfig       = "com.github.pureconfig" %% "pureconfig"                        % V.pureconfig
 
     // Scala (test only)
     val specs2            = "org.specs2"        %% "specs2-core"         % V.specs2   % Test

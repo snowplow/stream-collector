@@ -22,7 +22,6 @@ import akka.http.scaladsl.model.{HttpMethod, StatusCode, Uri}
 import io.prometheus.client.{CollectorRegistry, Counter, Gauge, Histogram}
 import io.prometheus.client.exporter.common.TextFormat
 
-import com.snowplowanalytics.snowplow.collectors.scalastream.generated.BuildInfo
 import com.snowplowanalytics.snowplow.collectors.scalastream.metrics.PrometheusMetricsService.Metrics._
 import com.snowplowanalytics.snowplow.collectors.scalastream.metrics.PrometheusMetricsService.NanosecondsInSecond
 import com.snowplowanalytics.snowplow.collectors.scalastream.model.PrometheusMetricsConfig
@@ -41,7 +40,8 @@ trait MetricsService {
   * which uses [[https://prometheus.io/]] data format for storing metrics and report generation
   * @param metricsConfig Configuration of metrics format
   */
-class PrometheusMetricsService(metricsConfig: PrometheusMetricsConfig) extends MetricsService {
+class PrometheusMetricsService(metricsConfig: PrometheusMetricsConfig, scalaVersion: String, appVersion: String)
+    extends MetricsService {
 
   private val registry = new CollectorRegistry
   private val requestCounter: Counter =
@@ -59,7 +59,7 @@ class PrometheusMetricsService(metricsConfig: PrometheusMetricsConfig) extends M
     .labelNames("java_version", "scala_version", "version")
     .register(registry)
 
-  applicationVersionGauge.labels(System.getProperty("java.version"), BuildInfo.scalaVersion, BuildInfo.version).set(1)
+  applicationVersionGauge.labels(System.getProperty("java.version"), scalaVersion, appVersion).set(1)
 
   override def observeRequest(method: HttpMethod, uri: Uri, status: StatusCode, duration: Duration): Unit = {
     val path        = uri.path.toString

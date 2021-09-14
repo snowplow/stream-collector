@@ -13,9 +13,7 @@
  * governing permissions and limitations there under.
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream
-
 import scala.concurrent.duration._
-
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 
 object TestUtils {
@@ -59,6 +57,7 @@ object TestUtils {
       ),
       buffer = BufferConfig(4000000L, 500L, 60000L)
     ),
+    telemetry         = None,
     prometheusMetrics = PrometheusMetricsConfig(false, None)
   )
 }
