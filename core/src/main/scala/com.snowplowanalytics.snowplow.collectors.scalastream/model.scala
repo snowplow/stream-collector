@@ -27,11 +27,13 @@ import com.typesafe.sslconfig.akka.util.AkkaLoggerFactory
 import com.typesafe.sslconfig.ssl.{ClientAuth => SslClientAuth}
 import com.typesafe.sslconfig.ssl.ConfigSSLContextBuilder
 
-import io.circe.Json
-
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.Sink
 
+import io.circe.Json
+
 package model {
+
+  import scala.concurrent.duration.DurationInt
 
   /**
     * Case class for holding both good and
@@ -143,6 +145,22 @@ package model {
     enabled: Boolean,
     durationBucketsInSeconds: Option[List[Double]]
   )
+  final case class TelemetryConfig(
+    // General params
+    isDisabled: Boolean      = false,
+    interval: FiniteDuration = 1.minute,
+    // http params
+    method: String    = "POST",
+    url: String       = "collector-g.snowplowanalytics.com",
+    port: Int         = 443,
+    isSecure: Boolean = true,
+    // Params injected by deployment scripts
+    userProvidedId: Option[String] = None,
+    moduleName: Option[String]     = None,
+    moduleVersion: Option[String]  = None,
+    instanceId: Option[String]     = None
+  )
+
   final case class SSLConfig(
     enable: Boolean   = false,
     redirect: Boolean = false,
@@ -162,8 +180,9 @@ package model {
     cors: CORSConfig,
     streams: StreamsConfig,
     prometheusMetrics: PrometheusMetricsConfig,
-    enableDefaultRedirect: Boolean = false,
-    ssl: SSLConfig                 = SSLConfig()
+    telemetry: Option[TelemetryConfig],
+    ssl: SSLConfig                 = SSLConfig(),
+    enableDefaultRedirect: Boolean = false
   ) {
     val cookieConfig = if (cookie.enabled) Some(cookie) else None
     val doNotTrackHttpCookie =

@@ -16,10 +16,13 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KafkaSink
+import com.snowplowanalytics.snowplow.collectors.scalastream.telemetry.TelemetryAkkaService
+import com.snowplowanalytics.snowplow.collectors.scalastream.subproject.generated.BuildInfo
 
 object KafkaCollector extends Collector {
   def main(args: Array[String]): Unit = {
     val (collectorConf, akkaConf) = parseConfig(args)
+    val telemetry                 = TelemetryAkkaService.initWithCollector(collectorConf, BuildInfo.moduleName, BuildInfo.version)
     val sinks = {
       val goodStream = collectorConf.streams.good
       val badStream  = collectorConf.streams.bad
@@ -31,6 +34,6 @@ object KafkaCollector extends Collector {
       }
       CollectorSinks(good, bad)
     }
-    run(collectorConf, akkaConf, sinks)
+    run(collectorConf, akkaConf, sinks, telemetry)
   }
 }

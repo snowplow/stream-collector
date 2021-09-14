@@ -15,17 +15,17 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import java.util.concurrent.ScheduledThreadPoolExecutor
-
 import cats.syntax.either._
-
+import com.snowplowanalytics.snowplow.collectors.scalastream.subproject.generated.BuildInfo
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink
+import com.snowplowanalytics.snowplow.collectors.scalastream.telemetry.TelemetryAkkaService
 
 object KinesisCollector extends Collector {
 
   def main(args: Array[String]): Unit = {
     val (collectorConf, akkaConf) = parseConfig(args)
-
+    val telemetry                 = TelemetryAkkaService.initWithCollector(collectorConf, BuildInfo.moduleName, BuildInfo.version)
     val sinks: Either[Throwable, CollectorSinks] = for {
       kc <- collectorConf.streams.sink match {
         case kc: Kinesis => kc.asRight
@@ -42,7 +42,7 @@ object KinesisCollector extends Collector {
     } yield CollectorSinks(good, bad)
 
     sinks match {
-      case Right(s) => run(collectorConf, akkaConf, s)
+      case Right(s) => run(collectorConf, akkaConf, s, telemetry)
       case Left(e)  => throw e
     }
   }

@@ -16,7 +16,6 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import java.io.File
 import org.slf4j.LoggerFactory
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.{ConnectionContext, Http}
 import akka.http.scaladsl.model.StatusCodes
@@ -28,9 +27,9 @@ import com.typesafe.sslconfig.akka.AkkaSSLConfig
 import pureconfig._
 import pureconfig.generic.auto._
 import pureconfig.generic.{FieldCoproductHint, ProductHint}
-
 import com.snowplowanalytics.snowplow.collectors.scalastream.metrics._
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
+import com.snowplowanalytics.snowplow.collectors.scalastream.telemetry.TelemetryAkkaService
 
 // Main entry point of the Scala collector.
 trait Collector {
@@ -69,11 +68,18 @@ trait Collector {
     (ConfigSource.fromConfig(conf.getConfig("collector")).loadOrThrow[CollectorConfig], conf)
   }
 
-  def run(collectorConf: CollectorConfig, akkaConf: Config, sinks: CollectorSinks): Unit = {
+  def run(
+    collectorConf: CollectorConfig,
+    akkaConf: Config,
+    sinks: CollectorSinks,
+    telemetry: TelemetryAkkaService
+  ): Unit = {
 
     implicit val system           = ActorSystem.create("scala-stream-collector", akkaConf)
     implicit val materializer     = ActorMaterializer()
     implicit val executionContext = system.dispatcher
+
+    telemetry.start()
 
     val collectorRoute = new CollectorRoute {
       override def collectorService = new CollectorService(collectorConf, sinks)
