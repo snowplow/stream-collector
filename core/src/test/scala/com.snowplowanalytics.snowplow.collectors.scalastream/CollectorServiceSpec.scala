@@ -31,8 +31,8 @@ import io.circe._
 import io.circe.parser._
 
 import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
+
 import com.snowplowanalytics.snowplow.badrows.{BadRow, Failure, Payload, Processor}
-import com.snowplowanalytics.snowplow.collectors.scalastream.generated.BuildInfo
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 
 import org.specs2.mutable.Specification
@@ -40,11 +40,15 @@ import org.specs2.mutable.Specification
 class CollectorServiceSpec extends Specification {
   val service = new CollectorService(
     TestUtils.testConf,
-    CollectorSinks(new TestSink, new TestSink)
+    CollectorSinks(new TestSink, new TestSink),
+    "app",
+    "version"
   )
   val bouncingService = new CollectorService(
     TestUtils.testConf.copy(cookieBounce = TestUtils.testConf.cookieBounce.copy(enabled = true)),
-    CollectorSinks(new TestSink, new TestSink)
+    CollectorSinks(new TestSink, new TestSink),
+    "app",
+    "version"
   )
   val uuidRegex    = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}".r
   val event        = new CollectorPayload("iglu-schema", "ip", System.currentTimeMillis, "UTF-8", "collector")
@@ -328,7 +332,7 @@ class CollectorServiceSpec extends Specification {
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
         e.ipAddress shouldEqual "ip"
         e.encoding shouldEqual "UTF-8"
-        e.collector shouldEqual s"${BuildInfo.shortName}-${BuildInfo.version}-kinesis"
+        e.collector shouldEqual s"app-version-kinesis"
         e.querystring shouldEqual "q"
         e.body shouldEqual "b"
         e.path shouldEqual "p"
@@ -361,7 +365,7 @@ class CollectorServiceSpec extends Specification {
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
         e.ipAddress shouldEqual "unknown"
         e.encoding shouldEqual "UTF-8"
-        e.collector shouldEqual s"${BuildInfo.shortName}-${BuildInfo.version}-kinesis"
+        e.collector shouldEqual s"app-version-kinesis"
         e.querystring shouldEqual "q"
         e.body shouldEqual "b"
         e.path shouldEqual "p"
@@ -394,7 +398,7 @@ class CollectorServiceSpec extends Specification {
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
         e.ipAddress shouldEqual "unknown"
         e.encoding shouldEqual "UTF-8"
-        e.collector shouldEqual s"${BuildInfo.shortName}-${BuildInfo.version}-kinesis"
+        e.collector shouldEqual s"app-version-kinesis"
         e.querystring shouldEqual null
         e.body shouldEqual "b"
         e.path shouldEqual "p"
@@ -447,7 +451,7 @@ class CollectorServiceSpec extends Specification {
     "sinkBad" in {
       "write out the generated bad row" in {
         val br = BadRow.GenericError(
-          Processor(generated.BuildInfo.name, generated.BuildInfo.version),
+          Processor("", ""),
           Failure.GenericFailure(Instant.now(), NonEmptyList.one("IllegalQueryString")),
           Payload.RawPayload("")
         )
@@ -876,7 +880,9 @@ class CollectorServiceSpec extends Specification {
       "should pass on the original path if no mapping for it can be found" in {
         val service = new CollectorService(
           TestUtils.testConf.copy(paths = Map.empty[String, String]),
-          CollectorSinks(new TestSink, new TestSink)
+          CollectorSinks(new TestSink, new TestSink),
+          "",
+          ""
         )
         val expected1 = "/com.acme/track"
         val expected2 = "/com.acme/redirect"

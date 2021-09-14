@@ -26,7 +26,7 @@ class MetricsServiceSpec extends Specification {
 
   "Prometheus metrics service" should {
     "return report about the observed requests" in {
-      val metricsService = new PrometheusMetricsService(PrometheusMetricsConfig(enabled = true, None))
+      val metricsService = new PrometheusMetricsService(PrometheusMetricsConfig(enabled = true, None), "", "")
 
       metricsService.observeRequest(HttpMethods.POST, Uri("/endpoint"), StatusCodes.BadGateway, Duration.ofSeconds(3))
 

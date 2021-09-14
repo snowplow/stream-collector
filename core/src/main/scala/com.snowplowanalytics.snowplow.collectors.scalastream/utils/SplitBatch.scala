@@ -27,11 +27,10 @@ import com.snowplowanalytics.iglu.core._
 import com.snowplowanalytics.iglu.core.circe.CirceIgluCodecs._
 import com.snowplowanalytics.snowplow.badrows._
 import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
-import com.snowplowanalytics.snowplow.collectors.scalastream.generated
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 
 /** Object handling splitting an array of strings correctly */
-object SplitBatch {
+case class SplitBatch(appName: String, appVersion: String) {
 
   // Serialize Thrift CollectorPayload objects
   val ThriftSerializer = new ThreadLocal[TSerializer] {
@@ -138,7 +137,7 @@ object SplitBatch {
   ): Array[Byte] =
     BadRow
       .SizeViolation(
-        Processor(generated.BuildInfo.name, generated.BuildInfo.version),
+        Processor(appName, appVersion),
         Failure.SizeViolation(Instant.now(), maxSize, size, s"oversized collector payload: $msg"),
         Payload.RawPayload(event.toString().take(maxSize / 10))
       )
