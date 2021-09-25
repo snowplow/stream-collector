@@ -33,7 +33,7 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.{ExecutionContextExecutorService, Future}
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 import cats.syntax.either._
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink.SqsClientAndName
@@ -122,7 +122,7 @@ class KinesisSink private (
         evts
       }
       lastFlushedTime = System.currentTimeMillis()
-      sinkBatch(eventsToSend, KinesisStream(maybeSqs))(MaxRetries)
+      sinkBatch(eventsToSend, KinesisStream(maybeSqs), minBackoff)(MaxRetries)
     }
 
     def getLastFlushTime: Long = lastFlushedTime
@@ -161,8 +161,8 @@ class KinesisSink private (
     * @param nextBackoff Period of time to wait before next attempt if retrying
     * @param retriesLeft How many retries are left to the current target. Once exhausted, the target will be switched.
     */
-  def sinkBatch(batch: List[Events], target: Target, nextBackoff: Long = minBackoff)(
-    retriesLeft: Int                                                   = MaxRetries
+  def sinkBatch(batch: List[Events], target: Target, nextBackoff: Long)(
+    retriesLeft: Int
   ): Unit =
     if (batch.nonEmpty) target match {
       case KinesisStream(buffer) =>
@@ -172,8 +172,17 @@ class KinesisSink private (
             // We only need to keep track of Kinesis health if no SQS buffer is configured.
             // We also need a way to recover from an SQS outage without writing to SQS,
             // as there's no guarantee the latter will happen.
-            if (buffer.isEmpty || (outage && sqsQueueExists(buffer.get.sqsClient, buffer.get.sqsBufferName)))
-              outage = false
+            if (outage) {
+              outage = buffer match {
+                case None => false
+                case Some(SqsClientAndName(sqsClient, bufferName)) =>
+                  sqsQueueExists(sqsClient, bufferName) match {
+                    case Success(true)  => false
+                    case Success(false) => true
+                    case Failure(_)     => true
+                  }
+              }
+            }
             val results      = s.getRecords.asScala.toList
             val failurePairs = batch.zip(results).filter(_._2.getErrorMessage != null)
             log.info(
@@ -383,13 +392,14 @@ object KinesisSink {
     bufferConfig: BufferConfig,
     streamName: String,
     sqsBufferName: Option[String],
+    enableStartupChecks: Boolean,
     executorService: ScheduledExecutorService
   ): Either[Throwable, KinesisSink] = {
     val clients = for {
       provider         <- getProvider(kinesisConfig.aws)
       kinesisClient    <- createKinesisClient(provider, kinesisConfig.endpoint, kinesisConfig.region)
       sqsClientAndName <- sqsBuffer(sqsBufferName, provider, kinesisConfig.region)
-      _ = runChecks(kinesisClient, streamName, sqsClientAndName)
+      _ = if (enableStartupChecks) runChecks(kinesisClient, streamName, sqsClientAndName)
     } yield (kinesisClient, sqsClientAndName)
 
     clients.map {
@@ -488,45 +498,63 @@ object KinesisSink {
     lazy val log = LoggerFactory.getLogger(getClass)
     val kExists  = streamExists(kinesisClient, streamName)
 
-    if (!kExists) log.error(s"Kinesis stream $streamName doesn't exist or isn't available.")
-
-    // format: off
-    sqs match {
-      case Some(clientAndName) =>
-        if (sqsQueueExists(clientAndName.sqsClient, clientAndName.sqsBufferName)) ()
-        else log.error(s"SQS queue ${clientAndName.sqsBufferName} is defined in config file, but does not exist or isn't available.")
-      case None =>
-        if (kExists) ()
-        else log.error(s"SQS buffer is not configured.")
+    kExists match {
+      case Success(true) =>
+        ()
+      case Success(false) =>
+        log.error(s"Kinesis stream $streamName doesn't exist or isn't available.")
+      case Failure(t) =>
+        log.error(s"Error checking if stream $streamName exists", t)
     }
-    // format: on
+
+    sqs match {
+      case Some(SqsClientAndName(sqsClient, bufferName)) =>
+        sqsQueueExists(sqsClient, bufferName) match {
+          case Success(true) =>
+            ()
+          case Success(false) =>
+            log.error(s"SQS queue $bufferName is defined in config file, but does not exist or isn't available.")
+          case Failure(t) =>
+            log.error(s"Error checking if SQS queue $bufferName exists", t)
+        }
+      case None =>
+        kExists match {
+          case Success(true) => ()
+          case _             => log.error(s"SQS buffer is not configured.")
+        }
+    }
   }
 
   /**
     * Check whether a Kinesis stream exists
     *
+    * An error is expected if Kinesis is unavailable or if api usage quota is exceeded.
+    *
     * @param name Name of the stream
     * @return Whether the stream exists
     */
-  private def streamExists(client: AmazonKinesis, name: String): Boolean =
-    try {
+  private def streamExists(client: AmazonKinesis, name: String): Try[Boolean] =
+    Try {
       val describeStreamResult = client.describeStream(name)
       val status               = describeStreamResult.getStreamDescription.getStreamStatus
       status == "ACTIVE" || status == "UPDATING"
-    } catch {
+    }.recover {
       case _: ResourceNotFoundException => false
     }
 
   /**
     * Check whether an SQS queue (buffer) exists
+    *
+    * An error is expected if SQS is unavailable or if api usage quota is exceeded.
+    *
     * @param name Name of the queue
     * @return Whether the queue exists
     */
-  private def sqsQueueExists(client: AmazonSQS, name: String): Boolean =
-    try {
+  private def sqsQueueExists(client: AmazonSQS, name: String): Try[Boolean] =
+    Try {
       client.getQueueUrl(name)
       true
-    } catch {
+    }.recover {
       case _: QueueDoesNotExistException => false
     }
 
