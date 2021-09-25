@@ -94,16 +94,17 @@ object GooglePubSubSink {
   def createAndInitialize(
     googlePubSubConfig: GooglePubSub,
     bufferConfig: BufferConfig,
-    topicName: String
+    topicName: String,
+    enableStartupChecks: Boolean
   ): Either[Throwable, GooglePubSubSink] =
     for {
       batching <- batchingSettings(bufferConfig).asRight
       retry = retrySettings(googlePubSubConfig.backoffPolicy)
       publisher <- createPublisher(googlePubSubConfig.googleProjectId, topicName, batching, retry)
-      _ <- topicExists(googlePubSubConfig.googleProjectId, topicName).flatMap { b =>
-        if (b) b.asRight
+      _ <- if (enableStartupChecks) topicExists(googlePubSubConfig.googleProjectId, topicName).flatMap { b =>
+        if (b) ().asRight
         else new IllegalArgumentException(s"Google PubSub topic $topicName doesn't exist").asLeft
-      }
+      } else ().asRight
     } yield new GooglePubSubSink(publisher, topicName)
 
   private val UserAgent = s"snowplow/stream-collector-${generated.BuildInfo.version}"
