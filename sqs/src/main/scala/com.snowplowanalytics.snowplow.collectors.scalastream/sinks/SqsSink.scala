@@ -270,12 +270,13 @@ object SqsSink {
     sqsConfig: Sqs,
     bufferConfig: BufferConfig,
     queueName: String,
+    enableStartupChecks: Boolean,
     executorService: ScheduledExecutorService
   ): Either[Throwable, SqsSink] = {
     val client = for {
       provider <- getProvider(sqsConfig.aws)
       client   <- createSqsClient(provider, sqsConfig.region)
-      _ = sqsQueueExists(client, queueName)
+      _ = if (enableStartupChecks) sqsQueueExists(client, queueName)
     } yield client
 
     client.map { c =>
