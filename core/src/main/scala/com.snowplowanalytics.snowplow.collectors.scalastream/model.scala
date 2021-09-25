@@ -155,7 +155,8 @@ package model {
     streams: StreamsConfig,
     prometheusMetrics: PrometheusMetricsConfig,
     enableDefaultRedirect: Boolean = false,
-    ssl: SSLConfig                 = SSLConfig()
+    ssl: SSLConfig                 = SSLConfig(),
+    enableStartupChecks: Boolean   = true
   ) {
     val cookieConfig = if (cookie.enabled) Some(cookie) else None
     val doNotTrackHttpCookie =
