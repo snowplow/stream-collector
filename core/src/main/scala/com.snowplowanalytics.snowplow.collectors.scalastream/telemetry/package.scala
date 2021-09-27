@@ -2,6 +2,7 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer, SelfDescribingData}
 import com.snowplowanalytics.snowplow.collectors.scalastream.model.TelemetryConfig
+import com.snowplowanalytics.snowplow.collectors.scalastream.telemetry.CloudVendor._
 import io.circe.Json
 import io.circe.generic.auto._
 import io.circe.syntax._
@@ -36,7 +37,7 @@ package object telemetry {
       moduleVersion      = teleCfg.moduleVersion,
       instanceId         = teleCfg.instanceId,
       region             = region,
-      cloud              = cloud.map(_.toString),
+      cloud              = cloud,
       applicationName    = appName,
       applicationVersion = appVersion,
       appGeneratedId     = teleUuid

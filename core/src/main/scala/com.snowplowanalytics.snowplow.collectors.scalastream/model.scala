@@ -147,13 +147,13 @@ package model {
   )
   final case class TelemetryConfig(
     // General params
-    isDisabled: Boolean      = false,
+    disable: Boolean         = false,
     interval: FiniteDuration = 1.minute,
     // http params
-    method: String    = "POST",
-    url: String       = "collector-g.snowplowanalytics.com",
-    port: Int         = 443,
-    isSecure: Boolean = true,
+    method: String  = "POST",
+    url: String     = "collector-g.snowplowanalytics.com",
+    port: Int       = 443,
+    secure: Boolean = true,
     // Params injected by deployment scripts
     userProvidedId: Option[String] = None,
     moduleName: Option[String]     = None,

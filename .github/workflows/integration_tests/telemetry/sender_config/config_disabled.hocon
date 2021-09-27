@@ -2,13 +2,13 @@
 collector {
   # The collector runs as a web service specified on the following interface and port.
   interface = "0.0.0.0"
-  port = "9292"
+  port = "10292"
 
   # optional SSL/TLS configuration
   ssl {
     enable = false
     redirect = false
-    port = 9393
+    port = 10393
   }
 
   # The collector responds with a cookie to requests with a path that matches the 'vendor/version' protocol.
@@ -188,14 +188,13 @@ collector {
 
   # this is not a reference config, see one in example.
    telemetry {
-    isDisabled  = false
-    interval = 1 second
+    disable  = true
+    interval = "1 second"
     method = "POST"
     url = "127.0.0.1"
     port = 9191
-    isSecure = false
-    userProvidedId = userProvidedIdValue
-    moduleName = moduleNameValue
+    userProvidedId = Disabled
+    moduleName = Disabled
    }
 }
 

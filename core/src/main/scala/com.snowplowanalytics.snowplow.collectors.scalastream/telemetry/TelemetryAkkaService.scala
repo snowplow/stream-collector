@@ -47,7 +47,7 @@ case class TelemetryAkkaService(
   private lazy val payload: SelfDescribingData[Json] = makeHeartbeatEvent(teleCfg, cloud, region, appName, appVersion)
 
   def start()(implicit actorSystem: ActorSystem): Unit =
-    if (teleCfg.isDisabled) {
+    if (teleCfg.disable) {
       log.info(s"Telemetry disabled")
     } else {
       log.info(s"Telemetry enabled")
@@ -69,7 +69,7 @@ case class TelemetryAkkaService(
         }
 
       val emitter: SyncEmitter = SyncEmitter(
-        EndpointParams(teleCfg.url, port = teleCfg.port, https = teleCfg.isSecure),
+        EndpointParams(teleCfg.url, port = teleCfg.port, https = teleCfg.secure),
         callback = Some(emitterCallback)
       )
       // telemetry - Unique identifier for website / application (aid)
