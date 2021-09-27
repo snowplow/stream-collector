@@ -14,18 +14,9 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
-import javax.net.ssl.SSLContext
-
 import scala.concurrent.duration.FiniteDuration
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.ConnectionContext
 import akka.http.scaladsl.model.headers.HttpCookiePair
-import akka.stream.TLSClientAuth
-import com.typesafe.sslconfig.akka.AkkaSSLConfig
-import com.typesafe.sslconfig.akka.util.AkkaLoggerFactory
-import com.typesafe.sslconfig.ssl.{ClientAuth => SslClientAuth}
-import com.typesafe.sslconfig.ssl.ConfigSSLContextBuilder
 
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.Sink
 
@@ -116,8 +107,9 @@ package model {
     sqsBadBuffer: Option[String]
   ) extends SinkConfig {
     val endpoint = customEndpoint.getOrElse(region match {
-      case cn @ "cn-north-1" => s"https://kinesis.$cn.amazonaws.com.cn"
-      case _                 => s"https://kinesis.$region.amazonaws.com"
+      case cn @ "cn-north-1"     => s"https://kinesis.$cn.amazonaws.com.cn"
+      case cn @ "cn-northwest-1" => s"https://kinesis.$cn.amazonaws.com.cn"
+      case _                     => s"https://kinesis.$region.amazonaws.com"
     })
   }
   final case class Sqs(region: String, threadPoolSize: Int, aws: AWSConfig, backoffPolicy: SqsBackoffPolicyConfig)
@@ -197,54 +189,4 @@ package model {
     def cookieExpiration = cookieConfig.map(_.expiration)
   }
 
-  object SSLConfig {
-    def secureConnectionContext(system: ActorSystem, sslConfig: AkkaSSLConfig) = {
-      val config = sslConfig.config
-
-      val sslContext = if (sslConfig.config.default) {
-        sslConfig.validateDefaultTrustManager(config)
-        SSLContext.getDefault
-      } else {
-        val mkLogger            = new AkkaLoggerFactory(system)
-        val keyManagerFactory   = sslConfig.buildKeyManagerFactory(config)
-        val trustManagerFactory = sslConfig.buildTrustManagerFactory(config)
-        new ConfigSSLContextBuilder(mkLogger, config, keyManagerFactory, trustManagerFactory).build()
-      }
-
-      val defaultParams    = sslContext.getDefaultSSLParameters
-      val defaultProtocols = defaultParams.getProtocols
-      val protocols        = sslConfig.configureProtocols(defaultProtocols, config)
-      defaultParams.setProtocols(protocols)
-
-      val defaultCiphers = defaultParams.getCipherSuites
-      val cipherSuites   = sslConfig.configureCipherSuites(defaultCiphers, config)
-      defaultParams.setCipherSuites(cipherSuites)
-
-      val clientAuth: Option[TLSClientAuth] = config.sslParametersConfig.clientAuth match {
-        case SslClientAuth.Default => None
-        case SslClientAuth.Want =>
-          defaultParams.setWantClientAuth(true)
-          Some(TLSClientAuth.Want)
-        case SslClientAuth.Need =>
-          defaultParams.setNeedClientAuth(true)
-          Some(TLSClientAuth.Need)
-        case SslClientAuth.None =>
-          defaultParams.setNeedClientAuth(false)
-          Some(TLSClientAuth.None)
-      }
-
-      if (!sslConfig.config.loose.disableHostnameVerification) {
-        defaultParams.setEndpointIdentificationAlgorithm("HTTPS")
-      }
-
-      ConnectionContext.https(
-        sslContext,
-        Some(sslConfig),
-        Some(cipherSuites.toList),
-        Some(defaultProtocols.toList),
-        clientAuth,
-        Some(defaultParams)
-      )
-    }
-  }
 }

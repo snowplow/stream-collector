@@ -17,10 +17,7 @@ import sbtbuildinfo.BuildInfoPlugin.autoImport.buildInfoPackage
 
 lazy val commonDependencies = Seq(
   // Java
-  Dependencies.Libraries.jackson,
   Dependencies.Libraries.thrift,
-  Dependencies.Libraries.commonsCodec,
-  Dependencies.Libraries.grpcCore,
   Dependencies.Libraries.jodaTime,
   Dependencies.Libraries.slf4j,
   Dependencies.Libraries.log4jOverSlf4j,
@@ -46,7 +43,12 @@ lazy val commonDependencies = Seq(
 )
 
 lazy val commonExclusions = Seq(
-  "org.apache.tomcat.embed" % "tomcat-embed-core" // exclude for security vulnerabilities introduced by libthrift
+  // Exclude for security vulnerabilities introduced by libthrift:
+  "org.apache.tomcat.embed" % "tomcat-embed-core",
+
+  // Avoid duplicate .proto files brought in by akka and google-cloud-pubsub.
+  // We don't need any akka serializers because collector runs in a single JVM.
+  "com.typesafe.akka" % "akka-protobuf-v3_2.12"
 )
 
 lazy val buildInfoSettings = Seq(
@@ -66,23 +68,33 @@ lazy val buildSettings = Seq(
 
 lazy val dockerSettings = Seq(
   Docker / maintainer := "Snowplow Analytics Ltd. <support@snowplowanalytics.com>",
-  dockerBaseImage := "snowplow/base-debian:0.2.2",
-  Docker / daemonUser := "snowplow",
-  dockerUpdateLatest := true
+  dockerBaseImage := "adoptopenjdk:11-jre-hotspot-focal",
+  Docker / daemonUser := "daemon",
+  dockerRepository := Some("snowplow"),
+  Docker / daemonUserUid := None,
+  Docker / defaultLinuxInstallLocation := "/opt/snowplow"
+)
+
+lazy val dynVerSettings = Seq(
+  ThisBuild / dynverVTagPrefix := false, // Otherwise git tags required to have v-prefix
+  ThisBuild / dynverSeparator := "-" // to be compatible with docker
 )
 
 lazy val allSettings = buildSettings ++
   BuildSettings.sbtAssemblySettings ++
   BuildSettings.formatting ++
   Seq(libraryDependencies ++= commonDependencies) ++
-  dockerSettings
+  Seq(excludeDependencies ++= commonExclusions) ++
+  dockerSettings ++
+  dynVerSettings
 
-lazy val root = project.in(file(".")).settings(buildSettings).aggregate(core, kinesis, pubsub, kafka, nsq, stdout)
+lazy val root = project.in(file(".")).settings(buildSettings ++ dynVerSettings).aggregate(core, kinesis, pubsub, kafka, nsq, stdout, sqs)
 
 lazy val core = project
   .settings(moduleName := "snowplow-stream-collector-core")
   .settings(buildSettings ++ BuildSettings.sbtAssemblySettings)
   .settings(libraryDependencies ++= commonDependencies)
+  .settings(excludeDependencies ++= commonExclusions)
   .enablePlugins(BuildInfoPlugin)
   .settings(
     buildInfoPackage := "com.snowplowanalytics.snowplow.collectors.scalastream.generated",
@@ -92,10 +104,11 @@ lazy val core = project
 lazy val kinesis = project
   .settings(moduleName := "snowplow-stream-collector-kinesis")
   .settings(allSettings)
-  .settings(Docker / packageName := "snowplow/scala-stream-collector-kinesis")
+  .settings(Docker / packageName := "scala-stream-collector-kinesis")
   .settings(
     libraryDependencies ++= Seq(
       Dependencies.Libraries.kinesis,
+      Dependencies.Libraries.sts,
       Dependencies.Libraries.cbor,
       Dependencies.Libraries.sqs
     )
@@ -107,10 +120,12 @@ lazy val kinesis = project
 lazy val sqs = project
   .settings(moduleName := "snowplow-stream-collector-sqs")
   .settings(allSettings)
-  .settings(Docker / packageName := "snowplow/scala-stream-collector-sqs")
+  .settings(Docker / packageName := "scala-stream-collector-sqs")
   .settings(
     libraryDependencies ++= Seq(
-      Dependencies.Libraries.sqs
+      Dependencies.Libraries.sqs,
+      Dependencies.Libraries.sts,
+      Dependencies.Libraries.cbor
     )
   )
   .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
@@ -120,7 +135,7 @@ lazy val sqs = project
 lazy val pubsub = project
   .settings(moduleName := "snowplow-stream-collector-google-pubsub")
   .settings(allSettings)
-  .settings(Docker / packageName := "snowplow/scala-stream-collector-pubsub")
+  .settings(Docker / packageName := "scala-stream-collector-pubsub")
   .settings(libraryDependencies ++= Seq(Dependencies.Libraries.pubsub))
   .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
   .settings(buildInfoSettings)
@@ -129,7 +144,7 @@ lazy val pubsub = project
 lazy val kafka = project
   .settings(moduleName := "snowplow-stream-collector-kafka")
   .settings(allSettings)
-  .settings(Docker / packageName := "snowplow/scala-stream-collector-kafka")
+  .settings(Docker / packageName := "scala-stream-collector-kafka")
   .settings(libraryDependencies ++= Seq(Dependencies.Libraries.kafkaClients))
   .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
   .settings(buildInfoSettings)
@@ -138,8 +153,11 @@ lazy val kafka = project
 lazy val nsq = project
   .settings(moduleName := "snowplow-stream-collector-nsq")
   .settings(allSettings)
-  .settings(Docker / packageName := "snowplow/scala-stream-collector-nsq")
-  .settings(libraryDependencies ++= Seq(Dependencies.Libraries.nsqClient))
+  .settings(Docker / packageName := "scala-stream-collector-nsq")
+  .settings(libraryDependencies ++= Seq(
+    Dependencies.Libraries.nsqClient,
+    Dependencies.Libraries.jackson
+  ))
   .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
   .settings(buildInfoSettings)
   .dependsOn(core)
@@ -147,7 +165,7 @@ lazy val nsq = project
 lazy val stdout = project
   .settings(moduleName := "snowplow-stream-collector-stdout")
   .settings(allSettings)
-  .settings(Docker / packageName := "snowplow/scala-stream-collector-stdout")
+  .settings(Docker / packageName := "scala-stream-collector-stdout")
   .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
   .settings(buildInfoSettings)
   .dependsOn(core)

@@ -377,22 +377,4 @@ akka {
       uri-parsing-mode = ${?AKKA_HTTP_SERVER_PARSING_URI_PARSING_MODE}
     }
   }
-
-  # By default setting `collector.ssl` relies on JSSE (Java Secure Socket
-  # Extension) to enable secure communication.
-  # To override the default settings set the following section as per
-  # https://lightbend.github.io/ssl-config/ExampleSSLConfig.html
-  # ssl-config {
-  #   debug = {
-  #     ssl = true
-  #   }
-  #   keyManager = {
-  #     stores = [
-  #       {type = "PKCS12", classpath = false, path = "/etc/ssl/mycert.p12", password = "mypassword" }
-  #     ]
-  #   }
-  #   loose {
-  #     disableHostnameVerification = false
-  #   }
-  # }
 }

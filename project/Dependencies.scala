@@ -40,24 +40,22 @@ object Dependencies {
     // Scala
     val collectorPayload = "0.0.0"
     val tracker          = "1.0.0"
-    val akkaHttp         = "10.1.12"
-    val akka             = "2.5.32"
+    val akkaHttp         = "10.2.6"
+    val akka             = "2.6.16"
     val scopt            = "4.0.1"
     val pureconfig       = "0.15.0"
-    val json4s           = "3.6.11"
-    val badRows          = "2.1.0"
+    val badRows          = "2.1.1"
     // Scala (test only)
     val specs2 = "4.11.0"
   }
 
   object Libraries {
     // Java
-    val jackson          = "com.fasterxml.jackson.core"       % "jackson-databind"        % V.jackson
+    val jackson          = "com.fasterxml.jackson.core"       % "jackson-databind"        % V.jackson // nsq only
     val thrift           = "org.apache.thrift"                % "libthrift"               % V.thrift
-    val commonsCodec     = "commons-codec"                    % "commons-codec"           % V.commonsCodec
-    val grpcCore         = "io.grpc"                          % "grpc-core"               % V.grpcCore
     val kinesis          = "com.amazonaws"                    % "aws-java-sdk-kinesis"    % V.awsSdk
     val sqs              = "com.amazonaws"                    % "aws-java-sdk-sqs"        % V.awsSdk
+    val sts              = "com.amazonaws"                    % "aws-java-sdk-sts"        % V.awsSdk % Runtime // Enables web token authentication https://github.com/snowplow/stream-collector/issues/169
     val pubsub           = "com.google.cloud"                 % "google-cloud-pubsub"     % V.pubsub
     val kafkaClients     = "org.apache.kafka"                 % "kafka-clients"           % V.kafka
     val nsqClient        = "com.snowplowanalytics"            % "nsq-java-client"         % V.nsqClient
@@ -80,6 +78,7 @@ object Dependencies {
     val akkaSlf4j        = "com.typesafe.akka"     %% "akka-slf4j"                        % V.akka
     val json4sJackson    = "org.json4s"            %% "json4s-jackson"                    % V.json4s
     val pureconfig       = "com.github.pureconfig" %% "pureconfig"                        % V.pureconfig
+
 
     // Scala (test only)
     val specs2            = "org.specs2"        %% "specs2-core"         % V.specs2   % Test

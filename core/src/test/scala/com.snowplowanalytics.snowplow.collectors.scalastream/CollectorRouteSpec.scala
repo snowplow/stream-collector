@@ -206,11 +206,12 @@ class CollectorRouteSpec extends Specification with Specs2RouteTest {
         } ~> check { responseAs[String] shouldEqual "unknown" }
       }
       "no SP-Anonymous present should extract the IP address" in {
-        Get() ~> `Remote-Address`(RemoteAddress.IP(InetAddress.getByName("127.0.0.1"))) ~> route.extractors(
-          None
-        ) { (_, ip, _) =>
-          complete(ip.toString)
-        } ~> check { responseAs[String] shouldEqual "127.0.0.1" }
+        Get().withAttributes(Map(AttributeKeys.remoteAddress -> RemoteAddress.IP(InetAddress.getByName("127.0.0.1")))) ~> route
+          .extractors(
+            None
+          ) { (_, ip, _) =>
+            complete(ip.toString)
+          } ~> check { responseAs[String] shouldEqual "127.0.0.1" }
       }
     }
   }

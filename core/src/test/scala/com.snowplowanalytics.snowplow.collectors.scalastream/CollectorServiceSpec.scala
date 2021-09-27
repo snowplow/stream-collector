@@ -652,29 +652,35 @@ class CollectorServiceSpec extends Specification {
 
     "headers" in {
       "filter out the correct headers if SP-Anonymous is not present" in {
-        val request = HttpRequest().withHeaders(
-          List(
-            `Location`("a"),
-            `Remote-Address`(RemoteAddress.Unknown),
-            `Raw-Request-URI`("uri")
+        val request = HttpRequest()
+          .withHeaders(
+            List(
+              `Location`("a"),
+              `Raw-Request-URI`("uri")
+            )
           )
-        )
+          .withAttributes(
+            Map(AttributeKeys.remoteAddress -> RemoteAddress.Unknown)
+          )
         service.headers(request, None) shouldEqual List(`Location`("a").toString)
       }
       "filter out the correct headers if SP-Anonymous is present" in {
-        val request = HttpRequest().withHeaders(
-          List(
-            `Location`("a"),
-            `Remote-Address`(RemoteAddress.Unknown),
-            `Raw-Request-URI`("uri"),
-            `X-Forwarded-For`(RemoteAddress(InetAddress.getByName("127.0.0.1"))),
-            `X-Real-Ip`(RemoteAddress(InetAddress.getByName("127.0.0.1"))),
-            `Cookie`(
-              "_sp_id.dc78",
-              "82dd4038-e749-4f9c-b502-d54a3611cc89.1598608039.19.1605281535.1604957469.5a2d5fe4-6323-4414-9bf0-9867a940d53b"
+        val request = HttpRequest()
+          .withHeaders(
+            List(
+              `Location`("a"),
+              `Raw-Request-URI`("uri"),
+              `X-Forwarded-For`(RemoteAddress(InetAddress.getByName("127.0.0.1"))),
+              `X-Real-Ip`(RemoteAddress(InetAddress.getByName("127.0.0.1"))),
+              `Cookie`(
+                "_sp_id.dc78",
+                "82dd4038-e749-4f9c-b502-d54a3611cc89.1598608039.19.1605281535.1604957469.5a2d5fe4-6323-4414-9bf0-9867a940d53b"
+              )
             )
           )
-        )
+          .withAttributes(
+            Map(AttributeKeys.remoteAddress -> RemoteAddress.Unknown)
+          )
         service.headers(request, Some("*")) shouldEqual List(`Location`("a").toString)
       }
     }
