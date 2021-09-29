@@ -77,16 +77,13 @@ case class TelemetryAkkaService(
       val tracker = new Tracker(NonEmptyList.of(emitter), "root", "telemetry")
 
       // discarding cancellation handle
-      val _ = scheduler.schedule(
+      val _ = scheduler.scheduleAtFixedRate(
         initialDelay = Duration(0, TimeUnit.SECONDS),
-        interval     = teleCfg.interval,
-        runnable = new Runnable {
-          def run(): Unit = {
-            tracker.trackSelfDescribingEvent(unstructEvent = payload)
-            tracker.flushEmitters() // this is important!
-          }
-        }
-      )
+        interval     = teleCfg.interval
+      )(() => {
+        tracker.trackSelfDescribingEvent(unstructEvent = payload)
+        tracker.flushEmitters() // this is important!
+      })
     }
 }
 

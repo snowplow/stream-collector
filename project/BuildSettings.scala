@@ -40,4 +40,10 @@ object BuildSettings {
     scalafmtConfig := file(".scalafmt.conf"),
     scalafmtOnCompile := true
   )
+
+  lazy val addExampleConfToTestCp = Seq(
+    Test / unmanagedClasspath += {
+      baseDirectory.value.getParentFile / "examples"
+    }
+  )
 }

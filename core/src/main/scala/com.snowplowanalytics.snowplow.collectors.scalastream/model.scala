@@ -140,7 +140,7 @@ package model {
   final case class TelemetryConfig(
     // General params
     disable: Boolean         = false,
-    interval: FiniteDuration = 1.minute,
+    interval: FiniteDuration = 60.minutes,
     // http params
     method: String  = "POST",
     url: String     = "collector-g.snowplowanalytics.com",

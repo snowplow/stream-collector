@@ -76,7 +76,6 @@ object Dependencies {
     val akkaHttp         = "com.typesafe.akka"     %% "akka-http"                         % V.akkaHttp
     val akkaStream       = "com.typesafe.akka"     %% "akka-stream"                       % V.akka
     val akkaSlf4j        = "com.typesafe.akka"     %% "akka-slf4j"                        % V.akka
-    val json4sJackson    = "org.json4s"            %% "json4s-jackson"                    % V.json4s
     val pureconfig       = "com.github.pureconfig" %% "pureconfig"                        % V.pureconfig
 
 

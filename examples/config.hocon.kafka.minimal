@@ -1,0 +1,15 @@
+collector {
+  interface = "0.0.0.0"
+  port = 80
+
+  streams {
+    good = "{{good}}"
+    bad = "{{bad}}"
+
+    sink {
+      enabled = kafka
+      brokers = "{{kafkaBrokers}}"
+      retries = 10
+    }
+  }
+}

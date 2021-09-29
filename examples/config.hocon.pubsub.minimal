@@ -1,0 +1,21 @@
+collector {
+  interface = "0.0.0.0"
+  port = 80
+
+  streams {
+    good = "{{good}}"
+    bad = "{{bad}}"
+
+    sink {
+      enabled = google-pub-sub
+      googleProjectId = "{{googleProjectId}}"
+
+      backoffPolicy {
+        minBackoff = 1000
+        maxBackoff = 1000
+        totalBackoff = 10000
+        multiplier = 2
+      }
+    }
+  }
+}

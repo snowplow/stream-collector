@@ -96,6 +96,7 @@ lazy val core = project
   .settings(libraryDependencies ++= commonDependencies)
   .settings(excludeDependencies ++= commonExclusions)
   .enablePlugins(BuildInfoPlugin)
+  .settings(BuildSettings.addExampleConfToTestCp)
   .settings(
     buildInfoPackage := "com.snowplowanalytics.snowplow.collectors.scalastream.generated",
     buildInfoKeys := Seq[BuildInfoKey](organization, name, version, "shortName" -> "ssc", scalaVersion)
@@ -169,3 +170,4 @@ lazy val stdout = project
   .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
   .settings(buildInfoSettings)
   .dependsOn(core)
+
