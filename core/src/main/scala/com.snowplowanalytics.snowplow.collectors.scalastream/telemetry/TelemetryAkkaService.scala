@@ -74,19 +74,16 @@ case class TelemetryAkkaService(
       )
       // telemetry - Unique identifier for website / application (aid)
       // root - The tracker namespace (tna)
-      val tracker = new Tracker(NonEmptyList.of(emitter), "root", "telemetry")
+      val tracker = new Tracker(NonEmptyList.of(emitter), "tracker-telemetry", appName)
 
       // discarding cancellation handle
-      val _ = scheduler.schedule(
+      val _ = scheduler.scheduleAtFixedRate(
         initialDelay = Duration(0, TimeUnit.SECONDS),
-        interval     = teleCfg.interval,
-        runnable = new Runnable {
-          def run(): Unit = {
-            tracker.trackSelfDescribingEvent(unstructEvent = payload)
-            tracker.flushEmitters() // this is important!
-          }
-        }
-      )
+        interval     = teleCfg.interval
+      ) { () =>
+        tracker.trackSelfDescribingEvent(unstructEvent = payload)
+        tracker.flushEmitters() // this is important!
+      }
     }
 }
 

@@ -35,15 +35,32 @@ import scala.concurrent.Future
 // Main entry point of the Scala collector.
 trait Collector {
 
+  def appName: String
+
+  def scalaVersion: String
+
+  def appVersion: String
+
   lazy val log = LoggerFactory.getLogger(getClass())
 
   implicit def hint[T] = ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
   implicit val _       = new FieldCoproductHint[SinkConfig]("enabled")
 
+  // Used as an option prefix when reading system properties.
+  val Namespace = "collector"
+
+  /** Optionally give precedence to configs wrapped in a "snowplow" block. To help avoid polluting system namespace */
+  private def namespaced(config: Config): Config =
+    if (config.hasPath(Namespace))
+      config.getConfig(Namespace).withFallback(config.withoutPath(Namespace))
+    else
+      config
+
   def parseConfig(args: Array[String]): (CollectorConfig, Config) = {
     case class FileConfig(config: File = new File("."))
-    val parser = new scopt.OptionParser[FileConfig](generated.BuildInfo.name) {
-      head(generated.BuildInfo.name, generated.BuildInfo.version)
+
+    val parser = new scopt.OptionParser[FileConfig](appName) {
+      head(appName, appVersion)
       help("help")
       version("version")
       opt[File]("config")
@@ -56,17 +73,14 @@ trait Collector {
         )
     }
 
-    val conf = parser.parse(args, FileConfig()) match {
+    val resolved = parser.parse(args, FileConfig()) match {
       case Some(c) => ConfigFactory.parseFile(c.config).resolve()
       case None    => ConfigFactory.empty()
     }
 
-    if (!conf.hasPath("collector")) {
-      System.err.println("configuration has no \"collector\" path")
-      System.exit(1)
-    }
+    val conf = namespaced(ConfigFactory.load(namespaced(resolved.withFallback(namespaced(ConfigFactory.load())))))
 
-    (ConfigSource.fromConfig(conf.getConfig("collector")).loadOrThrow[CollectorConfig], conf)
+    (ConfigSource.fromConfig(conf).loadOrThrow[CollectorConfig], conf)
   }
 
   def run(
@@ -82,10 +96,11 @@ trait Collector {
     telemetry.start()
 
     val collectorRoute = new CollectorRoute {
-      override def collectorService = new CollectorService(collectorConf, sinks)
+      override def collectorService = new CollectorService(collectorConf, sinks, appName, appVersion)
     }
 
-    val prometheusMetricsService = new PrometheusMetricsService(collectorConf.prometheusMetrics)
+    val prometheusMetricsService =
+      new PrometheusMetricsService(collectorConf.prometheusMetrics, scalaVersion, appVersion)
 
     val metricsRoute = new MetricsRoute {
       override def metricsService: MetricsService = prometheusMetricsService

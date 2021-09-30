@@ -30,7 +30,6 @@ import cats.implicits._
 
 import com.snowplowanalytics.snowplow.badrows._
 import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
-import com.snowplowanalytics.snowplow.collectors.scalastream.generated.BuildInfo
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 import com.snowplowanalytics.snowplow.collectors.scalastream.utils.SplitBatch
 
@@ -71,12 +70,15 @@ object CollectorService {
 
 class CollectorService(
   config: CollectorConfig,
-  sinks: CollectorSinks
+  sinks: CollectorSinks,
+  appName: String,
+  appVersion: String
 ) extends Service {
 
-  private val logger = LoggerFactory.getLogger(getClass)
+  private val logger         = LoggerFactory.getLogger(getClass)
+  val splitBatch: SplitBatch = SplitBatch(appName, appVersion)
 
-  private val collector = s"${BuildInfo.shortName}-${BuildInfo.version}-" +
+  private val collector = s"$appName-$appVersion-" +
     config.streams.sink.getClass.getSimpleName.toLowerCase
 
   override val cookieName            = config.cookieName
@@ -160,7 +162,7 @@ class CollectorService(
 
       case Left(error) =>
         val badRow = BadRow.GenericError(
-          Processor(generated.BuildInfo.name, generated.BuildInfo.version),
+          Processor(appName, appVersion),
           Failure.GenericFailure(Instant.now(), NonEmptyList.one(error.getMessage)),
           Payload.RawPayload(queryString.getOrElse(""))
         )
@@ -261,7 +263,7 @@ class CollectorService(
     partitionKey: String
   ): List[Array[Byte]] = {
     // Split events into Good and Bad
-    val eventSplit = SplitBatch.splitAndSerializePayload(event, sinks.good.MaxBytes)
+    val eventSplit = splitBatch.splitAndSerializePayload(event, sinks.good.MaxBytes)
     // Send events to respective sinks
     val sinkResponseGood = sinks.good.storeRawEvents(eventSplit.good, partitionKey)
     val sinkResponseBad  = sinks.bad.storeRawEvents(eventSplit.bad, partitionKey)

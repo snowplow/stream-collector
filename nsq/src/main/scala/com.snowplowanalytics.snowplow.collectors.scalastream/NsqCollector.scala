@@ -14,15 +14,19 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
-import com.snowplowanalytics.snowplow.collectors.scalastream.subproject.generated.BuildInfo
+import com.snowplowanalytics.snowplow.collectors.scalastream.generated.BuildInfo
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.NsqSink
 import com.snowplowanalytics.snowplow.collectors.scalastream.telemetry.TelemetryAkkaService
 
 object NsqCollector extends Collector {
+  def appName      = BuildInfo.moduleName
+  def appVersion   = BuildInfo.version
+  def scalaVersion = BuildInfo.scalaVersion
+
   def main(args: Array[String]): Unit = {
     val (collectorConf, akkaConf) = parseConfig(args)
-    val telemetry                 = TelemetryAkkaService.initWithCollector(collectorConf, BuildInfo.moduleName, BuildInfo.version)
+    val telemetry                 = TelemetryAkkaService.initWithCollector(collectorConf, appName, appVersion)
     val sinks = {
       val goodStream = collectorConf.streams.good
       val badStream  = collectorConf.streams.bad

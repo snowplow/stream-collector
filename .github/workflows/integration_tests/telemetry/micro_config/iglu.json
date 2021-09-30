@@ -12,16 +12,6 @@
             "uri": "http://iglucentral.com"
           }
         }
-      },
-      {
-        "name": "Collector Telemetry",
-        "priority": 0,
-        "vendorPrefixes": [ "com.snowplowanalytics" ],
-        "connection": {
-          "http": {
-            "uri": "http://iglucentral-dev.com.s3-website-us-east-1.amazonaws.com/feature/collector_telemetry"
-          }
-        }
       }
     ]
   }

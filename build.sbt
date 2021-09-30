@@ -52,7 +52,7 @@ lazy val commonExclusions = Seq(
 )
 
 lazy val buildInfoSettings = Seq(
-  buildInfoPackage := "com.snowplowanalytics.snowplow.collectors.scalastream.subproject.generated",
+  buildInfoPackage := "com.snowplowanalytics.snowplow.collectors.scalastream.generated",
   buildInfoKeys := Seq[BuildInfoKey](organization, moduleName, name, version, "shortName" -> "ssc", scalaVersion)
 )
 
@@ -95,11 +95,6 @@ lazy val core = project
   .settings(buildSettings ++ BuildSettings.sbtAssemblySettings)
   .settings(libraryDependencies ++= commonDependencies)
   .settings(excludeDependencies ++= commonExclusions)
-  .enablePlugins(BuildInfoPlugin)
-  .settings(
-    buildInfoPackage := "com.snowplowanalytics.snowplow.collectors.scalastream.generated",
-    buildInfoKeys := Seq[BuildInfoKey](organization, name, version, "shortName" -> "ssc", scalaVersion)
-  )
 
 lazy val kinesis = project
   .settings(moduleName := "snowplow-stream-collector-kinesis")
