@@ -167,13 +167,13 @@ collector {
 
   streams {
     # Events which have successfully been collected will be stored in the good stream/topic
-    good = "{{good}}"
+    good = "good"
 
     # Bad rows (https://docs.snowplowanalytics.com/docs/try-snowplow/recipes/recipe-understanding-bad-data/) will be stored in the bad stream/topic.
     # The collector can currently produce two flavours of bad row:
     #  - a size_violation if an event is larger that the Kinesis (1MB) or SQS (256KB) limits;
     #  - a generic_error if a request's querystring cannot be parsed because of illegal characters
-    bad = "{{bad}}"
+    bad = "bad"
 
     # Whether to use the incoming event's ip as the partition key for the good stream/topic
     # Note: Nsq does not make use of partition key.
@@ -188,24 +188,12 @@ collector {
 
       # Or NSQ
       ## Host name for nsqd
-      host = "{{nsqHost}}"
+      host = "nsqHost"
       ## TCP port for nsqd, 4150 by default
       port = 4150
     }
-
-
-    # Incoming events are stored in a buffer before being sent to Kinesis/Kafka.
-    # Note: Buffering is not supported by NSQ.
-    # The buffer is emptied whenever:
-    # - the number of stored records reaches record-limit or
-    # - the combined size of the stored records reaches byte-limit or
-    # - the time in milliseconds since the buffer was last emptied reaches time-limit
-    buffer {
-      byteLimit = 3145728
-      recordLimit = 500
-      timeLimit = 5000
-    }
   }
+
   # Telemetry sends heartbeat events to external pipeline.
   # Unless disable parameter set to true, this feature will be enabled. Deleting whole section will not disable it.
   # Schema URI: iglu:com.snowplowanalytics.oss/oss_context/jsonschema/1-0-1

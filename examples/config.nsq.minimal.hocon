@@ -3,11 +3,11 @@ collector {
   port = 80
 
   streams {
-    good = "{{good}}"
-    bad = "{{bad}}"
+    good = "good"
+    bad = "bad"
 
     sink {
-      enabled = stdout
+      host = "nsqHost"
     }
   }
 }

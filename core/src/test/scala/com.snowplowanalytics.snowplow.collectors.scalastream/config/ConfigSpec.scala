@@ -16,102 +16,107 @@
   * See the Apache License Version 2.0 for the specific language
   * governing permissions and limitations there under.
   */
-package com.snowplowanalytics.snowplow.collectors.scalastream
+package com.snowplowanalytics.snowplow.collectors.scalastream.config
 
-import cats.Semigroupal
-import cats.implicits._
+import com.snowplowanalytics.snowplow.collectors.scalastream.Collector
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 import org.specs2.mutable.Specification
-import org.specs2.specification.core.Fragment
+import org.specs2.specification.core.{Fragment, Fragments}
 
 import java.nio.file.Paths
 import scala.concurrent.duration.DurationInt
 
-class ConfigSpec extends Specification {
-
-  object stubCollector extends Collector
+abstract class ConfigSpec extends Specification {
 
   def configRefFactory(app: String): CollectorConfig = CollectorConfig(
     interface = "0.0.0.0",
-    port = 80,
-    paths = Map.empty[String, String],
+    port      = 80,
+    paths     = Map.empty[String, String],
     p3p = P3PConfig(
       policyRef = "/w3c/p3p.xml",
-      CP = "NOI DSP COR NID PSA OUR IND COM NAV STA"
+      CP        = "NOI DSP COR NID PSA OUR IND COM NAV STA"
     ),
     crossDomain = CrossDomainConfig(
       enabled = false,
       domains = List("*"),
-      secure = true
+      secure  = true
     ),
     cookie = CookieConfig(
-      enabled = true,
-      expiration = 365.days,
-      name = "sp",
-      domains = Some(List.empty[String]),
+      enabled        = true,
+      expiration     = 365.days,
+      name           = "sp",
+      domains        = Some(List.empty[String]),
       fallbackDomain = Some("acme1.com"),
-      secure = true,
-      httpOnly = false,
-      sameSite = Some("None")
+      secure         = true,
+      httpOnly       = false,
+      sameSite       = Some("None")
     ),
     doNotTrackCookie = DoNotTrackCookieConfig(
       enabled = false,
-      name = "",
-      value = ""
+      name    = "",
+      value   = ""
     ),
     cookieBounce = CookieBounceConfig(
-      enabled = false,
-      name = "n3pc",
-      fallbackNetworkUserId = "00000000-0000-4000-A000-000000000000",
+      enabled                 = false,
+      name                    = "n3pc",
+      fallbackNetworkUserId   = "00000000-0000-4000-A000-000000000000",
       forwardedProtocolHeader = None
     ),
     redirectMacro = RedirectMacroConfig(
-      enabled = false,
+      enabled     = false,
       placeholder = None
     ),
     rootResponse = RootResponseConfig(
-      enabled = false,
+      enabled    = false,
       statusCode = 302,
-      headers = Map.empty[String, String],
-      body = "302, redirecting"
+      headers    = Map.empty[String, String],
+      body       = "302, redirecting"
     ),
     cors = CORSConfig(5.seconds),
     prometheusMetrics = PrometheusMetricsConfig(
-      enabled = false,
+      enabled                  = false,
       durationBucketsInSeconds = None
     ),
-    telemetry = Some(TelemetryConfig()),
-    ssl = SSLConfig(enable = false, redirect = false, port = 9543),
+    telemetry             = Some(TelemetryConfig()),
+    ssl                   = SSLConfig(enable = false, redirect = false, port = 9543),
     enableDefaultRedirect = false,
     streams = StreamsConfig(
-      good = "{{good}}",
-      bad = "{{bad}}",
+      good                       = "good",
+      bad                        = "bad",
       useIpAddressAsPartitionKey = false,
-      buffer = BufferConfig(
-        byteLimit = 3145728,
-        recordLimit = 500,
-        timeLimit = 5000
-      ),
+      buffer =
+        if (app == "pubsub")
+          BufferConfig(
+            byteLimit   = 100000,
+            recordLimit = 40,
+            timeLimit   = 1000
+          )
+        else
+          BufferConfig(
+            byteLimit   = 3145728,
+            recordLimit = 500,
+            timeLimit   = 5000
+          ),
       sink = sinkConfigRefFactory(app)
     )
   )
 
   def sinkConfigRefFactory(app: String): SinkConfig = app match {
-    case "nsq" => Nsq("{{nsqHost}}", 4150)
-    case "kafka" => Kafka("{{kafkaBrokers}}", 10, None)
+    case "nsq"   => Nsq("nsqHost", 4150)
+    case "kafka" => Kafka("localhost:9092,another.host:9092", 10, None)
     case "pubsub" =>
       GooglePubSub(
-        googleProjectId = "{{googleProjectId}}",
+        googleProjectId = "googleProjectId",
         backoffPolicy = GooglePubSubBackoffPolicyConfig(
-          minBackoff = 1000,
-          maxBackoff = 1000,
+          minBackoff   = 1000,
+          maxBackoff   = 1000,
           totalBackoff = 10000,
-          multiplier = 2
+          multiplier   = 2
         )
       )
     case "sqs" =>
       Sqs(
-        region = "{{region}}",
+        region         = "eu-central-1",
         threadPoolSize = 10,
         aws = AWSConfig(
           accessKey = "iam",
@@ -125,7 +130,7 @@ class ConfigSpec extends Specification {
     case "stdout" => Stdout
     case "kinesis" =>
       Kinesis(
-        region = "{{region}}",
+        region         = "eu-central-1",
         threadPoolSize = 10,
         aws = AWSConfig(
           accessKey = "iam",
@@ -135,24 +140,29 @@ class ConfigSpec extends Specification {
           minBackoff = 3000,
           maxBackoff = 600000
         ),
-        sqsBadBuffer = None,
-        sqsGoodBuffer = None,
+        sqsBadBuffer   = None,
+        sqsGoodBuffer  = None,
         customEndpoint = None
       )
   }
 
+  def makeConfigTest(app: String, appVer: String, scalaVer: String): Fragments = {
+    object stubCollector extends Collector {
+      def appName      = app
+      def appVersion   = appVer
+      def scalaVersion = scalaVer
+    }
 
-  "Config.parseConfig" >> {
-    Fragment.foreach(
-      Semigroupal[List]
-        .product(List("minimal", "reference"), List("kafka", "kinesis", "nsq", "pubsub", "sqs", "stdout"))
-    ) { case (suffix, app) =>
-      s"accept example $suffix $app config" >> {
-        val config = Paths.get(getClass.getResource(s"/config.hocon.$app.$suffix").toURI)
-        val argv = Array("--config", config.toString)
-        val (result, _) = stubCollector.parseConfig(argv)
-        result must be equalTo configRefFactory(app)
-      }
+    "Config.parseConfig" >> Fragment.foreach(
+      Seq(("minimal", app), ("extended", app))
+    ) {
+      case (suffix, app) =>
+        s"accept example $suffix $app config" >> {
+          val config      = Paths.get(getClass.getResource(s"/config.$app.$suffix.hocon").toURI)
+          val argv        = Array("--config", config.toString)
+          val (result, _) = stubCollector.parseConfig(argv)
+          (result must be).equalTo(configRefFactory(app))
+        }
     }
   }
 }

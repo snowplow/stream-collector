@@ -167,13 +167,13 @@ collector {
 
   streams {
     # Events which have successfully been collected will be stored in the good stream/topic
-    good = "{{good}}"
+    good = "good"
 
     # Bad rows (https://docs.snowplowanalytics.com/docs/try-snowplow/recipes/recipe-understanding-bad-data/) will be stored in the bad stream/topic.
     # The collector can currently produce two flavours of bad row:
     #  - a size_violation if an event is larger that the Kinesis (1MB) or SQS (256KB) limits;
     #  - a generic_error if a request's querystring cannot be parsed because of illegal characters
-    bad = "{{bad}}"
+    bad = "bad"
 
     # Whether to use the incoming event's ip as the partition key for the good stream/topic
     # Note: Nsq does not make use of partition key.
@@ -187,7 +187,7 @@ collector {
       enabled = kafka
 
       # Or Kafka
-      brokers = "{{kafkaBrokers}}"
+      brokers = "localhost:9092,another.host:9092"
       ## Number of retries to perform before giving up on sending a record
       retries = 10
       # The kafka producer has a variety of possible configuration options defined at

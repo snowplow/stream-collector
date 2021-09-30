@@ -167,13 +167,13 @@ collector {
 
   streams {
     # Events which have successfully been collected will be stored in the good stream/topic
-    good = "{{good}}"
+    good = "good"
 
     # Bad rows (https://docs.snowplowanalytics.com/docs/try-snowplow/recipes/recipe-understanding-bad-data/) will be stored in the bad stream/topic.
     # The collector can currently produce two flavours of bad row:
     #  - a size_violation if an event is larger that the Kinesis (1MB) or SQS (256KB) limits;
     #  - a generic_error if a request's querystring cannot be parsed because of illegal characters
-    bad = "{{bad}}"
+    bad = "bad"
 
     # Whether to use the incoming event's ip as the partition key for the good stream/topic
     # Note: Nsq does not make use of partition key.
@@ -184,33 +184,20 @@ collector {
       # Choose between kinesis, sqs, google-pub-sub, kafka, nsq, or stdout.
       # To use stdout, comment or remove everything in the "collector.streams.sink" section except
       # "enabled" which should be set to "stdout".
-      enabled = sqs
-
-      # Region where the streams are located
-      region = "{{region}}"
-
-      # Thread pool size for Kinesis and SQS API requests
-      threadPoolSize = 10
+      enabled = google-pub-sub
 
 
-      # The following are used to authenticate for the Amazon Kinesis and SQS sinks.
-      # If both are set to 'default', the default provider chain is used
-      # (see http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/auth/DefaultAWSCredentialsProviderChain.html)
-      # If both are set to 'iam', use AWS IAM Roles to provision credentials.
-      # If both are set to 'env', use environment variables AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
-      aws {
-        accessKey = iam
-        accessKey = ${?COLLECTOR_STREAMS_SINK_AWS_ACCESS_KEY}
-        secretKey = iam
-        secretKey = ${?COLLECTOR_STREAMS_SINK_AWS_SECRET_KEY}
-      }
-
-      # Minimum and maximum backoff periods, in milliseconds
+      googleProjectId = "googleProjectId"
+      ## Minimum, maximum and total backoff periods, in milliseconds
+      ## and multiplier between two backoff
       backoffPolicy {
-        minBackoff = 3000
-        maxBackoff = 600000
+        minBackoff = 1000
+        maxBackoff = 1000
+        totalBackoff = 10000
+        multiplier = 2
       }
     }
+
 
     # Incoming events are stored in a buffer before being sent to Kinesis/Kafka.
     # Note: Buffering is not supported by NSQ.
@@ -219,9 +206,9 @@ collector {
     # - the combined size of the stored records reaches byte-limit or
     # - the time in milliseconds since the buffer was last emptied reaches time-limit
     buffer {
-      byteLimit = 3145728
-      recordLimit = 500
-      timeLimit = 5000
+      byteLimit   = 100000
+      recordLimit = 40
+      timeLimit   = 1000
     }
   }
   # Telemetry sends heartbeat events to external pipeline.
