@@ -27,7 +27,7 @@ collector {
     enable = false
     # whether to redirect HTTP to HTTPS
     redirect = false
-    port = 9543
+    port = 443
   }
 
   # The collector responds with a cookie to requests with a path that matches the 'vendor/version' protocol.
@@ -82,14 +82,14 @@ collector {
     # Examples:
     # domain.com will match domain.com, www.domain.com and secure.client.domain.com
     # client.domain.com will match secure.client.domain.com but not domain.com or www.domain.com
-    domains = [
+    #domains = [
         # "acme1.com" # e.g. "domain.com" -> any origin domain ending with this will be matched and domain.com will be returned
         # ... more domains
-    ]
+    #]
     # ... more domains
     # If specified, the fallback domain will be used if none of the Origin header hosts matches the list of
     # cookie domains configured above. (For example, if there is no Origin header.)
-    fallbackDomain = "acme1.com"
+    #fallbackDomain = "acme1.com"
     secure = true
     httpOnly = false
     # The sameSite is optional. You can choose to not specify the attribute, or you can use `Strict`,

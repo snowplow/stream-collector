@@ -45,8 +45,8 @@ abstract class ConfigSpec extends Specification {
       enabled        = true,
       expiration     = 365.days,
       name           = "sp",
-      domains        = Some(List.empty[String]),
-      fallbackDomain = Some("acme1.com"),
+      domains        = None,
+      fallbackDomain = None,
       secure         = true,
       httpOnly       = false,
       sameSite       = Some("None")
@@ -70,7 +70,7 @@ abstract class ConfigSpec extends Specification {
       enabled    = false,
       statusCode = 302,
       headers    = Map.empty[String, String],
-      body       = "302, redirecting"
+      body       = ""
     ),
     cors = CORSConfig(5.seconds),
     prometheusMetrics = PrometheusMetricsConfig(
@@ -78,7 +78,7 @@ abstract class ConfigSpec extends Specification {
       durationBucketsInSeconds = None
     ),
     telemetry             = Some(TelemetryConfig()),
-    ssl                   = SSLConfig(enable = false, redirect = false, port = 9543),
+    ssl                   = SSLConfig(enable = false, redirect = false, port = 443),
     enableDefaultRedirect = false,
     streams = StreamsConfig(
       good                       = "good",

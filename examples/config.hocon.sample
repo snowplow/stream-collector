@@ -31,7 +31,7 @@ collector {
     # whether to redirect HTTP to HTTPS
     redirect = false
     redirect = ${?COLLECTOR_SSL_REDIRECT}
-    port = 9543
+    port = 443
     port = ${?COLLECTOR_SSL_PORT}
   }
 
@@ -93,11 +93,11 @@ collector {
     # Examples:
     # domain.com will match domain.com, www.domain.com and secure.client.domain.com
     # client.domain.com will match secure.client.domain.com but not domain.com or www.domain.com
-    domains = [
-        "{{cookieDomain1}}" # e.g. "domain.com" -> any origin domain ending with this will be matched and domain.com will be returned
-        "{{cookieDomain2}}" # e.g. "secure.anotherdomain.com" -> any origin domain ending with this will be matched and secure.anotherdomain.com will be returned
+    #domains = [
+    #   "{{cookieDomain1}}" # e.g. "domain.com" -> any origin domain ending with this will be matched and domain.com will be returned
+    #    "{{cookieDomain2}}" # e.g. "secure.anotherdomain.com" -> any origin domain ending with this will be matched and secure.anotherdomain.com will be returned
         # ... more domains
-    ]
+    #]
     domains += ${?COLLECTOR_COOKIE_DOMAIN_1}
     domains += ${?COLLECTOR_COOKIE_DOMAIN_2}
     # ... more domains
