@@ -41,14 +41,14 @@ class CollectorServiceSpec extends Specification {
   val service = new CollectorService(
     TestUtils.testConf,
     CollectorSinks(new TestSink, new TestSink),
-    "",
-    ""
+    "app",
+    "version"
   )
   val bouncingService = new CollectorService(
     TestUtils.testConf.copy(cookieBounce = TestUtils.testConf.cookieBounce.copy(enabled = true)),
     CollectorSinks(new TestSink, new TestSink),
-    "",
-    ""
+    "app",
+    "version"
   )
   val uuidRegex    = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}".r
   val event        = new CollectorPayload("iglu-schema", "ip", System.currentTimeMillis, "UTF-8", "collector")
@@ -332,7 +332,7 @@ class CollectorServiceSpec extends Specification {
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
         e.ipAddress shouldEqual "ip"
         e.encoding shouldEqual "UTF-8"
-        e.collector shouldEqual s"--kinesis"
+        e.collector shouldEqual s"app-version-kinesis"
         e.querystring shouldEqual "q"
         e.body shouldEqual "b"
         e.path shouldEqual "p"
@@ -365,7 +365,7 @@ class CollectorServiceSpec extends Specification {
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
         e.ipAddress shouldEqual "unknown"
         e.encoding shouldEqual "UTF-8"
-        e.collector shouldEqual s"--kinesis"
+        e.collector shouldEqual s"app-version-kinesis"
         e.querystring shouldEqual "q"
         e.body shouldEqual "b"
         e.path shouldEqual "p"
@@ -398,7 +398,7 @@ class CollectorServiceSpec extends Specification {
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
         e.ipAddress shouldEqual "unknown"
         e.encoding shouldEqual "UTF-8"
-        e.collector shouldEqual s"--kinesis"
+        e.collector shouldEqual s"app-version-kinesis"
         e.querystring shouldEqual null
         e.body shouldEqual "b"
         e.path shouldEqual "p"

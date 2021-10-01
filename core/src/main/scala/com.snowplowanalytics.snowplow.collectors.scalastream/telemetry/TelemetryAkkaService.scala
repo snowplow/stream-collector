@@ -74,7 +74,7 @@ case class TelemetryAkkaService(
       )
       // telemetry - Unique identifier for website / application (aid)
       // root - The tracker namespace (tna)
-      val tracker = new Tracker(NonEmptyList.of(emitter), "tracker-telemetry", appName)
+      val tracker = new Tracker(NonEmptyList.of(emitter), "telemetry", appName)
 
       // discarding cancellation handle
       val _ = scheduler.scheduleAtFixedRate(
