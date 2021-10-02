@@ -140,7 +140,7 @@ package model {
   final case class TelemetryConfig(
     // General params
     disable: Boolean         = false,
-    interval: FiniteDuration = 1.minute,
+    interval: FiniteDuration = 60.minutes,
     // http params
     method: String  = "POST",
     url: String     = "collector-g.snowplowanalytics.com",
@@ -174,9 +174,9 @@ package model {
     streams: StreamsConfig,
     prometheusMetrics: PrometheusMetricsConfig,
     telemetry: Option[TelemetryConfig],
-    ssl: SSLConfig                 = SSLConfig(),
-    enableDefaultRedirect: Boolean = false,
-    enableStartupChecks: Boolean   = true
+    ssl: SSLConfig = SSLConfig(),
+    enableDefaultRedirect: Boolean,
+    enableStartupChecks: Boolean
   ) {
     val cookieConfig = if (cookie.enabled) Some(cookie) else None
     val doNotTrackHttpCookie =

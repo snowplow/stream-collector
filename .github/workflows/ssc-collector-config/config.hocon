@@ -67,6 +67,10 @@ collector {
       timeLimit = 30
     }
   }
+
+  telemetry{
+    disabled = true
+  }
 }
 
 akka {
