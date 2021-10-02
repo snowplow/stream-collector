@@ -18,16 +18,28 @@
 import sbt._
 import Keys._
 
+
+
 object BuildSettings {
+
   // sbt-assembly settings for building an executable
   import sbtassembly.AssemblyPlugin.autoImport._
+  import sbtassembly.MergeStrategy
+
+  val reverseConcat: MergeStrategy = new MergeStrategy {
+    val name = "reverseConcat"
+    def apply(tempDir: File, path: String, files: Seq[File]): Either[String, Seq[(File, String)]] =
+      MergeStrategy.concat(tempDir, path, files.reverse)
+  }
+
   lazy val sbtAssemblySettings = Seq(
     assembly / assemblyJarName := { s"${moduleName.value}-${version.value}.jar" },
     assembly / assemblyMergeStrategy := {
       // merge strategy for fixing netty conflict
-      case PathList("io", "netty", xs @ _*)                => MergeStrategy.first
-      case x if x.endsWith("io.netty.versions.properties") => MergeStrategy.discard
-      case x if x.endsWith("module-info.class")            => MergeStrategy.first
+      case PathList("io", "netty", xs @ _*)                     => MergeStrategy.first
+      case fileName if fileName.toLowerCase == "reference.conf" => reverseConcat
+      case x if x.endsWith("io.netty.versions.properties")      => MergeStrategy.discard
+      case x if x.endsWith("module-info.class")                 => MergeStrategy.first
       case x =>
         val oldStrategy = (assembly / assemblyMergeStrategy).value
         oldStrategy(x)
@@ -39,5 +51,11 @@ object BuildSettings {
   lazy val formatting = Seq(
     scalafmtConfig := file(".scalafmt.conf"),
     scalafmtOnCompile := true
+  )
+
+  lazy val addExampleConfToTestCp = Seq(
+    Test / unmanagedClasspath += {
+      baseDirectory.value.getParentFile / "examples"
+    }
   )
 }

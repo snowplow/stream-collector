@@ -84,7 +84,8 @@ lazy val allSettings = buildSettings ++
   Seq(libraryDependencies ++= commonDependencies) ++
   Seq(excludeDependencies ++= commonExclusions) ++
   dockerSettings ++
-  dynVerSettings
+  dynVerSettings ++
+  BuildSettings.addExampleConfToTestCp
 
 lazy val root = project.in(file(".")).settings(buildSettings ++ dynVerSettings).aggregate(core, kinesis, pubsub, kafka, nsq, stdout, sqs)
 
@@ -108,7 +109,7 @@ lazy val kinesis = project
   )
   .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
   .settings(buildInfoSettings)
-  .dependsOn(core)
+  .dependsOn(core % "test->test;compile->compile" )
 
 lazy val sqs = project
   .settings(moduleName := "snowplow-stream-collector-sqs")
@@ -123,7 +124,7 @@ lazy val sqs = project
   )
   .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
   .settings(buildInfoSettings)
-  .dependsOn(core)
+  .dependsOn(core % "test->test;compile->compile")
 
 lazy val pubsub = project
   .settings(moduleName := "snowplow-stream-collector-google-pubsub")
@@ -132,7 +133,7 @@ lazy val pubsub = project
   .settings(libraryDependencies ++= Seq(Dependencies.Libraries.pubsub))
   .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
   .settings(buildInfoSettings)
-  .dependsOn(core)
+  .dependsOn(core % "test->test;compile->compile")
 
 lazy val kafka = project
   .settings(moduleName := "snowplow-stream-collector-kafka")
@@ -141,7 +142,7 @@ lazy val kafka = project
   .settings(libraryDependencies ++= Seq(Dependencies.Libraries.kafkaClients))
   .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
   .settings(buildInfoSettings)
-  .dependsOn(core)
+  .dependsOn(core % "test->test;compile->compile")
 
 lazy val nsq = project
   .settings(moduleName := "snowplow-stream-collector-nsq")
@@ -150,7 +151,7 @@ lazy val nsq = project
   .settings(libraryDependencies ++= Seq(Dependencies.Libraries.nsqClient))
   .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
   .settings(buildInfoSettings)
-  .dependsOn(core)
+  .dependsOn(core % "test->test;compile->compile")
 
 lazy val stdout = project
   .settings(moduleName := "snowplow-stream-collector-stdout")
@@ -158,4 +159,4 @@ lazy val stdout = project
   .settings(Docker / packageName := "scala-stream-collector-stdout")
   .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
   .settings(buildInfoSettings)
-  .dependsOn(core)
+  .dependsOn(core % "test->test;compile->compile")
