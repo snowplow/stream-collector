@@ -143,11 +143,38 @@ trait Collector {
             )
         }
 
+    val sslContext: SSLContext = {
+
+      import java.io.{InputStream, FileInputStream}
+      import java.security.{ KeyStore, SecureRandom }
+      import javax.net.ssl.{ KeyManagerFactory, SSLContext, TrustManagerFactory }
+
+      val password: Array[Char] = System.getProperty("javax.net.ssl.keyStorePassword", "").toCharArray
+
+      val ks: KeyStore = KeyStore.getInstance("PKCS12")
+      val inputKey = System.getProperty("javax.net.ssl.keyStore")
+      val keystore: InputStream = new FileInputStream(inputKey)
+
+      require(keystore != null, "Keystore required!")
+      ks.load(keystore, password)
+
+      val keyManagerFactory: KeyManagerFactory = KeyManagerFactory.getInstance("SunX509")
+      keyManagerFactory.init(ks, password)
+
+      val tmf: TrustManagerFactory = TrustManagerFactory.getInstance("SunX509")
+      tmf.init(ks)
+
+      val sslContext: SSLContext = SSLContext.getInstance("TLS")
+      sslContext.init(keyManagerFactory.getKeyManagers, tmf.getTrustManagers, new SecureRandom)
+      sslContext
+    }
+
     lazy val secureEndpoint: Future[Unit] =
       bindRoutes(
         Http()
           .newServerAt(collectorConf.interface, collectorConf.ssl.port)
-          .enableHttps(ConnectionContext.httpsServer(SSLContext.getDefault)),
+          .enableHttps(ConnectionContext.httpsServer(sslContext)),
+//          .enableHttps(ConnectionContext.httpsServer(SSLContext.getDefault)),
         routes
       )
 
