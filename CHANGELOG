@@ -1,3 +1,16 @@
+Release 2.4.0 (2021-10-19)
+--------------------------
+Make it possible to configure the collector without a file (#173)
+Add telemetry (#167)
+Handle LimitExceededException when testing if stream exists (#174)
+Include aws-java-sdk-sts to enable web token authentication (#169)
+Use sbt-dynver to set application version (#166)
+Publish arm64 and amd64 docker images (#165)
+Change docker base image to adoptopenjdk:11-jre-hotspot-focal (#164)
+Use JRE defaults for https configuration (#163)
+Bump akka-http to 10.2.6 (#162)
+Bump akka to 2.6.16 (#161)
+
 Release 2.3.1 (2021-08-12)
 --------------------------
 Bump pubsub to 2.113.7 (#158)
@@ -295,6 +308,18 @@ Changed 1x1 pixel response to use a stable GIF (snowplow/snowplow#1260)
 Renamed default.conf to config.hocon.sample (snowplow/snowplow#1243)
 Started using ThreadLocal to handle Thrift serialization, thanks @denismo and @pkallos! (snowplow/snowplow#1254)
 Added healthcheck for load balancers, thanks @duncan! (snowplow/snowplow#1360)
+
+Release 0.2.0 (snowplow/snowplow: 0.9.12) (2014-11-26)
+------------------------------------------------------
+Changed organization to "com.snowplowanalytics" (snowplow/snowplow#1168)
+Made the --config option mandatory (snowplow/snowplow#1128)
+Added ability to set AWS credentials from environment variables (snowplow/snowplow#1116)
+Now enforcing Java 7 for compilation (snowplow/snowplow#1068)
+Increased request character limit to 32768 (snowplow/snowplow#987)
+Improved performance by using Future, thanks @pkallos! (snowplow/snowplow#580)
+Scala Stream Collector, Scala Kinesis Enrich: made endpoint configurable, thanks @sambo1972! (snowplow/snowplow#978)
+Scala Stream Collector, Scala Kinesis Enrich: added support for IAM roles, thanks @pkallos! (snowplow/snowplow#534)
+Scala Stream Collector, Scala Kinesis Enrich: replaced stream list with describe to tighten permissions, thanks @pkallos! (snowplow/snowplow#535)
 
 Release 0.2.0 (snowplow/snowplow: 0.9.12) (2014-11-26)
 ------------------------------------------------------
