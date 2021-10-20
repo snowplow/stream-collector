@@ -1,3 +1,7 @@
+Release 2.4.1 (2021-10-20)
+--------------------------
+OSS terraform modules unique id not propagated into telemetry event (#182)
+
 Release 2.4.0 (2021-10-19)
 --------------------------
 Make it possible to configure the collector without a file (#173)
