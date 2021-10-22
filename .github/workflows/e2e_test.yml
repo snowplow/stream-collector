@@ -1,4 +1,4 @@
-name: "e2e_test"
+name: "e2e test"
 
 #on:
 #  workflow_run:
@@ -34,3 +34,17 @@ jobs:
           fi
           echo "::set-output name=branch::BRANCH"
           env
+      - name: invoke deployment service
+        run: >
+          curl -X POST "https://deployment-service-next.snplow.net/v1/deployment"
+          -H  "accept: application/json"
+          -H  "X-Token: ${{ secrets.GITHUB_TOKEN }}"
+          -H  "Content-Type: application/json"
+          -d "{
+            \"type\": \"tests/gcp_e2e\",
+            \"version\": \"0.1.0\",
+            \"customer\": \"NA\",
+            \"environment\": \"NA\",
+            \"dry_run\": false,
+            \"github_ref\": ${{ steps.branch.outputs.branch }}
+          }"
