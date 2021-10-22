@@ -40,13 +40,13 @@ jobs:
           -H  "accept: application/json" \
           -H  "X-Token: ${{ secrets.API_DEPLOY_TOKEN }}" \
           -H  "Content-Type: application/json" \
-          -d '{ \
-            "type": "tests/gcp_e2e", \
-            "version": "0.1.0", \
-            "customer": "gcp_sandbox", \
-            "environment": "${{ steps.ver.outputs.project_version }}", \
-            "dry_run": false, \
-            "github_ref": "${{ steps.branch.outputs.branch }}"\
+          -d '{
+            "type": "tests/gcp_e2e",
+            "version": "0.1.0",
+            "customer": "gcp_sandbox",
+            "environment": "${{ steps.ver.outputs.project_version }}",
+            "dry_run": false,
+            "github_ref": "${{ steps.branch.outputs.branch }}"
           }')
           echo $output
           [[ "$output" =~ 'https' ]] || exit 1
