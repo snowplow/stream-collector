@@ -59,10 +59,11 @@ jobs:
             output=$(curl -X GET "https://deployment-service-next.snplow.net/v1/deployment/${{ steps.invoke.outputs.job }}" \
                -H  "accept: application/json"  \
                -H  "X-Token: ${{ secrets.API_DEPLOY_TOKEN }}" \
-               -H  "Content-Type: application/json")
+               -H  "Content-Type: application/json" 2>/dev/null)
             if [[ $output =~ 'running' ]]
             then
-              sleep 10
+              echo "still running..."
+              sleep 20
             else
               if [[ $output =~ 'failed' ]]
                 then
