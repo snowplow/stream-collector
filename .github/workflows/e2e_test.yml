@@ -40,11 +40,11 @@ jobs:
           -H  "accept: application/json"
           -H  "X-Token: ${{ secrets.API_DEPLOY_TOKEN }}"
           -H  "Content-Type: application/json"
-          -d "{
-            \"type\": \"tests/gcp_e2e\",
-            \"version\": \"0.1.0\",
-            \"customer\": \"NA\",
-            \"environment\": \"NA\",
-            \"dry_run\": false,
-            \"github_ref\": ${{ steps.branch.outputs.branch }}
-          }"
+          -d '{
+            "type": "tests/gcp_e2e",
+            "version": "0.1.0",
+            "customer": "NA",
+            "environment": "NA",
+            "dry_run": "false",
+            "github_ref": "${{ steps.branch.outputs.branch }}"
+          }'
