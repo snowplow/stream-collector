@@ -79,7 +79,7 @@ jobs:
         with:
           images: snowplow/scala-stream-collector-${{ matrix.platform }}
           tags: |
-            type=raw,value=latest,enable=${{ !contains(steps.ver.outputs.project_version, '+' }})
+            type=raw,value=latest,enable=${{ !contains(steps.ver.outputs.project_version, '+') }}
             type=raw,value=${{ steps.ver.outputs.project_version }}
           flavor: |
             latest=false
