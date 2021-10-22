@@ -44,7 +44,7 @@ jobs:
             "type": "tests/gcp_e2e",
             "version": "0.1.0",
             "customer": "gcp_sandbox",
-            "environment": "NA",
+            "environment": "${{ steps.ver.outputs.project_version }}",
             "dry_run": false,
             "github_ref": "${{ steps.branch.outputs.branch }}"
           }'
