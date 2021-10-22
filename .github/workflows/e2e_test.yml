@@ -1,0 +1,36 @@
+name: "e2e_test"
+
+#on:
+#  workflow_run:
+#    workflows: ["build"]
+#    types:
+#      - completed
+
+on: push
+
+jobs:
+  run_e2e:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v2
+      - uses: coursier/cache-action@v3
+      - name: Set up JDK
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Get current version
+        id: ver
+        run: |
+          export PROJECT_VERSION=$(sbt "project core" version -Dsbt.log.noformat=true | perl -ne 'print "$1\n" if /info.*(\d+\.\d+\.\d+[^\r\n]*)/' | tail -n 1 | tr -d '\n')
+          echo "::set-output name=project_version::$PROJECT_VERSION"
+      - name: Get tf modules branch
+        id: branch
+        run: |
+          if [[ ${{ steps.ver.outputs.project_version }} =~ '\d+.\d+.\d+' ]]
+            then
+              export BRANCH=master
+            else
+              export BRANCH="feature/collector/${{ steps.ver.outputs.project_version }}"
+          fi
+          echo "::set-output name=branch::BRANCH"
+          env
