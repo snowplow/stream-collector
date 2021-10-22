@@ -45,6 +45,6 @@ jobs:
             "version": "0.1.0",
             "customer": "NA",
             "environment": "NA",
-            "dry_run": "false",
+            "dry_run": false,
             "github_ref": "${{ steps.branch.outputs.branch }}"
           }'
