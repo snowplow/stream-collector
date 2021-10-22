@@ -33,18 +33,43 @@ jobs:
               export BRANCH="feature/collector/${{ steps.ver.outputs.project_version }}"
           fi
           echo "::set-output name=branch::$BRANCH"
-          env
       - name: invoke deployment service
-        run: >
-          curl -X POST "https://deployment-service-next.snplow.net/v1/deployment"
-          -H  "accept: application/json"
-          -H  "X-Token: ${{ secrets.API_DEPLOY_TOKEN }}"
-          -H  "Content-Type: application/json"
-          -d '{
-            "type": "tests/gcp_e2e",
-            "version": "0.1.0",
-            "customer": "gcp_sandbox",
-            "environment": "${{ steps.ver.outputs.project_version }}",
-            "dry_run": false,
-            "github_ref": "${{ steps.branch.outputs.branch }}"
-          }'
+        id: invoke
+        run: |
+          output=$(curl -X POST "https://deployment-service-next.snplow.net/v1/deployment" \
+          -H  "accept: application/json" \
+          -H  "X-Token: ${{ secrets.API_DEPLOY_TOKEN }}" \
+          -H  "Content-Type: application/json" \
+          -d '{ \
+            "type": "tests/gcp_e2e", \
+            "version": "0.1.0", \
+            "customer": "gcp_sandbox", \
+            "environment": "${{ steps.ver.outputs.project_version }}", \
+            "dry_run": false, \
+            "github_ref": "${{ steps.branch.outputs.branch }}"\
+          }')
+          [[ $output =~ 'https' ]] || exit 1
+          export JOB=$(echo $output|awk -F'"' '{ print $12 }')
+          echo "::set-output name=job::$JOB"
+      - name: poll the result
+        run: |
+          for attempt in {1..100}
+          do
+            output=$(curl -X GET "https://deployment-service-next.snplow.net/v1/deployment/70a91da2-3261-11ec-944b-0a58a9feac02" \
+               -H  "accept: application/json"  \
+               -H  "X-Token: ${{ secrets.API_DEPLOY_TOKEN }}" \
+               -H  "Content-Type: application/json")
+            if [[ $output =~ 'running' ]]
+            then
+              sleep 10
+            else
+              if [[ $output =~ 'failed' ]]
+                then
+                  echo "Job failed"
+                  exit 1
+                else
+                  echo "Job complete"
+                  break
+              fi
+            fi
+          done
