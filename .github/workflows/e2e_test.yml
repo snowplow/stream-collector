@@ -21,8 +21,8 @@ jobs:
       - name: Get current version
         id: ver
         run: |
-          ls
-          export PROJECT_VERSION=$(sbt "project core" version -Dsbt.log.noformat=true | perl -ne 'print "$1\n" if /info.*(\d+\.\d+\.\d+[^\r\n]*)/' | tail -n 1 | tr -d '\n')
+          export PROJECT_VERSION=$(grep 'version :=' build.sbt|awk -F'"' '{print $2}')
+#          export PROJECT_VERSION=$(sbt "project core" version -Dsbt.log.noformat=true | perl -ne 'print "$1\n" if /info.*(\d+\.\d+\.\d+[^\r\n]*)/' | tail -n 1 | tr -d '\n')
           echo "::set-output name=project_version::$PROJECT_VERSION"
       - name: Get tf modules branch
         id: branch
