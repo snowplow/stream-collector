@@ -32,13 +32,13 @@ jobs:
             else
               export BRANCH="feature/collector/${{ steps.ver.outputs.project_version }}"
           fi
-          echo "::set-output name=branch::BRANCH"
+          echo "::set-output name=branch::$BRANCH"
           env
       - name: invoke deployment service
         run: >
           curl -X POST "https://deployment-service-next.snplow.net/v1/deployment"
           -H  "accept: application/json"
-          -H  "X-Token: ${{ secrets.GITHUB_TOKEN }}"
+          -H  "X-Token: ${{ secrets.API_DEPLOY_TOKEN }}"
           -H  "Content-Type: application/json"
           -d "{
             \"type\": \"tests/gcp_e2e\",
