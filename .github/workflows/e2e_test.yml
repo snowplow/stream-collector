@@ -50,13 +50,13 @@ jobs:
           }')
           echo $output
           [[ "$output" =~ 'https' ]] || exit 1
-          export JOB=$(echo $output|awk -F'"' '{ print $12 }')
+          export JOB=$(echo $output|awk -F'"' '{ print $4 }')
           echo "::set-output name=job::$JOB"
       - name: poll the result
         run: |
           for attempt in {1..100}
           do
-            output=$(curl -X GET "https://deployment-service-next.snplow.net/v1/deployment/70a91da2-3261-11ec-944b-0a58a9feac02" \
+            output=$(curl -X GET "https://deployment-service-next.snplow.net/v1/deployment/${{ steps.invoke.outputs.job }}" \
                -H  "accept: application/json"  \
                -H  "X-Token: ${{ secrets.API_DEPLOY_TOKEN }}" \
                -H  "Content-Type: application/json")
@@ -69,7 +69,13 @@ jobs:
                   echo "Job failed"
                   exit 1
                 else
-                  echo "Job complete"
+                  if [[ $output =~ 'complete' ]]
+                    then
+                      echo "Job complete"
+                    else
+                      echo "Unknown response $output"
+                      exit 1
+                  fi
                   break
               fi
             fi
