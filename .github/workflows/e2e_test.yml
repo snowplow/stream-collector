@@ -47,14 +47,15 @@ jobs:
             "environment": "${{ steps.ver.outputs.project_version }}",
             "dry_run": false,
             "github_ref": "${{ steps.branch.outputs.branch }}"
-          }')
+          }' 2>/dev/null)
           echo $output
           [[ "$output" =~ 'https' ]] || exit 1
           export JOB=$(echo $output|awk -F'"' '{ print $4 }')
           echo "::set-output name=job::$JOB"
       - name: poll the result
         run: |
-          for attempt in {1..100}
+          sleep 900
+          for attempt in {1..50}
           do
             output=$(curl -X GET "https://deployment-service-next.snplow.net/v1/deployment/${{ steps.invoke.outputs.job }}" \
                -H  "accept: application/json"  \
@@ -63,7 +64,7 @@ jobs:
             if [[ $output =~ 'running' ]]
             then
               echo "still running..."
-              sleep 20
+              sleep 10
             else
               if [[ $output =~ 'failed' ]]
                 then
@@ -81,3 +82,8 @@ jobs:
               fi
             fi
           done
+          if [[ $attempt == 100 ]]
+          then
+            echo "timed out after 1400 seconds"
+            exit 1
+          fi
