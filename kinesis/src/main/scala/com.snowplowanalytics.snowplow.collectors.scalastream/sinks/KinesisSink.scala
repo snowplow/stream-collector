@@ -91,10 +91,8 @@ class KinesisSink private (
   @volatile private var outage: Boolean = false
   override def isHealthy: Boolean       = !outage
 
-  override def storeRawEvents(events: List[Array[Byte]], key: String): List[Array[Byte]] = {
+  override def storeRawEvents(events: List[Array[Byte]], key: String): Unit =
     events.foreach(e => EventStorage.store(e, key))
-    Nil
-  }
 
   object EventStorage {
     private val storedEvents              = ListBuffer.empty[Events]

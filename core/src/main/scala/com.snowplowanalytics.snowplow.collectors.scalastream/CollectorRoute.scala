@@ -62,7 +62,7 @@ trait CollectorRoute {
               post {
                 extractContentType { ct =>
                   entity(as[String]) { body =>
-                    val (r, _) = collectorService.cookie(
+                    val r = collectorService.cookie(
                       qs,
                       Some(body),
                       path,
@@ -83,7 +83,7 @@ trait CollectorRoute {
                 }
               } ~
                 (get | head) {
-                  val (r, _) = collectorService.cookie(
+                  val r = collectorService.cookie(
                     qs,
                     None,
                     path,
@@ -104,7 +104,7 @@ trait CollectorRoute {
             } ~
               path("""ice\.png""".r | "i".r) { path =>
                 (get | head) {
-                  val (r, _) = collectorService.cookie(
+                  val r = collectorService.cookie(
                     qs,
                     None,
                     "/" + path,
