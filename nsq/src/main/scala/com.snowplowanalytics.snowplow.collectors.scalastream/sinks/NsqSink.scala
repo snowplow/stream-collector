@@ -39,8 +39,6 @@ class NsqSink(nsqConfig: Nsq, topicName: String) extends Sink {
     * @param events The list of events to send
     * @param key The partition key (unused)
     */
-  override def storeRawEvents(events: List[Array[Byte]], key: String): List[Array[Byte]] = {
+  override def storeRawEvents(events: List[Array[Byte]], key: String): Unit =
     producer.produceMulti(topicName, events.asJava)
-    Nil
-  }
 }

@@ -25,7 +25,7 @@ class StdoutSink(streamName: String) extends Sink {
   override val MaxBytes = Int.MaxValue
 
   // Print a Base64-encoded event.
-  override def storeRawEvents(events: List[Array[Byte]], key: String): List[Array[Byte]] = {
+  override def storeRawEvents(events: List[Array[Byte]], key: String): Unit =
     streamName match {
       case "out" =>
         events.foreach { e =>
@@ -36,6 +36,4 @@ class StdoutSink(streamName: String) extends Sink {
           Console.err.println(Base64.encodeBase64String(e))
         }
     }
-    Nil
-  }
 }
