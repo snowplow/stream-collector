@@ -48,7 +48,7 @@ class GooglePubSubSink private (publisher: Publisher, topicName: String) extends
     * @param events The list of events to send
     * @param key Not used.
     */
-  override def storeRawEvents(events: List[Array[Byte]], key: String): List[Array[Byte]] = {
+  override def storeRawEvents(events: List[Array[Byte]], key: String): Unit = {
     if (events.nonEmpty)
       log.debug(s"Writing ${events.size} Thrift records to Google PubSub topic $topicName.")
     events.foreach { event =>
@@ -77,7 +77,6 @@ class GooglePubSubSink private (publisher: Publisher, topicName: String) extends
         )
       }
     }
-    Nil
   }
 
   override def shutdown(): Unit =

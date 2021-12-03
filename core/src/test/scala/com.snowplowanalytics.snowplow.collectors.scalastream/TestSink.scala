@@ -20,14 +20,20 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.Sink
 
+import scala.collection.mutable.ListBuffer
+
 // Allow the testing framework to test collection events using the
 // same methods from AbstractSink as the other sinks.
 class TestSink extends Sink {
 
+  private val buf: ListBuffer[Array[Byte]] = ListBuffer()
+  def storedRawEvents: List[Array[Byte]]   = buf.toList
+
   // Effectively no limit to the record size
   override val MaxBytes = Int.MaxValue
 
-  override def storeRawEvents(events: List[Array[Byte]], key: String): List[Array[Byte]] = events
+  override def storeRawEvents(events: List[Array[Byte]], key: String): Unit =
+    buf ++= events
 
   override def shutdown(): Unit = ()
 }

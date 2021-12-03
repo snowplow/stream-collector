@@ -38,18 +38,37 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 import org.specs2.mutable.Specification
 
 class CollectorServiceSpec extends Specification {
+  case class ProbeService(service: CollectorService, good: TestSink, bad: TestSink)
+
   val service = new CollectorService(
     TestUtils.testConf,
     CollectorSinks(new TestSink, new TestSink),
     "app",
     "version"
   )
-  val bouncingService = new CollectorService(
-    TestUtils.testConf.copy(cookieBounce = TestUtils.testConf.cookieBounce.copy(enabled = true)),
-    CollectorSinks(new TestSink, new TestSink),
-    "app",
-    "version"
-  )
+
+  def probeService(): ProbeService = {
+    val good = new TestSink
+    val bad  = new TestSink
+    val s = new CollectorService(
+      TestUtils.testConf,
+      CollectorSinks(good, bad),
+      "app",
+      "version"
+    )
+    ProbeService(s, good, bad)
+  }
+  def bouncingService(): ProbeService = {
+    val good = new TestSink
+    val bad  = new TestSink
+    val s = new CollectorService(
+      TestUtils.testConf.copy(cookieBounce = TestUtils.testConf.cookieBounce.copy(enabled = true)),
+      CollectorSinks(good, bad),
+      "app",
+      "version"
+    )
+    ProbeService(s, good, bad)
+  }
   val uuidRegex    = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}".r
   val event        = new CollectorPayload("iglu-schema", "ip", System.currentTimeMillis, "UTF-8", "collector")
   val hs           = List(`Raw-Request-URI`("uri"), `X-Forwarded-For`(RemoteAddress(InetAddress.getByName("127.0.0.1"))))
@@ -59,7 +78,8 @@ class CollectorServiceSpec extends Specification {
   "The collector service" should {
     "cookie" in {
       "attach p3p headers" in {
-        val (r, l) = service.cookie(
+        val ProbeService(s, good, bad) = probeService()
+        val r = s.cookie(
           Some("nuid=12"),
           Some("b"),
           "p",
@@ -82,10 +102,12 @@ class CollectorServiceSpec extends Specification {
         r.headers must contain(`Access-Control-Allow-Origin`(HttpOriginRange.`*`))
         r.headers must contain(`Access-Control-Allow-Credentials`(true))
         r.headers.filter(_.toString.startsWith("Set-Cookie")) must have size 1
-        l must have size 1
+        good.storedRawEvents must have size 1
+        bad.storedRawEvents must have size 0
       }
       "not store stuff and provide no cookie if do not track is on" in {
-        val (r, l) = service.cookie(
+        val ProbeService(s, good, bad) = probeService()
+        val r = s.cookie(
           Some("nuid=12"),
           Some("b"),
           "p",
@@ -107,10 +129,11 @@ class CollectorServiceSpec extends Specification {
         )
         r.headers must contain(`Access-Control-Allow-Origin`(HttpOriginRange.`*`))
         r.headers must contain(`Access-Control-Allow-Credentials`(true))
-        l must have size 0
+        good.storedRawEvents must have size 0
+        bad.storedRawEvents must have size 0
       }
       "not set a cookie if SP-Anonymous is present" in {
-        val (r, _) = service.cookie(
+        val r = service.cookie(
           Some("nuid=12"),
           Some("b"),
           "p",
@@ -129,7 +152,8 @@ class CollectorServiceSpec extends Specification {
         r.headers.filter(_.toString.startsWith("Set-Cookie")) must have size 0
       }
       "not set a network_userid from cookie if SP-Anonymous is present" in {
-        val (_, l) = service.cookie(
+        val ProbeService(s, good, bad) = probeService()
+        s.cookie(
           None,
           Some("b"),
           "p",
@@ -144,13 +168,15 @@ class CollectorServiceSpec extends Specification {
           None,
           Some("*")
         )
-        l must have size 1
+        good.storedRawEvents must have size 1
+        bad.storedRawEvents must have size 0
         val newEvent = new CollectorPayload("iglu-schema", "ip", System.currentTimeMillis, "UTF-8", "collector")
-        deserializer.deserialize(newEvent, l.head)
+        deserializer.deserialize(newEvent, good.storedRawEvents.head)
         newEvent.networkUserId shouldEqual "00000000-0000-0000-0000-000000000000"
       }
       "network_userid from cookie should persist if SP-Anonymous is not present" in {
-        val (_, l) = service.cookie(
+        val ProbeService(s, good, bad) = probeService()
+        s.cookie(
           None,
           Some("b"),
           "p",
@@ -165,13 +191,15 @@ class CollectorServiceSpec extends Specification {
           None,
           None
         )
-        l must have size 1
+        good.storedRawEvents must have size 1
+        bad.storedRawEvents must have size 0
         val newEvent = new CollectorPayload("iglu-schema", "ip", System.currentTimeMillis, "UTF-8", "collector")
-        deserializer.deserialize(newEvent, l.head)
+        deserializer.deserialize(newEvent, good.storedRawEvents.head)
         newEvent.networkUserId shouldEqual "cookie-nuid"
       }
       "not store stuff if bouncing and provide a location header" in {
-        val (r, l) = bouncingService.cookie(
+        val ProbeService(s, good, bad) = bouncingService()
+        val r = s.cookie(
           None,
           Some("b"),
           "p",
@@ -187,10 +215,12 @@ class CollectorServiceSpec extends Specification {
         r.headers must have size 6
         r.headers must contain(`Location`("/?bounce=true"))
         r.headers must contain(`Cache-Control`(`no-cache`, `no-store`, `must-revalidate`))
-        l must have size 0
+        good.storedRawEvents must have size 0
+        bad.storedRawEvents must have size 0
       }
       "store stuff if having already bounced with the fallback nuid" in {
-        val (r, l) = bouncingService.cookie(
+        val ProbeService(s, good, bad) = bouncingService()
+        val r = s.cookie(
           Some("bounce=true"),
           Some("b"),
           "p",
@@ -205,13 +235,15 @@ class CollectorServiceSpec extends Specification {
         )
         r.headers must have size 5
         r.headers must contain(`Cache-Control`(`no-cache`, `no-store`, `must-revalidate`))
-        l must have size 1
+        good.storedRawEvents must have size 1
+        bad.storedRawEvents must have size 0
         val newEvent = new CollectorPayload("iglu-schema", "ip", System.currentTimeMillis, "UTF-8", "collector")
-        deserializer.deserialize(newEvent, l.head)
+        deserializer.deserialize(newEvent, good.storedRawEvents.head)
         newEvent.networkUserId shouldEqual "new-nuid"
       }
       "respond with a 200 OK and a bad row in case of illegal querystring" in {
-        val (r, l) = service.cookie(
+        val ProbeService(s, good, bad) = probeService()
+        val r = s.cookie(
           Some("a b"),
           None,
           "p",
@@ -224,13 +256,14 @@ class CollectorServiceSpec extends Specification {
           false,
           false
         )
+        good.storedRawEvents must have size 0
+        bad.storedRawEvents must have size 1
+        r.status mustEqual StatusCodes.OK
 
-        val brJson  = parse(new String(l.head, StandardCharsets.UTF_8)).getOrElse(Json.Null)
+        val brJson  = parse(new String(bad.storedRawEvents.head, StandardCharsets.UTF_8)).getOrElse(Json.Null)
         val failure = brJson.hcursor.downField("data").downField("failure").downField("errors").downArray.as[String]
         val payload = brJson.hcursor.downField("data").downField("payload").as[String]
 
-        r.status mustEqual StatusCodes.OK
-        l must have size 1
         failure must beRight(
           "Illegal query: Invalid input ' ', expected '+', '=', query-char, 'EOI', '&' or pct-encoded (line 1, column 2): a b\n ^"
         )
@@ -442,9 +475,11 @@ class CollectorServiceSpec extends Specification {
 
     "sinkEvent" in {
       "send back the produced events" in {
-        val l = service.sinkEvent(event, "key")
-        l must have size 1
-        l.head.zip(serializer.serialize(event)).forall { case (a, b) => a mustEqual b }
+        val ProbeService(s, good, bad) = probeService()
+        s.sinkEvent(event, "key")
+        good.storedRawEvents must have size 1
+        bad.storedRawEvents must have size 0
+        good.storedRawEvents.head.zip(serializer.serialize(event)).forall { case (a, b) => a mustEqual b }
       }
     }
 
@@ -455,10 +490,12 @@ class CollectorServiceSpec extends Specification {
           Failure.GenericFailure(Instant.now(), NonEmptyList.one("IllegalQueryString")),
           Payload.RawPayload("")
         )
-        val l = service.sinkBad(br, "key")
+        val ProbeService(s, good, bad) = probeService()
+        s.sinkBad(br, "key")
 
-        l must have size 1
-        l.head.zip(br.compact).forall { case (a, b) => a mustEqual b }
+        bad.storedRawEvents must have size 1
+        good.storedRawEvents must have size 0
+        bad.storedRawEvents.head.zip(br.compact).forall { case (a, b) => a mustEqual b }
       }
     }
 
@@ -466,21 +503,21 @@ class CollectorServiceSpec extends Specification {
       val redirConf = TestUtils.testConf.redirectMacro
 
       "rely on buildRedirectHttpResponse if redirect is true" in {
-        val (res, Nil) = service.buildHttpResponse(event, Map("u" -> "12"), hs, true, true, false, redirConf)
+        val res = service.buildHttpResponse(event, Map("u" -> "12"), hs, true, true, false, redirConf)
         res shouldEqual HttpResponse(302).withHeaders(`RawHeader`("Location", "12") :: hs)
       }
       "send back a gif if pixelExpected is true" in {
-        val (res, Nil) = service.buildHttpResponse(event, Map.empty, hs, false, true, false, redirConf)
+        val res = service.buildHttpResponse(event, Map.empty, hs, false, true, false, redirConf)
         res shouldEqual HttpResponse(200)
           .withHeaders(hs)
           .withEntity(HttpEntity(contentType = ContentType(MediaTypes.`image/gif`), bytes = CollectorService.pixel))
       }
       "send back a found if pixelExpected and bounce is true" in {
-        val (res, Nil) = service.buildHttpResponse(event, Map.empty, hs, false, true, true, redirConf)
+        val res = service.buildHttpResponse(event, Map.empty, hs, false, true, true, redirConf)
         res shouldEqual HttpResponse(302).withHeaders(hs)
       }
       "send back ok otherwise" in {
-        val (res, Nil) = service.buildHttpResponse(event, Map.empty, hs, false, false, false, redirConf)
+        val res = service.buildHttpResponse(event, Map.empty, hs, false, false, false, redirConf)
         res shouldEqual HttpResponse(200, entity = "ok").withHeaders(hs)
       }
     }
@@ -502,22 +539,22 @@ class CollectorServiceSpec extends Specification {
     "buildRedirectHttpResponse" in {
       val redirConf = TestUtils.testConf.redirectMacro
       "give back a 302 if redirecting and there is a u query param" in {
-        val (res, Nil) = service.buildRedirectHttpResponse(event, Map("u" -> "12"), redirConf)
+        val res = service.buildRedirectHttpResponse(event, Map("u" -> "12"), redirConf)
         res shouldEqual HttpResponse(302).withHeaders(`RawHeader`("Location", "12"))
       }
       "give back a 400 if redirecting and there are no u query params" in {
-        val (res, _) = service.buildRedirectHttpResponse(event, Map.empty, redirConf)
+        val res = service.buildRedirectHttpResponse(event, Map.empty, redirConf)
         res shouldEqual HttpResponse(400)
       }
       "the redirect url should ignore a cookie replacement macro on redirect if not enabled" in {
         event.networkUserId = "1234"
-        val (res, Nil) =
+        val res =
           service.buildRedirectHttpResponse(event, Map("u" -> s"http://localhost/?uid=$${SP_NUID}"), redirConf)
         res shouldEqual HttpResponse(302).withHeaders(`RawHeader`("Location", s"http://localhost/?uid=$${SP_NUID}"))
       }
       "the redirect url should support a cookie replacement macro on redirect if enabled" in {
         event.networkUserId = "1234"
-        val (res, Nil) = service.buildRedirectHttpResponse(
+        val res = service.buildRedirectHttpResponse(
           event,
           Map("u" -> s"http://localhost/?uid=$${SP_NUID}"),
           redirConf.copy(enabled = true)
@@ -526,7 +563,7 @@ class CollectorServiceSpec extends Specification {
       }
       "the redirect url should allow for custom token placeholders" in {
         event.networkUserId = "1234"
-        val (res, Nil) = service.buildRedirectHttpResponse(
+        val res = service.buildRedirectHttpResponse(
           event,
           Map("u" -> "http://localhost/?uid=[TOKEN]"),
           redirConf.copy(enabled = true, Some("[TOKEN]"))
@@ -534,7 +571,7 @@ class CollectorServiceSpec extends Specification {
         res shouldEqual HttpResponse(302).withHeaders(`RawHeader`("Location", "http://localhost/?uid=1234"))
       }
       "the redirect url should allow for double encoding for return redirects" in {
-        val (res, Nil) =
+        val res =
           service.buildRedirectHttpResponse(event, Map("u" -> "a%3Db"), redirConf)
         res shouldEqual HttpResponse(302).withHeaders(`RawHeader`("Location", "a%3Db"))
       }

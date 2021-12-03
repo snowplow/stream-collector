@@ -47,7 +47,7 @@ class CollectorRouteSpec extends Specification with Specs2RouteTest {
           doNotTrack: Boolean,
           contentType: Option[ContentType] = None,
           spAnonymous: Option[String]      = spAnonymous
-        ): (HttpResponse, List[Array[Byte]])                       = (HttpResponse(200, entity = s"cookie"), List.empty)
+        ): HttpResponse                                            = HttpResponse(200, entity = s"cookie")
         def cookieName: Option[String]                             = Some("name")
         def doNotTrackCookie: Option[DntCookieMatcher]             = None
         def determinePath(vendor: String, version: String): String = "/p1/p2"
