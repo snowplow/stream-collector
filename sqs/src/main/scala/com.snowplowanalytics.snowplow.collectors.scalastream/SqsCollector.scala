@@ -18,13 +18,15 @@ import java.util.concurrent.ScheduledThreadPoolExecutor
 import cats.syntax.either._
 import com.snowplowanalytics.snowplow.collectors.scalastream.generated.BuildInfo
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
-import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.SqsSink
+import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.{Sink, SqsSink}
 import com.snowplowanalytics.snowplow.collectors.scalastream.telemetry.TelemetryAkkaService
 
 object SqsCollector extends Collector {
   def appName      = BuildInfo.moduleName
   def appVersion   = BuildInfo.version
   def scalaVersion = BuildInfo.scalaVersion
+
+  type ThrowableOr[A] = Either[Throwable, A]
 
   def main(args: Array[String]): Unit = {
     val (collectorConf, akkaConf) = parseConfig(args)
@@ -38,9 +40,12 @@ object SqsCollector extends Collector {
       goodQueue  = collectorConf.streams.good
       badQueue   = collectorConf.streams.bad
       bufferConf = collectorConf.streams.buffer
-      good <- SqsSink.createAndInitialize(sqs, bufferConf, goodQueue, collectorConf.enableStartupChecks, es)
-      bad  <- SqsSink.createAndInitialize(sqs, bufferConf, badQueue, collectorConf.enableStartupChecks, es)
-    } yield CollectorSinks(good, bad)
+      sinks <- Sink.throttled[ThrowableOr](
+        collectorConf.streams.buffer,
+        SqsSink.createAndInitialize(sqs, bufferConf, goodQueue, collectorConf.enableStartupChecks, es, _),
+        SqsSink.createAndInitialize(sqs, bufferConf, badQueue, collectorConf.enableStartupChecks, es, _)
+      )
+    } yield sinks
 
     sinks match {
       case Right(s) => run(collectorConf, akkaConf, s, telemetry)

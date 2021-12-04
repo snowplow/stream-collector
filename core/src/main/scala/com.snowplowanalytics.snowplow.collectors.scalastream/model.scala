@@ -125,7 +125,13 @@ package model {
   ) extends SinkConfig
   final case class Nsq(host: String, port: Int) extends SinkConfig
   case object Stdout extends SinkConfig
-  final case class BufferConfig(byteLimit: Long, recordLimit: Long, timeLimit: Long)
+  final case class BufferConfig(
+    byteLimit: Long,
+    recordLimit: Long,
+    timeLimit: Long,
+    hardByteLimit: Option[Long],
+    enqueueTimeout: Long
+  )
   final case class StreamsConfig(
     good: String,
     bad: String,

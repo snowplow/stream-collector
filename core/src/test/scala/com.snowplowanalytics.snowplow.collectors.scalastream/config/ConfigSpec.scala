@@ -88,15 +88,19 @@ abstract class ConfigSpec extends Specification {
       buffer =
         if (app == "pubsub")
           BufferConfig(
-            byteLimit   = 100000,
-            recordLimit = 40,
-            timeLimit   = 1000
+            byteLimit      = 100000,
+            recordLimit    = 40,
+            timeLimit      = 1000,
+            hardByteLimit  = None,
+            enqueueTimeout = 10000
           )
         else
           BufferConfig(
-            byteLimit   = 3145728,
-            recordLimit = 500,
-            timeLimit   = 5000
+            byteLimit      = 3145728,
+            recordLimit    = 500,
+            timeLimit      = 5000,
+            hardByteLimit  = None,
+            enqueueTimeout = 10000
           ),
       sink = sinkConfigRefFactory(app)
     )

@@ -33,7 +33,8 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 /**
   * Google PubSub Sink for the Scala Stream Collector
   */
-class GooglePubSubSink private (publisher: Publisher, topicName: String) extends Sink {
+class GooglePubSubSink private (publisher: Publisher, topicName: String, throttler: Sink.Throttler)
+    extends Sink.Throttled(throttler) {
   private val logExecutor = Executors.newSingleThreadExecutor()
 
   // maximum size of a pubsub message is 10MB
@@ -48,34 +49,34 @@ class GooglePubSubSink private (publisher: Publisher, topicName: String) extends
     * @param events The list of events to send
     * @param key Not used.
     */
-  override def storeRawEvents(events: List[Array[Byte]], key: String): Unit = {
+  override def storeRawEventsThrottled(events: List[Array[Byte]], key: String): Unit = {
     if (events.nonEmpty)
       log.debug(s"Writing ${events.size} Thrift records to Google PubSub topic $topicName.")
     events.foreach { event =>
-      publisher.asRight.map { p =>
-        val future = p.publish(eventToPubsubMessage(event))
-        ApiFutures.addCallback(
-          future,
-          new ApiFutureCallback[String]() {
-            override def onSuccess(messageId: String): Unit = {
-              outage = false
-              log.debug(s"Successfully published event with id $messageId to $topicName.")
-            }
+      val future = publisher.publish(eventToPubsubMessage(event))
+      ApiFutures.addCallback(
+        future,
+        new ApiFutureCallback[String]() {
+          override def onSuccess(messageId: String): Unit = {
+            outage = false
+            log.debug(s"Successfully published event with id $messageId to $topicName.")
+            onComplete(event.size.toLong)
+          }
 
-            override def onFailure(throwable: Throwable): Unit = {
-              outage = true
-              throwable match {
-                case apiEx: ApiException =>
-                  log.error(
-                    s"Publishing message to $topicName failed with code ${apiEx.getStatusCode}: ${apiEx.getMessage} This error is retryable: ${apiEx.isRetryable}."
-                  )
-                case t => log.error(s"Publishing message to $topicName failed with ${t.getMessage}.")
-              }
+          override def onFailure(throwable: Throwable): Unit = {
+            outage = true
+            throwable match {
+              case apiEx: ApiException =>
+                log.error(
+                  s"Publishing message to $topicName failed with code ${apiEx.getStatusCode}: ${apiEx.getMessage} This error is retryable: ${apiEx.isRetryable}."
+                )
+              case t => log.error(s"Publishing message to $topicName failed with ${t.getMessage}.")
             }
-          },
-          logExecutor
-        )
-      }
+            onComplete(event.size.toLong)
+          }
+        },
+        logExecutor
+      )
     }
   }
 
@@ -94,7 +95,8 @@ object GooglePubSubSink {
     googlePubSubConfig: GooglePubSub,
     bufferConfig: BufferConfig,
     topicName: String,
-    enableStartupChecks: Boolean
+    enableStartupChecks: Boolean,
+    throttler: Sink.Throttler
   ): Either[Throwable, GooglePubSubSink] =
     for {
       batching <- batchingSettings(bufferConfig).asRight
@@ -104,7 +106,7 @@ object GooglePubSubSink {
         if (b) ().asRight
         else new IllegalArgumentException(s"Google PubSub topic $topicName doesn't exist").asLeft
       } else ().asRight
-    } yield new GooglePubSubSink(publisher, topicName)
+    } yield new GooglePubSubSink(publisher, topicName, throttler)
 
   private val UserAgent = s"snowplow/stream-collector-${generated.BuildInfo.version}"
 

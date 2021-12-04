@@ -47,8 +47,9 @@ class KinesisSink private (
   bufferConfig: BufferConfig,
   streamName: String,
   executorService: ScheduledExecutorService,
-  maybeSqs: Option[SqsClientAndName]
-) extends Sink {
+  maybeSqs: Option[SqsClientAndName],
+  throttler: Sink.Throttler
+) extends Sink.Throttled(throttler) {
   import KinesisSink._
 
   log.info("Creating thread pool of size " + kinesisConfig.threadPoolSize)
@@ -91,7 +92,7 @@ class KinesisSink private (
   @volatile private var outage: Boolean = false
   override def isHealthy: Boolean       = !outage
 
-  override def storeRawEvents(events: List[Array[Byte]], key: String): Unit =
+  override def storeRawEventsThrottled(events: List[Array[Byte]], key: String): Unit =
     events.foreach(e => EventStorage.store(e, key))
 
   object EventStorage {
@@ -181,8 +182,8 @@ class KinesisSink private (
                   }
               }
             }
-            val results      = s.getRecords.asScala.toList
-            val failurePairs = batch.zip(results).filter(_._2.getErrorMessage != null)
+            val results                      = s.getRecords.asScala.toList
+            val (failurePairs, successPairs) = batch.zip(results).partition(_._2.getErrorMessage != null)
             log.info(
               s"Successfully wrote ${batch.size - failurePairs.size} out of ${batch.size} records to Kinesis stream $streamName."
             )
@@ -202,6 +203,8 @@ class KinesisSink private (
               log.error(errorMessage)
               scheduleWrite(failures, target, nextBackoff)(retriesLeft - 1)
             }
+            val writtenBytes = successPairs.foldLeft(0L)(_ + _._1.payloads.size.toLong)
+            onComplete(writtenBytes)
           case Failure(f) =>
             log.error("Writing failed with error:", f)
 
@@ -292,9 +295,14 @@ class KinesisSink private (
           }
           .toMap
         // Events to retry and reasons for failure
-        msgGroup.collect {
-          case (e, m) if failures.contains(m.getId) =>
-            (e, failures(m.getId))
+        msgGroup.flatMap {
+          case (e, m) =>
+            failures.get(m.getId) match {
+              case Some(failure) => Some((e, failure))
+              case None =>
+                onComplete(e.payloads.size.toLong)
+                None
+            }
         }
       }
     }
@@ -391,7 +399,8 @@ object KinesisSink {
     streamName: String,
     sqsBufferName: Option[String],
     enableStartupChecks: Boolean,
-    executorService: ScheduledExecutorService
+    executorService: ScheduledExecutorService,
+    throttler: Sink.Throttler
   ): Either[Throwable, KinesisSink] = {
     val clients = for {
       provider         <- getProvider(kinesisConfig.aws)
@@ -409,7 +418,8 @@ object KinesisSink {
             bufferConfig,
             streamName,
             executorService,
-            sqsClientAndName
+            sqsClientAndName,
+            throttler
           )
         ks.EventStorage.scheduleFlush()
 

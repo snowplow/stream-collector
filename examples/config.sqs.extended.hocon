@@ -212,8 +212,7 @@ collector {
       }
     }
 
-    # Incoming events are stored in a buffer before being sent to Kinesis/Kafka.
-    # Note: Buffering is not supported by NSQ.
+    # Incoming events are stored in a buffer before being sent to SQS
     # The buffer is emptied whenever:
     # - the number of stored records reaches record-limit or
     # - the combined size of the stored records reaches byte-limit or
@@ -222,6 +221,16 @@ collector {
       byteLimit = 3145728
       recordLimit = 500
       timeLimit = 5000
+
+      # The limit on bytes held in memory before the collector throttles new http requests.
+      # This becomes relevant only if the collector is receiving events more quickly than the buffer
+      # can be emptied to the sink.
+      # The default (null) means use 1/4 of the maximum heap size.
+      hardByteLimit = null
+
+      # When the hardByteLimit is reached, the collector waits to enqueue incoming events to the buffer.
+      # If they are not enqueued within the timeout in milliseconds, then the collector returns a 503.
+      enqueueTimeout = 10000
     }
   }
   # Telemetry sends heartbeat events to external pipeline.

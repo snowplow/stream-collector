@@ -14,8 +14,9 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
+import cats.Id
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
-import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KafkaSink
+import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.{KafkaSink, Sink}
 import com.snowplowanalytics.snowplow.collectors.scalastream.telemetry.TelemetryAkkaService
 import com.snowplowanalytics.snowplow.collectors.scalastream.generated.BuildInfo
 
@@ -31,12 +32,15 @@ object KafkaCollector extends Collector {
       val goodStream = collectorConf.streams.good
       val badStream  = collectorConf.streams.bad
       val bufferConf = collectorConf.streams.buffer
-      val (good, bad) = collectorConf.streams.sink match {
+      collectorConf.streams.sink match {
         case kc: Kafka =>
-          (new KafkaSink(kc, bufferConf, goodStream), new KafkaSink(kc, bufferConf, badStream))
+          Sink.throttled[Id](
+            collectorConf.streams.buffer,
+            new KafkaSink(kc, bufferConf, goodStream, _),
+            new KafkaSink(kc, bufferConf, badStream, _)
+          )
         case _ => throw new IllegalArgumentException("Configured sink is not Kafka")
       }
-      CollectorSinks(good, bad)
     }
     run(collectorConf, akkaConf, sinks, telemetry)
   }

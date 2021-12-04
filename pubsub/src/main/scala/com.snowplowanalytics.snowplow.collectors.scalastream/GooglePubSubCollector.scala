@@ -17,13 +17,15 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 import cats.syntax.either._
 import com.snowplowanalytics.snowplow.collectors.scalastream.generated.BuildInfo
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
-import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.GooglePubSubSink
+import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.{GooglePubSubSink, Sink}
 import com.snowplowanalytics.snowplow.collectors.scalastream.telemetry.TelemetryAkkaService
 
 object GooglePubSubCollector extends Collector {
   def appName      = BuildInfo.moduleName
   def appVersion   = BuildInfo.version
   def scalaVersion = BuildInfo.scalaVersion
+
+  type ThrowableOr[A] = Either[Throwable, A]
 
   def main(args: Array[String]): Unit = {
     val (collectorConf, akkaConf) = parseConfig(args)
@@ -36,9 +38,12 @@ object GooglePubSubCollector extends Collector {
       goodStream = collectorConf.streams.good
       badStream  = collectorConf.streams.bad
       bufferConf = collectorConf.streams.buffer
-      good <- GooglePubSubSink.createAndInitialize(pc, bufferConf, goodStream, collectorConf.enableStartupChecks)
-      bad  <- GooglePubSubSink.createAndInitialize(pc, bufferConf, badStream, collectorConf.enableStartupChecks)
-    } yield CollectorSinks(good, bad)
+      sinks <- Sink.throttled[ThrowableOr](
+        collectorConf.streams.buffer,
+        GooglePubSubSink.createAndInitialize(pc, bufferConf, goodStream, collectorConf.enableStartupChecks, _),
+        GooglePubSubSink.createAndInitialize(pc, bufferConf, badStream, collectorConf.enableStartupChecks, _)
+      )
+    } yield sinks
 
     sinks match {
       case Right(s) => run(collectorConf, akkaConf, s, telemetry)

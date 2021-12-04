@@ -56,7 +56,7 @@ object TestUtils {
           sqsGoodBuffer  = Some("good-buffer"),
           sqsBadBuffer   = Some("bad-buffer")
         ),
-        buffer = BufferConfig(4000000L, 500L, 60000L)
+        buffer = BufferConfig(4000000L, 500L, 60000L, Some(8000000L), 10000L)
       ),
       telemetry             = None,
       prometheusMetrics     = PrometheusMetricsConfig(false, None),

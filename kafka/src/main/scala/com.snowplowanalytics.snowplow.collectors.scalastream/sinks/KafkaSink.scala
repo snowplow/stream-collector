@@ -25,8 +25,9 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 class KafkaSink(
   kafkaConfig: Kafka,
   bufferConfig: BufferConfig,
-  topicName: String
-) extends Sink {
+  topicName: String,
+  throttler: Sink.Throttler
+) extends Sink.Throttled(throttler) {
 
   // Records must not exceed MaxBytes - 1MB
   override val MaxBytes = 1000000
@@ -64,7 +65,7 @@ class KafkaSink(
     * @param events The list of events to send
     * @param key The partition key to use
     */
-  override def storeRawEvents(events: List[Array[Byte]], key: String): Unit = {
+  override def storeRawEventsThrottled(events: List[Array[Byte]], key: String): Unit = {
     log.debug(s"Writing ${events.size} Thrift records to Kafka topic $topicName at key $key")
     events.foreach { event =>
       kafkaProducer.send(
@@ -72,6 +73,7 @@ class KafkaSink(
         new Callback {
           override def onCompletion(metadata: RecordMetadata, e: Exception): Unit =
             if (e != null) log.error(s"Sending event failed: ${e.getMessage}")
+          onComplete(events.size.toLong)
         }
       )
     }

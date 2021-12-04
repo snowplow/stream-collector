@@ -187,18 +187,6 @@ collector {
       enabled = stdout
       enabled = ${?COLLECTOR_STREAMS_SINK_ENABLED}
       }
-
-    # Incoming events are stored in a buffer before being sent to Kinesis/Kafka.
-    # Note: Buffering is not supported by NSQ.
-    # The buffer is emptied whenever:
-    # - the number of stored records reaches record-limit or
-    # - the combined size of the stored records reaches byte-limit or
-    # - the time in milliseconds since the buffer was last emptied reaches time-limit
-    buffer {
-      byteLimit = 3145728
-      recordLimit = 500
-      timeLimit = 5000
-    }
   }
   # Telemetry sends heartbeat events to external pipeline.
   # Unless disable parameter set to true, this feature will be enabled. Deleting whole section will not disable it.

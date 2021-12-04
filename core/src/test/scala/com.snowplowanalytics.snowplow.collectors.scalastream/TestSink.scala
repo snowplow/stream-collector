@@ -32,6 +32,8 @@ class TestSink extends Sink {
   // Effectively no limit to the record size
   override val MaxBytes = Int.MaxValue
 
-  override def storeRawEvents(events: List[Array[Byte]], key: String): Unit =
+  override def storeRawEvents(events: List[Array[Byte]], key: String): Boolean = {
     buf ++= events
+    true
+  }
 }

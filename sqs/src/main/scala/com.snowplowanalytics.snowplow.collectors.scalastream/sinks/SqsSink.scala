@@ -49,8 +49,9 @@ class SqsSink private (
   sqsConfig: Sqs,
   bufferConfig: BufferConfig,
   queueName: String,
-  executorService: ScheduledExecutorService
-) extends Sink {
+  executorService: ScheduledExecutorService,
+  throttler: Sink.Throttler
+) extends Sink.Throttled(throttler) {
   import SqsSink._
 
   // Records must not exceed 256K when writing to SQS.
@@ -75,7 +76,7 @@ class SqsSink private (
   @volatile private var outage: Boolean = false
   override def isHealthy: Boolean       = !outage
 
-  override def storeRawEvents(events: List[Array[Byte]], key: String): Unit =
+  override def storeRawEventsThrottled(events: List[Array[Byte]], key: String): Unit =
     events.foreach(e => EventStorage.store(e, key))
 
   object EventStorage {
@@ -186,10 +187,16 @@ class SqsSink private (
               (bree.getId, BatchResultErrorInfo(bree.getCode, bree.getMessage))
             }
             .toMap
+
           // Events to retry and reasons for failure
-          msgGroup.collect {
-            case (e, m) if failures.contains(m.getId) =>
-              (e, failures(m.getId))
+          msgGroup.flatMap {
+            case (e, m) =>
+              failures.get(m.getId) match {
+                case Some(failure) => Some((e, failure))
+                case None =>
+                  onComplete(e.payloads.size.toLong)
+                  None
+              }
           }
         }
         .toList
@@ -269,7 +276,8 @@ object SqsSink {
     bufferConfig: BufferConfig,
     queueName: String,
     enableStartupChecks: Boolean,
-    executorService: ScheduledExecutorService
+    executorService: ScheduledExecutorService,
+    throttler: Sink.Throttler
   ): Either[Throwable, SqsSink] = {
     val client = for {
       provider <- getProvider(sqsConfig.aws)
@@ -278,7 +286,7 @@ object SqsSink {
     } yield client
 
     client.map { c =>
-      val sqsSink = new SqsSink(c, sqsConfig, bufferConfig, queueName, executorService)
+      val sqsSink = new SqsSink(c, sqsConfig, bufferConfig, queueName, executorService, throttler)
       sqsSink.EventStorage.scheduleFlush()
 
       // When the application is shut down try to send all stored events.
