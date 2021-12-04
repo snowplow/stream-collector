@@ -131,6 +131,7 @@ trait Collector {
     ): Future[Unit] =
       builder
         .bind(rs)
+        .map(_.addToCoordinatedShutdown(collectorConf.terminationDeadline))
         .map { binding =>
           log.info(s"REST interface bound to ${binding.localAddress}")
         }

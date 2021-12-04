@@ -61,6 +61,7 @@ object TestUtils {
       telemetry             = None,
       prometheusMetrics     = PrometheusMetricsConfig(false, None),
       enableStartupChecks   = true,
-      enableDefaultRedirect = false
+      enableDefaultRedirect = false,
+      terminationDeadline   = 10.seconds
     )
 }
