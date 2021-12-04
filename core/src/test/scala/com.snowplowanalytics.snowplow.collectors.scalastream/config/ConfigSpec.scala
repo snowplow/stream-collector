@@ -112,10 +112,13 @@ abstract class ConfigSpec extends Specification {
       GooglePubSub(
         googleProjectId = "googleProjectId",
         backoffPolicy = GooglePubSubBackoffPolicyConfig(
-          minBackoff   = 1000,
-          maxBackoff   = 1000,
-          totalBackoff = 10000,
-          multiplier   = 2
+          minBackoff           = 1000,
+          maxBackoff           = 1000,
+          totalBackoff         = 9223372036854L,
+          multiplier           = 2,
+          initialRpcTimeout    = 10000,
+          maxRpcTimeout        = 10000,
+          rpcTimeoutMultiplier = 2
         )
       )
     case "sqs" =>
