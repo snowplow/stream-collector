@@ -34,7 +34,7 @@ object KinesisCollector extends Collector {
         case kc: Kinesis => kc.asRight
         case _           => new IllegalArgumentException("Configured sink is not Kinesis").asLeft
       }
-      es         = new ScheduledThreadPoolExecutor(kc.threadPoolSize)
+      es         = buildExecutorService(kc)
       goodStream = collectorConf.streams.good
       badStream  = collectorConf.streams.bad
       bufferConf = collectorConf.streams.buffer
@@ -55,5 +55,10 @@ object KinesisCollector extends Collector {
       case Right(s) => run(collectorConf, akkaConf, s, telemetry)
       case Left(e)  => throw e
     }
+  }
+
+  def buildExecutorService(kc: Kinesis): ScheduledThreadPoolExecutor = {
+    log.info("Creating thread pool of size " + kc.threadPoolSize)
+    new ScheduledThreadPoolExecutor(kc.threadPoolSize)
   }
 }

@@ -51,8 +51,6 @@ class KinesisSink private (
 ) extends Sink {
   import KinesisSink._
 
-  log.info("Creating thread pool of size " + kinesisConfig.threadPoolSize)
-
   maybeSqs match {
     case Some(sqs) =>
       log.info(
