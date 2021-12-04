@@ -140,7 +140,12 @@ object GooglePubSubSink {
         if (b) ().asRight
         else new IllegalArgumentException(s"Google PubSub topic $topicName doesn't exist").asLeft
       } else ().asRight
-    } yield new GooglePubSubSink(publisher, topicName, throttler, InitialRpcTimeout)
+    } yield new GooglePubSubSink(
+      publisher,
+      topicName,
+      throttler,
+      Duration.ofMillis(googlePubSubConfig.backoffPolicy.initialRpcTimeout)
+    )
 
   private val UserAgent = s"snowplow/stream-collector-${generated.BuildInfo.version}"
 
@@ -172,8 +177,6 @@ object GooglePubSubSink {
       .setDelayThreshold(Duration.ofMillis(bufferConfig.timeLimit))
       .build()
 
-  val InitialRpcTimeout = Duration.ofMillis(10000)
-
   /** Defaults are used for the rpc configuration, see Publisher.java */
   private def retrySettings(backoffPolicy: GooglePubSubBackoffPolicyConfig): RetrySettings =
     RetrySettings
@@ -182,9 +185,9 @@ object GooglePubSubSink {
       .setMaxRetryDelay(Duration.ofMillis(backoffPolicy.maxBackoff))
       .setRetryDelayMultiplier(backoffPolicy.multiplier)
       .setTotalTimeout(Duration.ofMillis(backoffPolicy.totalBackoff))
-      .setInitialRpcTimeout(InitialRpcTimeout)
-      .setRpcTimeoutMultiplier(2)
-      .setMaxRpcTimeout(Duration.ofSeconds(10))
+      .setInitialRpcTimeout(Duration.ofMillis(backoffPolicy.initialRpcTimeout))
+      .setRpcTimeoutMultiplier(backoffPolicy.rpcTimeoutMultiplier)
+      .setMaxRpcTimeout(Duration.ofMillis(backoffPolicy.maxRpcTimeout))
       .build()
 
   /** Checks that a PubSub topic exists **/

@@ -93,7 +93,10 @@ package model {
     minBackoff: Long,
     maxBackoff: Long,
     totalBackoff: Long,
-    multiplier: Double
+    multiplier: Double,
+    initialRpcTimeout: Long,
+    maxRpcTimeout: Long,
+    rpcTimeoutMultiplier: Double
   )
   sealed trait SinkConfig
   final case class AWSConfig(accessKey: String, secretKey: String)
