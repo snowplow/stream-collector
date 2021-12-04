@@ -147,9 +147,9 @@ object GooglePubSubSink {
       .setMaxRetryDelay(Duration.ofMillis(backoffPolicy.maxBackoff))
       .setRetryDelayMultiplier(backoffPolicy.multiplier)
       .setTotalTimeout(Duration.ofMillis(backoffPolicy.totalBackoff))
-      .setInitialRpcTimeout(Duration.ofSeconds(10))
-      .setRpcTimeoutMultiplier(2)
-      .setMaxRpcTimeout(Duration.ofSeconds(10))
+      .setInitialRpcTimeout(Duration.ofMillis(backoffPolicy.initialRpcTimeout))
+      .setRpcTimeoutMultiplier(backoffPolicy.rpcTimeoutMultiplier)
+      .setMaxRpcTimeout(Duration.ofMillis(backoffPolicy.maxRpcTimeout))
       .build()
 
   /** Checks that a PubSub topic exists **/
