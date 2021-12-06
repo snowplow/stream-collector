@@ -185,6 +185,7 @@ package model {
     telemetry: Option[TelemetryConfig],
     ssl: SSLConfig = SSLConfig(),
     enableDefaultRedirect: Boolean,
+    redirectDomains: Set[String],
     enableStartupChecks: Boolean,
     terminationDeadline: FiniteDuration
   ) {

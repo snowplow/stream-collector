@@ -80,6 +80,7 @@ abstract class ConfigSpec extends Specification {
     telemetry             = Some(TelemetryConfig()),
     ssl                   = SSLConfig(enable = false, redirect = false, port = 443),
     enableDefaultRedirect = false,
+    redirectDomains       = Set.empty,
     enableStartupChecks   = true,
     terminationDeadline   = 10.seconds,
     streams = StreamsConfig(
