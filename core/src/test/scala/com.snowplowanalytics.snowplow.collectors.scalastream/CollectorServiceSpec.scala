@@ -501,10 +501,11 @@ class CollectorServiceSpec extends Specification {
 
     "buildHttpResponse" in {
       val redirConf = TestUtils.testConf.redirectMacro
+      val domain    = TestUtils.testConf.redirectDomains.head
 
       "rely on buildRedirectHttpResponse if redirect is true" in {
-        val res = service.buildHttpResponse(event, Map("u" -> "12"), hs, true, true, false, redirConf)
-        res shouldEqual HttpResponse(302).withHeaders(`RawHeader`("Location", "12") :: hs)
+        val res = service.buildHttpResponse(event, Map("u" -> s"https://$domain/12"), hs, true, true, false, redirConf)
+        res shouldEqual HttpResponse(302).withHeaders(`RawHeader`("Location", s"https://$domain/12") :: hs)
       }
       "send back a gif if pixelExpected is true" in {
         val res = service.buildHttpResponse(event, Map.empty, hs, false, true, false, redirConf)
@@ -538,9 +539,10 @@ class CollectorServiceSpec extends Specification {
 
     "buildRedirectHttpResponse" in {
       val redirConf = TestUtils.testConf.redirectMacro
+      val domain    = TestUtils.testConf.redirectDomains.head
       "give back a 302 if redirecting and there is a u query param" in {
-        val res = service.buildRedirectHttpResponse(event, Map("u" -> "12"), redirConf)
-        res shouldEqual HttpResponse(302).withHeaders(`RawHeader`("Location", "12"))
+        val res = service.buildRedirectHttpResponse(event, Map("u" -> s"http://$domain/12"), redirConf)
+        res shouldEqual HttpResponse(302).withHeaders(`RawHeader`("Location", s"http://$domain/12"))
       }
       "give back a 400 if redirecting and there are no u query params" in {
         val res = service.buildRedirectHttpResponse(event, Map.empty, redirConf)
@@ -549,31 +551,47 @@ class CollectorServiceSpec extends Specification {
       "the redirect url should ignore a cookie replacement macro on redirect if not enabled" in {
         event.networkUserId = "1234"
         val res =
-          service.buildRedirectHttpResponse(event, Map("u" -> s"http://localhost/?uid=$${SP_NUID}"), redirConf)
-        res shouldEqual HttpResponse(302).withHeaders(`RawHeader`("Location", s"http://localhost/?uid=$${SP_NUID}"))
+          service.buildRedirectHttpResponse(event, Map("u" -> s"http://$domain/?uid=$${SP_NUID}"), redirConf)
+        res shouldEqual HttpResponse(302).withHeaders(`RawHeader`("Location", s"http://$domain/?uid=$${SP_NUID}"))
       }
       "the redirect url should support a cookie replacement macro on redirect if enabled" in {
         event.networkUserId = "1234"
         val res = service.buildRedirectHttpResponse(
           event,
-          Map("u" -> s"http://localhost/?uid=$${SP_NUID}"),
+          Map("u" -> s"http://$domain/?uid=$${SP_NUID}"),
           redirConf.copy(enabled = true)
         )
-        res shouldEqual HttpResponse(302).withHeaders(`RawHeader`("Location", "http://localhost/?uid=1234"))
+        res shouldEqual HttpResponse(302).withHeaders(`RawHeader`("Location", s"http://$domain/?uid=1234"))
       }
       "the redirect url should allow for custom token placeholders" in {
         event.networkUserId = "1234"
         val res = service.buildRedirectHttpResponse(
           event,
-          Map("u" -> "http://localhost/?uid=[TOKEN]"),
+          Map("u" -> s"http://$domain/?uid=[TOKEN]"),
           redirConf.copy(enabled = true, Some("[TOKEN]"))
         )
-        res shouldEqual HttpResponse(302).withHeaders(`RawHeader`("Location", "http://localhost/?uid=1234"))
+        res shouldEqual HttpResponse(302).withHeaders(`RawHeader`("Location", s"http://$domain/?uid=1234"))
       }
       "the redirect url should allow for double encoding for return redirects" in {
         val res =
-          service.buildRedirectHttpResponse(event, Map("u" -> "a%3Db"), redirConf)
-        res shouldEqual HttpResponse(302).withHeaders(`RawHeader`("Location", "a%3Db"))
+          service.buildRedirectHttpResponse(event, Map("u" -> s"http://$domain/a%3Db"), redirConf)
+        res shouldEqual HttpResponse(302).withHeaders(`RawHeader`("Location", s"http://$domain/a%3Db"))
+      }
+      "give back a 400 if redirecting to a disallowed domain" in {
+        val res = service.buildRedirectHttpResponse(event, Map("u" -> s"http://invalid.acme.com/12"), redirConf)
+        res shouldEqual HttpResponse(400)
+      }
+      "give back a 302 if redirecting to an unknown domain, with no restrictions on domains" in {
+        def conf = TestUtils.testConf.copy(redirectDomains = Set.empty)
+        val permissiveService = new CollectorService(
+          conf,
+          CollectorSinks(new TestSink, new TestSink),
+          "app",
+          "version"
+        )
+        val res =
+          permissiveService.buildRedirectHttpResponse(event, Map("u" -> s"http://unknown.acme.com/12"), redirConf)
+        res shouldEqual HttpResponse(302).withHeaders(`RawHeader`("Location", s"http://unknown.acme.com/12"))
       }
     }
 

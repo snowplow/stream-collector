@@ -132,6 +132,12 @@ collector {
   # Custom redirects configured in `paths` can still be used.
   enableDefaultRedirect = false
 
+  # Domains which are valid for collector redirects. If empty (the default) then redirects are
+  # allowed to any domain.
+  redirectDomains = [
+    # "acme1.com"
+  ]
+
   # When enabled, the redirect url passed via the `u` query parameter is scanned for a placeholder
   # token. All instances of that token are replaced withe the network ID. If the placeholder isn't
   # specified, the default value is `${SP_NUID}`.
