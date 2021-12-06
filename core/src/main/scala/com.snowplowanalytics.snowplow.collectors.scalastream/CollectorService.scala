@@ -14,6 +14,7 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
+import java.net.{MalformedURLException, URL}
 import java.nio.charset.StandardCharsets.UTF_8
 import java.time.Instant
 import java.util.UUID
@@ -310,14 +311,25 @@ class CollectorService(
     redirectMacroConfig: RedirectMacroConfig
   ): HttpResponse =
     queryParams.get("u") match {
-      case Some(target) =>
+      case Some(target) if redirectTargetAllowed(target) =>
         val canReplace = redirectMacroConfig.enabled && event.isSetNetworkUserId
         val token      = redirectMacroConfig.placeholder.getOrElse(s"$${SP_NUID}")
         val replacedTarget =
           if (canReplace) target.replaceAllLiterally(token, event.networkUserId)
           else target
         HttpResponse(StatusCodes.Found).withHeaders(`RawHeader`("Location", replacedTarget))
-      case None => HttpResponse(StatusCodes.BadRequest)
+      case _ => HttpResponse(StatusCodes.BadRequest)
+    }
+
+  private def redirectTargetAllowed(target: String): Boolean =
+    if (config.redirectDomains.isEmpty) true
+    else {
+      try {
+        val url = Option(new URL(target).getHost)
+        config.redirectDomains.exists(url.contains)
+      } catch {
+        case _: MalformedURLException => false
+      }
     }
 
   /**

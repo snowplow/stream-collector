@@ -62,6 +62,7 @@ object TestUtils {
       prometheusMetrics       = PrometheusMetricsConfig(false, None),
       enableStartupChecks     = true,
       enableDefaultRedirect   = false,
+      redirectDomains         = Set("localhost"),
       terminationDeadline     = 10.seconds,
       preTerminationPeriod    = 10.seconds,
       preTerminationUnhealthy = false
