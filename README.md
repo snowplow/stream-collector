@@ -44,10 +44,10 @@ limitations under the License.
 [roadmap-image]: https://d3i6fms1cm1j0i.cloudfront.net/github/images/roadmap.png
 [contributing-image]: https://d3i6fms1cm1j0i.cloudfront.net/github/images/contributing.png
 
-[techdocs]: https://github.com/snowplow/snowplow/wiki/Scala-Stream-collector
-[setup]: https://github.com/snowplow/snowplow/wiki/Setting-up-the-Scala-Stream-collector
+[techdocs]: https://docs.snowplowanalytics.com/docs/pipeline-components-and-applications/stream-collector/
+[setup]: https://docs.snowplowanalytics.com/docs/getting-started-on-snowplow-open-source/
 [roadmap]: https://github.com/snowplow/snowplow/projects/7
-[contributing]: https://github.com/snowplow/snowplow/wiki/Scala-Stream-collector-contributing
+[contributing]: https://docs.snowplowanalytics.com/docs/contributing/
 
 [build-image]: https://github.com/snowplow/stream-collector/workflows/build/badge.svg
 [build-wf]: https://github.com/snowplow/stream-collector/actions?query=workflow%3Abuild
