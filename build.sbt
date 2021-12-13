@@ -74,7 +74,7 @@ lazy val dockerSettings = Seq(
 
 lazy val dynVerSettings = Seq(
   ThisBuild / dynverVTagPrefix := false, // Otherwise git tags required to have v-prefix
-  ThisBuild / dynverSeparator := "-" // to be compatible with docker
+  ThisBuild / dynverSeparator := "-"     // to be compatible with docker
 )
 
 lazy val allSettings = buildSettings ++
@@ -86,7 +86,10 @@ lazy val allSettings = buildSettings ++
   dynVerSettings ++
   BuildSettings.addExampleConfToTestCp
 
-lazy val root = project.in(file(".")).settings(buildSettings ++ dynVerSettings).aggregate(core, kinesis, pubsub, kafka, nsq, stdout, sqs)
+lazy val root = project
+  .in(file("."))
+  .settings(buildSettings ++ dynVerSettings)
+  .aggregate(core, kinesis, pubsub, kafka, nsq, stdout, sqs)
 
 lazy val core = project
   .settings(moduleName := "snowplow-stream-collector-core")
@@ -108,7 +111,7 @@ lazy val kinesis = project
   )
   .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
   .settings(buildInfoSettings)
-  .dependsOn(core % "test->test;compile->compile" )
+  .dependsOn(core % "test->test;compile->compile")
 
 lazy val sqs = project
   .settings(moduleName := "snowplow-stream-collector-sqs")
@@ -147,10 +150,13 @@ lazy val nsq = project
   .settings(moduleName := "snowplow-stream-collector-nsq")
   .settings(allSettings)
   .settings(Docker / packageName := "scala-stream-collector-nsq")
-  .settings(libraryDependencies ++= Seq(
-    Dependencies.Libraries.nsqClient,
-    Dependencies.Libraries.jackson
-  ))
+  .settings(
+    libraryDependencies ++= Seq(
+      Dependencies.Libraries.nsqClient,
+      Dependencies.Libraries.jackson,
+      Dependencies.Libraries.log4j
+    )
+  )
   .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
   .settings(buildInfoSettings)
   .dependsOn(core % "test->test;compile->compile")
