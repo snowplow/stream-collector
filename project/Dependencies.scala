@@ -28,7 +28,7 @@ object Dependencies {
     val pubsub       = "1.113.7"
     val kafka        = "2.2.1"
     val nsqClient    = "1.3.0"
-    val jodaTime     = "2.10.8"
+    val jodaTime     = "2.10.13"
     val slf4j        = "1.7.32"
     val log4j        = "2.16.0" // CVE-2021-44228
     val config       = "1.4.1"
