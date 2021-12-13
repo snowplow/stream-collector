@@ -29,7 +29,7 @@ object Dependencies {
     val kafka        = "2.2.1"
     val nsqClient    = "1.3.0"
     val jodaTime     = "2.10.8"
-    val slf4j        = "1.7.30"
+    val slf4j        = "1.7.32"
     val log4j        = "2.15.0" // CVE-2021-44228
     val config       = "1.4.1"
     val prometheus   = "0.9.0"
