@@ -30,6 +30,7 @@ object Dependencies {
     val nsqClient    = "1.3.0"
     val jodaTime     = "2.10.8"
     val slf4j        = "1.7.30"
+    val log4j        = "2.16.0" // CVE-2021-44228
     val config       = "1.4.1"
     val prometheus   = "0.9.0"
     val cbor         = "2.11.4" // See snowplow/snowplow/issues/4266
@@ -63,6 +64,7 @@ object Dependencies {
     val jodaTime         = "joda-time"                        % "joda-time"               % V.jodaTime
     val slf4j            = "org.slf4j"                        % "slf4j-simple"            % V.slf4j
     val log4jOverSlf4j   = "org.slf4j"                        % "log4j-over-slf4j"        % V.slf4j
+    val log4j            = "org.apache.logging.log4j"         % "log4j-core"              % V.log4j
     val config           = "com.typesafe"                     % "config"                  % V.config
     val prometheus       = "io.prometheus"                    % "simpleclient"            % V.prometheus
     val prometheusCommon = "io.prometheus"                    % "simpleclient_common"     % V.prometheus
