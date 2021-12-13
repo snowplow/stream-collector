@@ -25,7 +25,7 @@ object Dependencies {
   object V {
     // Java
     val awsSdk       = "1.12.128"
-    val pubsub       = "1.113.7"
+    val pubsub       = "1.115.0"
     val kafka        = "2.2.1"
     val nsqClient    = "1.3.0"
     val jodaTime     = "2.10.13"
