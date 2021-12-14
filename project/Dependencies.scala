@@ -35,7 +35,7 @@ object Dependencies {
     val prometheus   = "0.9.0"
     val cbor         = "2.11.4" // See snowplow/snowplow/issues/4266
     val jackson      = "2.10.5.1" // force this version to mitigate security vulnerabilities
-    val thrift       = "0.14.1" // force this version to mitigate security vulnerabilities
+    val thrift       = "0.15.0" // force this version to mitigate security vulnerabilities
     val commonsCodec = "1.13" // force this version to mitigate security vulnerabilities
     val grpcCore     = "1.31.0" // force this version to mitigate security vulnerabilities
     // Scala
