@@ -1,3 +1,13 @@
+Release 2.4.3 (2021-12-14)
+--------------------------
+Fix log4j-core version to 2.15.0 (#195)
+Bump slf4j to 1.7.32 (#196)
+Bump joda-time to 2.10.13 (#198)
+Bump aws-java-sdk to 1.12.128 (#199)
+Bump google-cloud-pubsub to 1.115.0 (#200)
+Bump libthrift to 0.15.0 (#201)
+Bump sbt to 1.5.6 (#202)
+
 Release 2.4.2 (2021-12-08)
 --------------------------
 Fix docs link in README (#192)
