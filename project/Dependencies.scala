@@ -30,7 +30,7 @@ object Dependencies {
     val nsqClient    = "1.3.0"
     val jodaTime     = "2.10.13"
     val slf4j        = "1.7.32"
-    val log4j        = "2.16.0" // CVE-2021-44228
+    val log4j        = "2.17.0" // CVE-2021-44228
     val config       = "1.4.1"
     val prometheus   = "0.9.0"
     val cbor         = "2.11.4" // See snowplow/snowplow/issues/4266
