@@ -43,4 +43,7 @@ class NsqSink(nsqConfig: Nsq, topicName: String) extends Sink {
     producer.produceMulti(topicName, events.asJava)
     Nil
   }
+
+  override def shutdown(): Unit =
+    producer.shutdown()
 }

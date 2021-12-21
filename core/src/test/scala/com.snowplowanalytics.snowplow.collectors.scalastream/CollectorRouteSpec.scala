@@ -54,6 +54,9 @@ class CollectorRouteSpec extends Specification with Specs2RouteTest {
         def enableDefaultRedirect: Boolean                         = withRedirects
         def sinksHealthy: Boolean                                  = true
       }
+      override val healthService = new HealthService {
+        def isHealthy: Boolean = true
+      }
     }
   val route                      = mkRoute(true, None)
   val routeWithoutRedirects      = mkRoute(false, None)

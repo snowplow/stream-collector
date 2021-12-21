@@ -240,6 +240,7 @@ class SqsSink private (
   }
 
   def shutdown(): Unit = {
+    EventStorage.flush()
     executorService.shutdown()
     executorService.awaitTermination(10000, MILLISECONDS)
     ()
@@ -282,16 +283,6 @@ object SqsSink {
     client.map { c =>
       val sqsSink = new SqsSink(c, sqsConfig, bufferConfig, queueName, executorService)
       sqsSink.EventStorage.scheduleFlush()
-
-      // When the application is shut down try to send all stored events.
-      Runtime
-        .getRuntime
-        .addShutdownHook(new Thread {
-          override def run(): Unit = {
-            sqsSink.EventStorage.flush()
-            sqsSink.shutdown()
-          }
-        })
       sqsSink
     }
   }

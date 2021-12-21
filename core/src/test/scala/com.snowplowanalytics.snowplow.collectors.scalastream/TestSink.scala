@@ -28,4 +28,6 @@ class TestSink extends Sink {
   override val MaxBytes = Int.MaxValue
 
   override def storeRawEvents(events: List[Array[Byte]], key: String): List[Array[Byte]] = events
+
+  override def shutdown(): Unit = ()
 }

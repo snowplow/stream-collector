@@ -77,4 +77,7 @@ class KafkaSink(
     }
     Nil
   }
+
+  override def shutdown(): Unit =
+    kafkaProducer.close()
 }

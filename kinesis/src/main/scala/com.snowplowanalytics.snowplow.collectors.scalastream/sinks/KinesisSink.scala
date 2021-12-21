@@ -355,6 +355,7 @@ class KinesisSink private (
   }
 
   def shutdown(): Unit = {
+    EventStorage.flush()
     executorService.shutdown()
     executorService.awaitTermination(10000, MILLISECONDS)
     ()
@@ -414,16 +415,6 @@ object KinesisSink {
             sqsClientAndName
           )
         ks.EventStorage.scheduleFlush()
-
-        // When the application is shut down try to send all stored events
-        Runtime
-          .getRuntime
-          .addShutdownHook(new Thread {
-            override def run(): Unit = {
-              ks.EventStorage.flush()
-              ks.shutdown()
-            }
-          })
         ks
     }
   }

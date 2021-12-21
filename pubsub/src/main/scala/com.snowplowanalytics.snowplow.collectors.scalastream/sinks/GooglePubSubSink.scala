@@ -80,6 +80,9 @@ class GooglePubSubSink private (publisher: Publisher, topicName: String) extends
     Nil
   }
 
+  override def shutdown(): Unit =
+    publisher.shutdown()
+
   /**
     * Convert event bytes to a PubsubMessage to be published
     * @param event Event to be converted

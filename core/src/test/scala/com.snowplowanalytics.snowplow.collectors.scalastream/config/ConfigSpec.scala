@@ -77,10 +77,13 @@ abstract class ConfigSpec extends Specification {
       enabled                  = false,
       durationBucketsInSeconds = None
     ),
-    telemetry             = Some(TelemetryConfig()),
-    ssl                   = SSLConfig(enable = false, redirect = false, port = 443),
-    enableDefaultRedirect = false,
-    enableStartupChecks   = true,
+    telemetry               = Some(TelemetryConfig()),
+    ssl                     = SSLConfig(enable = false, redirect = false, port = 443),
+    enableDefaultRedirect   = false,
+    enableStartupChecks     = true,
+    terminationDeadline     = 10.seconds,
+    preTerminationPeriod    = 10.seconds,
+    preTerminationUnhealthy = false,
     streams = StreamsConfig(
       good                       = "good",
       bad                        = "bad",

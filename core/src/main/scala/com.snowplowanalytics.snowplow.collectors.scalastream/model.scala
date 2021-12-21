@@ -176,7 +176,10 @@ package model {
     telemetry: Option[TelemetryConfig],
     ssl: SSLConfig = SSLConfig(),
     enableDefaultRedirect: Boolean,
-    enableStartupChecks: Boolean
+    enableStartupChecks: Boolean,
+    terminationDeadline: FiniteDuration,
+    preTerminationPeriod: FiniteDuration,
+    preTerminationUnhealthy: Boolean
   ) {
     val cookieConfig = if (cookie.enabled) Some(cookie) else None
     val doNotTrackHttpCookie =
