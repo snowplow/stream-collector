@@ -24,6 +24,7 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.monitoring.BeanRegi
 
 trait CollectorRoute {
   def collectorService: Service
+  def healthService: HealthService
 
   private val headers = optionalHeaderValueByName("User-Agent") &
     optionalHeaderValueByName("Referer") &
@@ -172,7 +173,10 @@ trait CollectorRoute {
 
   private def healthRoute: Route = get {
     path("health".r) { _ =>
-      complete(HttpResponse(200, entity = "OK"))
+      if (healthService.isHealthy)
+        complete(HttpResponse(200, entity = "OK"))
+      else
+        complete(HttpResponse(503, entity = "Service Unavailable"))
     }
   }
 

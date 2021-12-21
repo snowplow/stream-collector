@@ -38,4 +38,6 @@ class StdoutSink(streamName: String) extends Sink {
     }
     Nil
   }
+
+  override def shutdown(): Unit = ()
 }

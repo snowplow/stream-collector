@@ -31,4 +31,5 @@ trait Sink {
 
   def isHealthy: Boolean = true
   def storeRawEvents(events: List[Array[Byte]], key: String): List[Array[Byte]]
+  def shutdown(): Unit
 }

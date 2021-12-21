@@ -58,9 +58,11 @@ object TestUtils {
         ),
         buffer = BufferConfig(4000000L, 500L, 60000L)
       ),
-      telemetry             = None,
-      prometheusMetrics     = PrometheusMetricsConfig(false, None),
-      enableStartupChecks   = true,
-      enableDefaultRedirect = false
+      telemetry                  = None,
+      prometheusMetrics          = PrometheusMetricsConfig(false, None),
+      enableStartupChecks        = true,
+      enableDefaultRedirect      = false,
+      terminationDeadline        = 10.seconds,
+      terminationUnhealthyPeriod = 10.seconds
     )
 }

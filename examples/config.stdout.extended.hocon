@@ -214,6 +214,13 @@ collector {
       port = 443
       secure = true
    }
+
+  # When shutting down, the collector can spend a configurable amount of time returning 503s to the /health endpoint.
+  # Helpful for signalling to a load balancer that the collector is shuttding down.
+  terminationUnhealthyPeriod = 10 seconds
+
+  # The akka server's deadline for closing connections during graceful shutdown
+  terminationDeadline = 10 seconds
 }
 
 # Akka has a variety of possible configuration options defined at

@@ -30,7 +30,7 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.metrics._
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 import com.snowplowanalytics.snowplow.collectors.scalastream.telemetry.TelemetryAkkaService
 
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
 
 // Main entry point of the Scala collector.
 trait Collector {
@@ -95,8 +95,11 @@ trait Collector {
 
     telemetry.start()
 
+    val health = new HealthService.Settable
+
     val collectorRoute = new CollectorRoute {
       override def collectorService = new CollectorService(collectorConf, sinks, appName, appVersion)
+      override def healthService    = health
     }
 
     val prometheusMetricsService =
@@ -131,6 +134,7 @@ trait Collector {
     ): Future[Unit] =
       builder
         .bind(rs)
+        .map(_.addToCoordinatedShutdown(collectorConf.terminationDeadline))
         .map { binding =>
           log.info(s"REST interface bound to ${binding.localAddress}")
         }
@@ -170,5 +174,20 @@ trait Collector {
         unsecureEndpoint(routes)
         ()
     }
+
+    Runtime
+      .getRuntime
+      .addShutdownHook(new Thread(() => {
+        log.info("Received shutdown signal, setting health endpoint to unhealthy")
+        health.toUnhealthy()
+        log.info(s"Sleeping for ${collectorConf.terminationUnhealthyPeriod}")
+        Thread.sleep(collectorConf.terminationUnhealthyPeriod.toMillis)
+        log.info("Initiating http server termination")
+        Await.result(system.terminate(), collectorConf.terminationDeadline)
+        log.info("Server terminated. Initiating sinks shutdown")
+        sinks.good.shutdown()
+        sinks.bad.shutdown()
+        ()
+      }))
   }
 }
