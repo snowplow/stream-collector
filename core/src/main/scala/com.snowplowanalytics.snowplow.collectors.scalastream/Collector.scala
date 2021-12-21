@@ -26,11 +26,14 @@ import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig._
 import pureconfig.generic.auto._
 import pureconfig.generic.{FieldCoproductHint, ProductHint}
+import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.Sink
 import com.snowplowanalytics.snowplow.collectors.scalastream.metrics._
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 import com.snowplowanalytics.snowplow.collectors.scalastream.telemetry.TelemetryAkkaService
 
-import scala.concurrent.Future
+import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.duration.Duration
+import scala.util.control.NonFatal
 
 // Main entry point of the Scala collector.
 trait Collector {
@@ -95,8 +98,11 @@ trait Collector {
 
     telemetry.start()
 
+    val health = new HealthService.Settable
+
     val collectorRoute = new CollectorRoute {
       override def collectorService = new CollectorService(collectorConf, sinks, appName, appVersion)
+      override def healthService    = health
     }
 
     val prometheusMetricsService =
@@ -131,6 +137,7 @@ trait Collector {
     ): Future[Unit] =
       builder
         .bind(rs)
+        .map(_.addToCoordinatedShutdown(collectorConf.terminationDeadline))
         .map { binding =>
           log.info(s"REST interface bound to ${binding.localAddress}")
         }
@@ -170,5 +177,39 @@ trait Collector {
         unsecureEndpoint(routes)
         ()
     }
+
+    Runtime
+      .getRuntime
+      .addShutdownHook(new Thread(() => {
+        log.warn("Received shutdown signal")
+        if (collectorConf.preTerminationUnhealthy) {
+          log.warn("setting health endpoint to unhealthy")
+          health.toUnhealthy()
+        }
+        log.warn(s"Sleeping for ${collectorConf.preTerminationPeriod}")
+        Thread.sleep(collectorConf.preTerminationPeriod.toMillis)
+        log.warn("Initiating http server termination")
+        try {
+          // The actor system is already configured to shutdown within `terminationDeadline` so we await for double that.
+          Await.result(system.terminate(), collectorConf.terminationDeadline * 2)
+          log.warn("Server terminated")
+        } catch {
+          case NonFatal(t) =>
+            log.error("Caught exception awaiting server termination", t)
+        }
+        val shutdowns = List(shutdownSink(sinks.good, "good"), shutdownSink(sinks.bad, "bad"))
+        Await.result(Future.sequence(shutdowns), Duration.Inf)
+        ()
+      }))
   }
+
+  private def shutdownSink(sink: Sink, label: String)(implicit ec: ExecutionContext): Future[Unit] =
+    Future {
+      log.warn(s"Initiating $label sink shutdown")
+      sink.shutdown()
+      log.warn(s"Completed $label sink shutdown")
+    }.recover {
+      case NonFatal(t) =>
+        log.error(s"Caught exception shutting down $label sink", t)
+    }
 }

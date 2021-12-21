@@ -230,6 +230,17 @@ collector {
       port = 443
       secure = true
    }
+
+  # Configures how long the colletor should pause after receiving a sigterm before starting the graceful shutdown.
+  # During this period the collector continues to accept new connections and respond to requests.
+  preTerminationPeriod = 10 seconds
+
+  # During the preTerminationPeriod, the collector can be configured to return 503s on the /health endpoint
+  # Can be helpful for removing the collector from a load balancer's targets.
+  preTerminationUnhealthy = false
+
+  # The akka server's deadline for closing connections during graceful shutdown
+  terminationDeadline = 10 seconds
 }
 
 # Akka has a variety of possible configuration options defined at
