@@ -53,8 +53,8 @@ class CollectorServiceSpec extends Specification {
   val uuidRegex    = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}".r
   val event        = new CollectorPayload("iglu-schema", "ip", System.currentTimeMillis, "UTF-8", "collector")
   val hs           = List(`Raw-Request-URI`("uri"), `X-Forwarded-For`(RemoteAddress(InetAddress.getByName("127.0.0.1"))))
-  val serializer   = new TSerializer()
-  val deserializer = new TDeserializer()
+  def serializer   = new TSerializer()
+  def deserializer = new TDeserializer()
 
   "The collector service" should {
     "cookie" in {
@@ -340,7 +340,7 @@ class CollectorServiceSpec extends Specification {
         e.refererUri shouldEqual "ref"
         e.hostname shouldEqual "h"
         e.networkUserId shouldEqual "nuid"
-        e.headers shouldEqual (List(l) ++ List(xff) ++ ct).map(_.toString).asJava
+        e.headers shouldEqual (l.unsafeToString :: xff.unsafeToString :: ct.toList).asJava
         e.contentType shouldEqual ct.get
       }
       "fill the correct values if SP-Anonymous is present" in {
@@ -373,7 +373,7 @@ class CollectorServiceSpec extends Specification {
         e.refererUri shouldEqual "ref"
         e.hostname shouldEqual "h"
         e.networkUserId shouldEqual "00000000-0000-0000-0000-000000000000"
-        e.headers shouldEqual (List(l) ++ ct).map(_.toString).asJava
+        e.headers shouldEqual (l.unsafeToString :: ct.toList).asJava
         e.contentType shouldEqual ct.get
       }
       "have a null queryString if it's None" in {
@@ -406,7 +406,7 @@ class CollectorServiceSpec extends Specification {
         e.refererUri shouldEqual "ref"
         e.hostname shouldEqual "h"
         e.networkUserId shouldEqual "00000000-0000-0000-0000-000000000000"
-        e.headers shouldEqual (List(l) ++ ct).map(_.toString).asJava
+        e.headers shouldEqual (l.unsafeToString :: ct.toList).asJava
         e.contentType shouldEqual ct.get
       }
       "have an empty nuid if SP-Anonymous is present" in {
@@ -666,7 +666,7 @@ class CollectorServiceSpec extends Specification {
           .withAttributes(
             Map(AttributeKeys.remoteAddress -> RemoteAddress.Unknown)
           )
-        service.headers(request, None) shouldEqual List(`Location`("a").toString)
+        service.headers(request, None) shouldEqual List(`Location`("a").unsafeToString)
       }
       "filter out the correct headers if SP-Anonymous is present" in {
         val request = HttpRequest()
@@ -685,7 +685,7 @@ class CollectorServiceSpec extends Specification {
           .withAttributes(
             Map(AttributeKeys.remoteAddress -> RemoteAddress.Unknown)
           )
-        service.headers(request, Some("*")) shouldEqual List(`Location`("a").toString)
+        service.headers(request, Some("*")) shouldEqual List(`Location`("a").unsafeToString)
       }
     }
 
