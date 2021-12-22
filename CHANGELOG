@@ -1,3 +1,7 @@
+Release 2.4.5 (2021-12-22)
+--------------------------
+Fix how headers are stringified in the collector payload (#210)
+
 Release 2.4.4 (2021-12-19)
 --------------------------
 Bump log4j-core to 2.17.0 (#206)
