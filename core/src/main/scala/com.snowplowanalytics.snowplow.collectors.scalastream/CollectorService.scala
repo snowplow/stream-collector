@@ -399,7 +399,7 @@ class CollectorService(
       case _: `Remote-Address` | _: `Raw-Request-URI` | _: `X-Forwarded-For` | _: `X-Real-Ip` | _: `Cookie`
           if spAnonymous.isDefined =>
         None
-      case other => Some(other.toString)
+      case other => Some(other.unsafeToString) // named "unsafe" because it might contain sensitive information
     }
 
   /** If the pixel is requested, this attaches cache control headers to the response to prevent any caching. */
