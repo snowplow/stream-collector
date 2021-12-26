@@ -105,6 +105,7 @@ abstract class ConfigSpec extends Specification {
   def sinkConfigRefFactory(app: String): SinkConfig = app match {
     case "nsq"   => Nsq("nsqHost", 4150)
     case "kafka" => Kafka("localhost:9092,another.host:9092", 10, None)
+    case "pulsar" => Pulsar("pulsar://localhost:6650,another.host:6650")
     case "pubsub" =>
       GooglePubSub(
         googleProjectId = "googleProjectId",

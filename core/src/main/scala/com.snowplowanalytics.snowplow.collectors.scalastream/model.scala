@@ -123,6 +123,9 @@ package model {
     retries: Int,
     producerConf: Option[Map[String, String]]
   ) extends SinkConfig
+  final case class Pulsar(
+    brokers: String,
+  ) extends SinkConfig
   final case class Nsq(host: String, port: Int) extends SinkConfig
   case object Stdout extends SinkConfig
   final case class BufferConfig(byteLimit: Long, recordLimit: Long, timeLimit: Long)

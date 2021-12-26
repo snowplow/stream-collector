@@ -1,0 +1,13 @@
+collector {
+  interface = "0.0.0.0"
+  port = 80
+
+  streams {
+    good = "good"
+    bad = "bad"
+
+    sink {
+      brokers = "pulsar://localhost:6650,another.host:6650"
+    }
+  }
+}
