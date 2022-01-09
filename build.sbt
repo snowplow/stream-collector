@@ -141,7 +141,10 @@ lazy val kafka = project
   .settings(moduleName := "snowplow-stream-collector-kafka")
   .settings(allSettings)
   .settings(Docker / packageName := "scala-stream-collector-kafka")
-  .settings(libraryDependencies ++= Seq(Dependencies.Libraries.kafkaClients))
+  .settings(libraryDependencies ++= Seq(
+    Dependencies.Libraries.kafkaClients,
+    Dependencies.Libraries.mskAuth
+  ))
   .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
   .settings(buildInfoSettings)
   .dependsOn(core % "test->test;compile->compile")
