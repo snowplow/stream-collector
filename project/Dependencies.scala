@@ -27,6 +27,7 @@ object Dependencies {
     val awsSdk       = "1.12.128"
     val pubsub       = "1.115.0"
     val kafka        = "2.2.1"
+    val mskAuth      = "1.1.1"
     val nsqClient    = "1.3.0"
     val jodaTime     = "2.10.13"
     val slf4j        = "1.7.32"
@@ -60,6 +61,7 @@ object Dependencies {
     val sts              = "com.amazonaws"                    % "aws-java-sdk-sts"        % V.awsSdk % Runtime // Enables web token authentication https://github.com/snowplow/stream-collector/issues/169
     val pubsub           = "com.google.cloud"                 % "google-cloud-pubsub"     % V.pubsub
     val kafkaClients     = "org.apache.kafka"                 % "kafka-clients"           % V.kafka
+    val mskAuth          = "software.amazon.msk"              % "aws-msk-iam-auth"        % V.mskAuth % Runtime // Enables AWS MSK IAM authentication https://github.com/snowplow/stream-collector/pull/214
     val nsqClient        = "com.snowplowanalytics"            % "nsq-java-client"         % V.nsqClient
     val jodaTime         = "joda-time"                        % "joda-time"               % V.jodaTime
     val slf4j            = "org.slf4j"                        % "slf4j-simple"            % V.slf4j

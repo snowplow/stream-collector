@@ -18,8 +18,6 @@
 import sbt._
 import Keys._
 
-
-
 object BuildSettings {
 
   // sbt-assembly settings for building an executable
@@ -40,6 +38,8 @@ object BuildSettings {
       case fileName if fileName.toLowerCase == "reference.conf" => reverseConcat
       case x if x.endsWith("io.netty.versions.properties")      => MergeStrategy.discard
       case x if x.endsWith("module-info.class")                 => MergeStrategy.first
+      case x if x.endsWith("paginators-1.json")                 => MergeStrategy.first
+      case x if x.endsWith("service-2.json")                    => MergeStrategy.first
       case x =>
         val oldStrategy = (assembly / assemblyMergeStrategy).value
         oldStrategy(x)
