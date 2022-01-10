@@ -21,7 +21,7 @@ events to [Amazon Kinesis][kinesis] and [NSQ][nsq], and is built on top of [akka
 
 ## Copyright and license
 
-The Scala Stream Collector is copyright 2013-2021 Snowplow Analytics Ltd.
+The Scala Stream Collector is copyright 2013-2022 Snowplow Analytics Ltd.
 
 Licensed under the [Apache License, Version 2.0][license] (the "License");
 you may not use this software except in compliance with the License.
