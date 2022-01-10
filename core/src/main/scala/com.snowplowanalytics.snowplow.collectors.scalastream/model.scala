@@ -146,7 +146,7 @@ package model {
     interval: FiniteDuration = 60.minutes,
     // http params
     method: String  = "POST",
-    url: String     = "collector-g.snowplowanalytics.com",
+    url: String     = "telemetry-g.snowplowanalytics.com",
     port: Int       = 443,
     secure: Boolean = true,
     // Params injected by deployment scripts
