@@ -22,13 +22,13 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink
 import com.snowplowanalytics.snowplow.collectors.scalastream.telemetry.TelemetryAkkaService
 
 object KinesisCollector extends Collector {
-  def appName      = BuildInfo.moduleName
+  def appName      = BuildInfo.shortName
   def appVersion   = BuildInfo.version
   def scalaVersion = BuildInfo.scalaVersion
 
   def main(args: Array[String]): Unit = {
     val (collectorConf, akkaConf) = parseConfig(args)
-    val telemetry                 = TelemetryAkkaService.initWithCollector(collectorConf, appName, appVersion)
+    val telemetry                 = TelemetryAkkaService.initWithCollector(collectorConf, BuildInfo.moduleName, appVersion)
     val sinks: Either[Throwable, CollectorSinks] = for {
       kc <- collectorConf.streams.sink match {
         case kc: Kinesis => kc.asRight
