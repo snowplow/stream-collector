@@ -20,13 +20,13 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.telemetry.Telemetry
 import com.snowplowanalytics.snowplow.collectors.scalastream.generated.BuildInfo
 
 object KafkaCollector extends Collector {
-  def appName      = BuildInfo.moduleName
+  def appName      = BuildInfo.shortName
   def appVersion   = BuildInfo.version
   def scalaVersion = BuildInfo.scalaVersion
 
   def main(args: Array[String]): Unit = {
     val (collectorConf, akkaConf) = parseConfig(args)
-    val telemetry                 = TelemetryAkkaService.initWithCollector(collectorConf, appName, appVersion)
+    val telemetry                 = TelemetryAkkaService.initWithCollector(collectorConf, BuildInfo.moduleName, appVersion)
     val sinks = {
       val goodStream = collectorConf.streams.good
       val badStream  = collectorConf.streams.bad
