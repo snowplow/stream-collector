@@ -1,3 +1,15 @@
+Release 2.5.0 (2022-01-31)
+--------------------------
+Use shorter app name (#217)
+Update copyright notices to 2022 (#216)
+Disable warnings for illegal headers (#178)
+Change default telemetry url (#209)
+Add configuration option for allow list for collector redirects (#131)
+Increase default value of pubsub backoffPolicy totalBackoff (#187)
+Move logging of thread pool creation out of KinesisSink (#129)
+CollectorServiceSpec should test number of events written to sink (#188)
+Improve graceful shutdown (#12)
+
 Release 2.4.5 (2021-12-22)
 --------------------------
 Fix how headers are stringified in the collector payload (#210)
