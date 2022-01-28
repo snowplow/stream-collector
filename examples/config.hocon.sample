@@ -375,6 +375,7 @@ akka {
       max-uri-length = ${?AKKA_HTTP_SERVER_PARSING_MAX_URI_LENGTH}
       uri-parsing-mode = relaxed
       uri-parsing-mode = ${?AKKA_HTTP_SERVER_PARSING_URI_PARSING_MODE}
+      ignore-illegal-header-for = ["user-agent"]
     }
   }
 }
