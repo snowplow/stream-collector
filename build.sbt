@@ -59,13 +59,13 @@ lazy val buildSettings = Seq(
   name := "snowplow-stream-collector",
   description := "Scala Stream Collector for Snowplow raw events",
   scalaVersion := "2.12.10",
-  javacOptions := Seq("-source", "11", "-target", "11"),
+  javacOptions := Seq("-source", "17", "-target", "17"),
   resolvers ++= Dependencies.resolutionRepos
 )
 
 lazy val dockerSettings = Seq(
   Docker / maintainer := "Snowplow Analytics Ltd. <support@snowplowanalytics.com>",
-  dockerBaseImage := "adoptopenjdk:11-jre-hotspot-focal",
+  dockerBaseImage := "eclipse-temurin:17-jre-focal",
   Docker / daemonUser := "daemon",
   dockerRepository := Some("snowplow"),
   Docker / daemonUserUid := None,
