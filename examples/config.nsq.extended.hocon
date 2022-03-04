@@ -162,15 +162,6 @@ collector {
     accessControlMaxAge = 60 minutes
   }
 
-  # Configuration of prometheus http metrics
-  prometheusMetrics {
-    # If metrics are enabled then all requests will be logged as prometheus metrics
-    # and '/metrics' endpoint will return the report about the requests
-    enabled = false
-    # Custom buckets for http_request_duration_seconds_bucket duration metric
-    #durationBucketsInSeconds = [0.1, 3, 10]
-  }
-
   streams {
     # Events which have successfully been collected will be stored in the good stream/topic
     good = "good"
@@ -213,6 +204,17 @@ collector {
       url = telemetry-g.snowplowanalytics.com
       port = 443
       secure = true
+   }
+
+   monitoring.metrics.statsd {
+      enabled = false
+      # StatsD metric reporting protocol configuration
+      hostname = localhost
+      port = 8125
+      # Required, how frequently to report metrics
+      period = "10 seconds"
+      # Optional, override the default metric prefix
+      # "prefix": "snowplow.collector"
    }
 
   # Configures how long the colletor should pause after receiving a sigterm before starting the graceful shutdown.

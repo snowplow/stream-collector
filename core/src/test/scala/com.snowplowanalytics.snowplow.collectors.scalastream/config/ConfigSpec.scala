@@ -72,11 +72,8 @@ abstract class ConfigSpec extends Specification {
       headers    = Map.empty[String, String],
       body       = ""
     ),
-    cors = CORSConfig(60.minutes),
-    prometheusMetrics = PrometheusMetricsConfig(
-      enabled                  = false,
-      durationBucketsInSeconds = None
-    ),
+    cors                    = CORSConfig(60.minutes),
+    monitoring              = MonitoringConfig(MetricsConfig(StatsdConfig(false, "localhost", 8125, 10.seconds))),
     telemetry               = Some(TelemetryConfig()),
     ssl                     = SSLConfig(enable = false, redirect = false, port = 443),
     enableDefaultRedirect   = false,
