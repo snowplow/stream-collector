@@ -123,13 +123,26 @@ trait Collector {
 
     lazy val redirectRoutes =
       scheme("http") {
-        extract(_.request.uri) { uri =>
-          redirect(
-            uri.copy(scheme = "https").withPort(collectorConf.ssl.port),
-            StatusCodes.MovedPermanently
-          )
-        }
+        redirectToHttps(collectorConf.ssl.port)
       }
+
+    def redirectToHttps(port: Int) =
+      extract(_.request.uri) { uri =>
+        redirect(
+          uri.withScheme("https").withPort(port),
+          StatusCodes.MovedPermanently
+        )
+      }
+
+    def xForwardedProto(routes: Route): Route =
+      if (collectorConf.ssl.redirect)
+        optionalHeaderValueByName("X-Forwarded-Proto") {
+          case Some(clientProtocol) if clientProtocol == "http" =>
+            redirectToHttps(0)
+          case _ => routes
+        }
+      else
+        routes
 
     def bindRoutes(
       builder: ServerBuilder,
@@ -155,13 +168,13 @@ trait Collector {
         Http()
           .newServerAt(collectorConf.interface, collectorConf.ssl.port)
           .enableHttps(ConnectionContext.httpsServer(SSLContext.getDefault)),
-        routes
+        xForwardedProto(routes)
       )
 
     def unsecureEndpoint(routes: Route): Future[Unit] =
       bindRoutes(
         Http().newServerAt(collectorConf.interface, collectorConf.port),
-        routes
+        xForwardedProto(routes)
       )
 
     collectorConf.ssl match {
