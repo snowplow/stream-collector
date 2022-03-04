@@ -20,7 +20,6 @@ import akka.http.scaladsl.server.{Directive1, Route}
 import akka.http.scaladsl.server.Directives._
 
 import com.snowplowanalytics.snowplow.collectors.scalastream.model.DntCookieMatcher
-import com.snowplowanalytics.snowplow.collectors.scalastream.monitoring.BeanRegistry
 
 trait CollectorRoute {
   def collectorService: Service
@@ -77,7 +76,6 @@ trait CollectorRoute {
                       Some(ct),
                       spAnonymous
                     )
-                    incrementRequests(r.status)
                     complete(r)
                   }
                 }
@@ -98,7 +96,6 @@ trait CollectorRoute {
                     None,
                     spAnonymous
                   )
-                  incrementRequests(r.status)
                   complete(r)
                 }
             } ~
@@ -119,7 +116,6 @@ trait CollectorRoute {
                     None,
                     spAnonymous
                   )
-                  incrementRequests(r.status)
                   complete(r)
                 }
               }
@@ -127,7 +123,6 @@ trait CollectorRoute {
         }
       }
     } ~ corsRoute ~ healthRoute ~ sinkHealthRoute ~ crossDomainRoute ~ rootRoute ~ robotsRoute ~ {
-      BeanRegistry.collectorBean.incrementFailedRequests()
       complete(HttpResponse(404, entity = "404 not found"))
     }
 
@@ -209,12 +204,4 @@ trait CollectorRoute {
       complete(HttpResponse(200, entity = "User-agent: *\nDisallow: /"))
     }
   }
-
-  private def incrementRequests(status: StatusCode): Unit =
-    if (List(StatusCodes.OK, StatusCodes.Found).contains(status)) {
-      BeanRegistry.collectorBean.incrementSuccessfulRequests()
-    } else {
-      BeanRegistry.collectorBean.incrementFailedRequests()
-    }
-
 }
