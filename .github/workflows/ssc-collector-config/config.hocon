@@ -48,10 +48,6 @@ collector {
     accessControlMaxAge = 5 seconds
   }
 
-  prometheusMetrics {
-    enabled = false
-  }
-
   streams {
     good = "good"
     bad = "bad"

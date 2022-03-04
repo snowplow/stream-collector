@@ -18,7 +18,7 @@ import java.io.File
 import javax.net.ssl.SSLContext
 import org.slf4j.LoggerFactory
 import akka.actor.ActorSystem
-import akka.http.scaladsl.{ConnectionContext, Http, ServerBuilder}
+import akka.http.scaladsl.{ConnectionContext, Http}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.Directives._
@@ -26,8 +26,11 @@ import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig._
 import pureconfig.generic.auto._
 import pureconfig.generic.{FieldCoproductHint, ProductHint}
+import com.timgroup.statsd.NonBlockingStatsDClientBuilder
+import fr.davit.akka.http.metrics.core.HttpMetricsRegistry
+import fr.davit.akka.http.metrics.core.HttpMetrics._
+import fr.davit.akka.http.metrics.datadog.{DatadogRegistry, DatadogSettings}
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.Sink
-import com.snowplowanalytics.snowplow.collectors.scalastream.metrics._
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 import com.snowplowanalytics.snowplow.collectors.scalastream.telemetry.TelemetryAkkaService
 
@@ -105,22 +108,6 @@ trait Collector {
       override def healthService    = health
     }
 
-    val prometheusMetricsService =
-      new PrometheusMetricsService(collectorConf.prometheusMetrics, scalaVersion, appVersion)
-
-    val metricsRoute = new MetricsRoute {
-      override def metricsService: MetricsService = prometheusMetricsService
-    }
-
-    val metricsDirectives = new MetricsDirectives {
-      override def metricsService: MetricsService = prometheusMetricsService
-    }
-
-    val routes =
-      if (collectorConf.prometheusMetrics.enabled)
-        metricsRoute.metricsRoute ~ metricsDirectives.logRequest(collectorRoute.collectorRoute)
-      else collectorRoute.collectorRoute
-
     lazy val redirectRoutes =
       scheme("http") {
         extract(_.request.uri) { uri =>
@@ -131,50 +118,74 @@ trait Collector {
         }
       }
 
-    def bindRoutes(
-      builder: ServerBuilder,
-      rs: Route
+    def shutdownHook(binding: Http.ServerBinding): Http.ServerBinding =
+      binding.addToCoordinatedShutdown(collectorConf.terminationDeadline)
+    def startupHook(binding: Http.ServerBinding): Unit = log.info(s"REST interface bound to ${binding.localAddress}")
+    def errorHook(ex: Throwable): Unit = log.error(
+      "REST interface could not be bound to " +
+        s"${collectorConf.interface}:${collectorConf.port}",
+      ex.getMessage
+    )
+
+    lazy val metricRegistry: Option[HttpMetricsRegistry] = collectorConf.monitoring.metrics.statsd match {
+      case StatsdConfig(true, hostname, port, period, prefix) =>
+        Some(
+          DatadogRegistry(
+            client = new NonBlockingStatsDClientBuilder()
+              .hostname(hostname)
+              .port(port)
+              .enableAggregation(true)
+              .aggregationFlushInterval(period.toMillis.toInt)
+              .enableTelemetry(false)
+              .build(),
+            DatadogSettings
+              .default
+              .withNamespace(prefix)
+              .withIncludeMethodDimension(true)
+              .withIncludeStatusDimension(true)
+          )
+        )
+      case _ => None
+    }
+
+    def secureEndpoint(metricRegistry: Option[HttpMetricsRegistry]): Future[Unit] =
+      endpoint(collectorRoute.collectorRoute, collectorConf.ssl.port, true, metricRegistry)
+
+    def unsecureEndpoint(routes: Route, metricRegistry: Option[HttpMetricsRegistry]): Future[Unit] =
+      endpoint(routes, collectorConf.port, false, metricRegistry)
+
+    def endpoint(
+      routes: Route,
+      port: Int,
+      secure: Boolean,
+      metricRegistry: Option[HttpMetricsRegistry]
     ): Future[Unit] =
-      builder
-        .bind(rs)
-        .map(_.addToCoordinatedShutdown(collectorConf.terminationDeadline))
-        .map { binding =>
-          log.info(s"REST interface bound to ${binding.localAddress}")
-        }
-        .recover {
-          case ex =>
-            log.error(
-              "REST interface could not be bound to " +
-                s"${collectorConf.interface}:${collectorConf.port}",
-              ex.getMessage
-            )
-        }
-
-    lazy val secureEndpoint: Future[Unit] =
-      bindRoutes(
-        Http()
-          .newServerAt(collectorConf.interface, collectorConf.ssl.port)
-          .enableHttps(ConnectionContext.httpsServer(SSLContext.getDefault)),
-        routes
-      )
-
-    def unsecureEndpoint(routes: Route): Future[Unit] =
-      bindRoutes(
-        Http().newServerAt(collectorConf.interface, collectorConf.port),
-        routes
-      )
+      metricRegistry match {
+        case Some(r) =>
+          val builder = Http().newMeteredServerAt(collectorConf.interface, port, r)
+          val stage   = if (secure) builder.enableHttps(ConnectionContext.httpsServer(SSLContext.getDefault)) else builder
+          stage.bind(routes).map(shutdownHook).map(startupHook).recover {
+            case ex => errorHook(ex)
+          }
+        case None =>
+          val builder = Http().newServerAt(collectorConf.interface, port)
+          val stage   = if (secure) builder.enableHttps(ConnectionContext.httpsServer(SSLContext.getDefault)) else builder
+          stage.bind(routes).map(shutdownHook).map(startupHook).recover {
+            case ex => errorHook(ex)
+          }
+      }
 
     collectorConf.ssl match {
       case SSLConfig(true, true, _) =>
-        unsecureEndpoint(redirectRoutes)
-        secureEndpoint
+        unsecureEndpoint(redirectRoutes, metricRegistry)
+        secureEndpoint(metricRegistry)
         ()
       case SSLConfig(true, false, _) =>
-        unsecureEndpoint(routes)
-        secureEndpoint
+        unsecureEndpoint(collectorRoute.collectorRoute, metricRegistry)
+        secureEndpoint(metricRegistry)
         ()
       case _ =>
-        unsecureEndpoint(routes)
+        unsecureEndpoint(collectorRoute.collectorRoute, metricRegistry)
         ()
     }
 

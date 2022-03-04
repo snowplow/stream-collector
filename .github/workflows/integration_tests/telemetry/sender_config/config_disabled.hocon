@@ -144,15 +144,6 @@ collector {
     accessControlMaxAge = 5 seconds
   }
 
-  # Configuration of prometheus http metrics
-  prometheusMetrics {
-    # If metrics are enabled then all requests will be logged as prometheus metrics
-    # and '/metrics' endpoint will return the report about the requests
-    enabled = false
-    # Custom buckets for http_request_duration_seconds_bucket duration metric
-    #durationBucketsInSeconds = [0.1, 3, 10]
-  }
-
   streams {
     # Events which have successfully been collected will be stored in the good stream/topic
     good = ""

@@ -32,7 +32,6 @@ object Dependencies {
     val slf4j        = "1.7.32"
     val log4j        = "2.17.0" // CVE-2021-44228
     val config       = "1.4.1"
-    val prometheus   = "0.9.0"
     val cbor         = "2.11.4" // See snowplow/snowplow/issues/4266
     val jackson      = "2.10.5.1" // force this version to mitigate security vulnerabilities
     val thrift       = "0.15.0" // force this version to mitigate security vulnerabilities
@@ -46,6 +45,7 @@ object Dependencies {
     val scopt            = "4.0.1"
     val pureconfig       = "0.15.0"
     val json4s           = "3.6.11"
+    val akkaHttpMetrics  = "1.7.0"
     val badRows          = "2.1.1"
     // Scala (test only)
     val specs2 = "4.11.0"
@@ -53,22 +53,20 @@ object Dependencies {
 
   object Libraries {
     // Java
-    val jackson          = "com.fasterxml.jackson.core"       % "jackson-databind"        % V.jackson // nsq only
-    val thrift           = "org.apache.thrift"                % "libthrift"               % V.thrift
-    val kinesis          = "com.amazonaws"                    % "aws-java-sdk-kinesis"    % V.awsSdk
-    val sqs              = "com.amazonaws"                    % "aws-java-sdk-sqs"        % V.awsSdk
-    val sts              = "com.amazonaws"                    % "aws-java-sdk-sts"        % V.awsSdk % Runtime // Enables web token authentication https://github.com/snowplow/stream-collector/issues/169
-    val pubsub           = "com.google.cloud"                 % "google-cloud-pubsub"     % V.pubsub
-    val kafkaClients     = "org.apache.kafka"                 % "kafka-clients"           % V.kafka
-    val nsqClient        = "com.snowplowanalytics"            % "nsq-java-client"         % V.nsqClient
-    val jodaTime         = "joda-time"                        % "joda-time"               % V.jodaTime
-    val slf4j            = "org.slf4j"                        % "slf4j-simple"            % V.slf4j
-    val log4jOverSlf4j   = "org.slf4j"                        % "log4j-over-slf4j"        % V.slf4j
-    val log4j            = "org.apache.logging.log4j"         % "log4j-core"              % V.log4j
-    val config           = "com.typesafe"                     % "config"                  % V.config
-    val prometheus       = "io.prometheus"                    % "simpleclient"            % V.prometheus
-    val prometheusCommon = "io.prometheus"                    % "simpleclient_common"     % V.prometheus
-    val cbor             = "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % V.cbor
+    val jackson        = "com.fasterxml.jackson.core"       % "jackson-databind"        % V.jackson // nsq only
+    val thrift         = "org.apache.thrift"                % "libthrift"               % V.thrift
+    val kinesis        = "com.amazonaws"                    % "aws-java-sdk-kinesis"    % V.awsSdk
+    val sqs            = "com.amazonaws"                    % "aws-java-sdk-sqs"        % V.awsSdk
+    val sts            = "com.amazonaws"                    % "aws-java-sdk-sts"        % V.awsSdk % Runtime // Enables web token authentication https://github.com/snowplow/stream-collector/issues/169
+    val pubsub         = "com.google.cloud"                 % "google-cloud-pubsub"     % V.pubsub
+    val kafkaClients   = "org.apache.kafka"                 % "kafka-clients"           % V.kafka
+    val nsqClient      = "com.snowplowanalytics"            % "nsq-java-client"         % V.nsqClient
+    val jodaTime       = "joda-time"                        % "joda-time"               % V.jodaTime
+    val slf4j          = "org.slf4j"                        % "slf4j-simple"            % V.slf4j
+    val log4jOverSlf4j = "org.slf4j"                        % "log4j-over-slf4j"        % V.slf4j
+    val log4j          = "org.apache.logging.log4j"         % "log4j-core"              % V.log4j
+    val config         = "com.typesafe"                     % "config"                  % V.config
+    val cbor           = "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % V.cbor
 
     // Scala
     val collectorPayload = "com.snowplowanalytics" % "collector-payload-1"                % V.collectorPayload
@@ -81,6 +79,7 @@ object Dependencies {
     val akkaSlf4j        = "com.typesafe.akka"     %% "akka-slf4j"                        % V.akka
     val json4sJackson    = "org.json4s"            %% "json4s-jackson"                    % V.json4s
     val pureconfig       = "com.github.pureconfig" %% "pureconfig"                        % V.pureconfig
+    val akkaHttpMetrics  = "fr.davit"              %% "akka-http-metrics-datadog"         % V.akkaHttpMetrics
 
     // Scala (test only)
     val specs2            = "org.specs2"        %% "specs2-core"         % V.specs2   % Test

@@ -58,8 +58,8 @@ object TestUtils {
         ),
         buffer = BufferConfig(4000000L, 500L, 60000L)
       ),
+      monitoring              = MonitoringConfig(MetricsConfig(StatsdConfig(false, "localhost", 8125, 10.seconds))),
       telemetry               = None,
-      prometheusMetrics       = PrometheusMetricsConfig(false, None),
       enableStartupChecks     = true,
       enableDefaultRedirect   = false,
       redirectDomains         = Set("localhost"),

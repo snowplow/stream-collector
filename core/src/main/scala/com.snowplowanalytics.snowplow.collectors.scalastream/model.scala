@@ -136,10 +136,17 @@ package model {
     sink: SinkConfig,
     buffer: BufferConfig
   )
-  final case class PrometheusMetricsConfig(
+
+  final case class StatsdConfig(
     enabled: Boolean,
-    durationBucketsInSeconds: Option[List[Double]]
+    hostname: String,
+    port: Int,
+    period: FiniteDuration = 1.minute,
+    prefix: String         = "snowplow.collector"
   )
+  final case class MetricsConfig(statsd: StatsdConfig)
+  final case class MonitoringConfig(metrics: MetricsConfig)
+
   final case class TelemetryConfig(
     // General params
     disable: Boolean         = false,
@@ -175,7 +182,7 @@ package model {
     rootResponse: RootResponseConfig,
     cors: CORSConfig,
     streams: StreamsConfig,
-    prometheusMetrics: PrometheusMetricsConfig,
+    monitoring: MonitoringConfig,
     telemetry: Option[TelemetryConfig],
     ssl: SSLConfig = SSLConfig(),
     enableDefaultRedirect: Boolean,
