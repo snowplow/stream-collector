@@ -67,7 +67,7 @@ trait Collector {
       help("help")
       version("version")
       opt[File]("config")
-        .required()
+        .optional()
         .valueName("<filename>")
         .action((f: File, c: FileConfig) => c.copy(f))
         .validate(f =>
