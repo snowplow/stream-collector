@@ -71,7 +71,10 @@ jobs:
           echo "::set-output name=project_version::$PROJECT_VERSION"
 
       - name: Stage the Docker build
-        run: sbt "project ${{ matrix.platform}}" docker:stage
+        run: sbt "project ${{ matrix.platform }}" docker:stage
+
+      - name: Stage the Docker distroless build
+        run: sbt "project ${{ matrix.platform }}Distroless" docker:stage
 
       - name: Docker metadata
         id: meta
@@ -80,7 +83,20 @@ jobs:
           images: snowplow/scala-stream-collector-${{ matrix.platform }}
           tags: |
             type=raw,value=latest,enable=${{ !contains(steps.ver.outputs.project_version, 'rc') }}
+            type=raw,value=latest-focal,enable=${{ !contains(steps.ver.outputs.project_version, 'rc') }}
             type=raw,value=${{ steps.ver.outputs.project_version }}
+            type=raw,value=${{ steps.ver.outputs.project_version }}-focal
+          flavor: |
+            latest=false
+
+      - name: Docker metadata distroless
+        id: distroless-meta
+        uses: docker/metadata-action@v3
+        with:
+          images: snowplow/scala-stream-collector-${{ matrix.platform }}
+          tags: |
+            type=raw,value=latest-distroless,enable=${{ !contains(steps.ver.outputs.project_version, 'rc') }}
+            type=raw,value=${{ steps.ver.outputs.project_version }}-distroless
           flavor: |
             latest=false
 
@@ -103,4 +119,13 @@ jobs:
           file: ${{ matrix.platform }}/target/docker/stage/Dockerfile
           platforms: linux/amd64,linux/arm64/v8
           tags: ${{ steps.meta.outputs.tags }}
+          push: true
+
+      - name: Push distroless image
+        uses: docker/build-push-action@v2
+        with:
+          context: distroless/${{ matrix.platform }}/target/docker/stage
+          file: distroless/${{ matrix.platform }}/target/docker/stage/Dockerfile
+          platforms: linux/amd64,linux/arm64/v8
+          tags: ${{ steps.distroless-meta.outputs.tags }}
           push: true

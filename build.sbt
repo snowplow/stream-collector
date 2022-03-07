@@ -72,6 +72,15 @@ lazy val dockerSettings = Seq(
   Docker / defaultLinuxInstallLocation := "/opt/snowplow"
 )
 
+lazy val dockerSettingsDistroless = Seq(
+  dockerBaseImage := "gcr.io/distroless/java11-debian11:nonroot",
+  Docker / daemonUser := "nonroot",
+  Docker / daemonGroup := "nonroot",
+  Docker / daemonUserUid := None,
+  dockerEntrypoint := Seq("java", "-jar",s"/opt/snowplow/lib/${(packageJavaLauncherJar / artifactPath).value.getName}"),
+  dockerPermissionStrategy := DockerPermissionStrategy.CopyChown
+)
+
 lazy val dynVerSettings = Seq(
   ThisBuild / dynverVTagPrefix := false, // Otherwise git tags required to have v-prefix
   ThisBuild / dynverSeparator := "-"     // to be compatible with docker
@@ -97,11 +106,10 @@ lazy val core = project
   .settings(libraryDependencies ++= commonDependencies)
   .settings(excludeDependencies ++= commonExclusions)
 
-lazy val kinesis = project
-  .settings(moduleName := "snowplow-stream-collector-kinesis")
-  .settings(allSettings)
-  .settings(Docker / packageName := "scala-stream-collector-kinesis")
-  .settings(
+lazy val kinesisSettings = 
+  allSettings ++ buildInfoSettings ++ Seq(
+    moduleName := "snowplow-stream-collector-kinesis",
+    Docker / packageName := "scala-stream-collector-kinesis",
     libraryDependencies ++= Seq(
       Dependencies.Libraries.kinesis,
       Dependencies.Libraries.sts,
@@ -109,62 +117,111 @@ lazy val kinesis = project
       Dependencies.Libraries.sqs
     )
   )
-  .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
-  .settings(buildInfoSettings)
+
+lazy val kinesis = project
+  .settings(kinesisSettings)
+  .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
   .dependsOn(core % "test->test;compile->compile")
 
-lazy val sqs = project
-  .settings(moduleName := "snowplow-stream-collector-sqs")
-  .settings(allSettings)
-  .settings(Docker / packageName := "scala-stream-collector-sqs")
-  .settings(
+lazy val kinesisDistroless = project
+  .in(file("distroless/kinesis"))
+  .settings(kinesisSettings ++ dockerSettingsDistroless)
+  .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
+  .dependsOn(core % "test->test;compile->compile")
+
+lazy val sqsSettings = 
+  allSettings ++ buildInfoSettings ++ Seq(
+    moduleName := "snowplow-stream-collector-sqs",
+    Docker / packageName := "scala-stream-collector-sqs",
     libraryDependencies ++= Seq(
       Dependencies.Libraries.sqs,
       Dependencies.Libraries.sts,
       Dependencies.Libraries.cbor
     )
   )
-  .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
-  .settings(buildInfoSettings)
+
+lazy val sqs = project
+  .settings(sqsSettings)
+  .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
   .dependsOn(core % "test->test;compile->compile")
+
+lazy val sqsDistroless = project
+  .in(file("distroless/sqs"))
+  .settings(sqsSettings ++ dockerSettingsDistroless)
+  .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
+  .dependsOn(core % "test->test;compile->compile")
+
+lazy val pubsubSettings = 
+  allSettings ++ buildInfoSettings ++ Seq(
+    moduleName := "snowplow-stream-collector-google-pubsub",
+    Docker / packageName := "scala-stream-collector-pubsub",
+    libraryDependencies ++= Seq(Dependencies.Libraries.pubsub)
+  )
 
 lazy val pubsub = project
-  .settings(moduleName := "snowplow-stream-collector-google-pubsub")
-  .settings(allSettings)
-  .settings(Docker / packageName := "scala-stream-collector-pubsub")
-  .settings(libraryDependencies ++= Seq(Dependencies.Libraries.pubsub))
-  .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
-  .settings(buildInfoSettings)
+  .settings(pubsubSettings)
+  .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
   .dependsOn(core % "test->test;compile->compile")
+
+lazy val pubsubDistroless = project
+  .in(file("distroless/pubsub"))
+  .settings(pubsubSettings ++ dockerSettingsDistroless)
+  .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
+  .dependsOn(core % "test->test;compile->compile")
+
+lazy val kafkaSettings = 
+  allSettings ++ buildInfoSettings ++ Seq(
+    moduleName := "snowplow-stream-collector-kafka",
+    Docker / packageName := "scala-stream-collector-kafka",
+    libraryDependencies ++= Seq(Dependencies.Libraries.kafkaClients)
+  )
 
 lazy val kafka = project
-  .settings(moduleName := "snowplow-stream-collector-kafka")
-  .settings(allSettings)
-  .settings(Docker / packageName := "scala-stream-collector-kafka")
-  .settings(libraryDependencies ++= Seq(Dependencies.Libraries.kafkaClients))
-  .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
-  .settings(buildInfoSettings)
+  .settings(kafkaSettings)
+  .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
   .dependsOn(core % "test->test;compile->compile")
 
-lazy val nsq = project
-  .settings(moduleName := "snowplow-stream-collector-nsq")
-  .settings(allSettings)
-  .settings(Docker / packageName := "scala-stream-collector-nsq")
-  .settings(
+lazy val kafkaDistroless = project
+  .in(file("distroless/kafka"))
+  .settings(kafkaSettings ++ dockerSettingsDistroless)
+  .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
+  .dependsOn(core % "test->test;compile->compile")
+
+lazy val nsqSettings = 
+  allSettings ++ buildInfoSettings ++ Seq(
+    moduleName := "snowplow-stream-collector-nsq",
+    Docker / packageName := "scala-stream-collector-nsq",
     libraryDependencies ++= Seq(
       Dependencies.Libraries.nsqClient,
       Dependencies.Libraries.jackson,
       Dependencies.Libraries.log4j
     )
   )
-  .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
-  .settings(buildInfoSettings)
+
+lazy val nsq = project
+  .settings(nsqSettings)
+  .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
   .dependsOn(core % "test->test;compile->compile")
 
+lazy val nsqDistroless = project
+  .in(file("distroless/nsq"))
+  .settings(nsqSettings ++ dockerSettingsDistroless)
+  .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
+  .dependsOn(core % "test->test;compile->compile")
+
+lazy val stdoutSettings = 
+  allSettings ++ buildInfoSettings ++ Seq(
+    moduleName := "snowplow-stream-collector-stdout",
+    Docker / packageName := "scala-stream-collector-stdout"
+  )
+
 lazy val stdout = project
-  .settings(moduleName := "snowplow-stream-collector-stdout")
-  .settings(allSettings)
-  .settings(Docker / packageName := "scala-stream-collector-stdout")
-  .enablePlugins(JavaAppPackaging, DockerPlugin, BuildInfoPlugin)
-  .settings(buildInfoSettings)
+  .settings(stdoutSettings)
+  .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
+  .dependsOn(core % "test->test;compile->compile")
+
+lazy val stdoutDistroless = project
+  .in(file("distroless/stdout"))
+  .settings(stdoutSettings ++ dockerSettingsDistroless)
+  .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
   .dependsOn(core % "test->test;compile->compile")
