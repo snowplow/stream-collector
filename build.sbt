@@ -65,7 +65,7 @@ lazy val buildSettings = Seq(
 
 lazy val dockerSettings = Seq(
   Docker / maintainer := "Snowplow Analytics Ltd. <support@snowplowanalytics.com>",
-  dockerBaseImage := "adoptopenjdk:11-jre-hotspot-focal",
+  dockerBaseImage := "eclipse-temurin:11-jre-focal",
   Docker / daemonUser := "daemon",
   dockerRepository := Some("snowplow"),
   Docker / daemonUserUid := None,
