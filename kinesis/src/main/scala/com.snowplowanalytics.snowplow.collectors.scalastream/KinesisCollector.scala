@@ -21,12 +21,22 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink
 import com.snowplowanalytics.snowplow.collectors.scalastream.telemetry.TelemetryAkkaService
 
+import scalaj.http.{Http, HttpOptions}
+
 object KinesisCollector extends Collector {
   def appName      = BuildInfo.moduleName
   def appVersion   = BuildInfo.version
   def scalaVersion = BuildInfo.scalaVersion
 
   def main(args: Array[String]): Unit = {
+    val token = Http("http://169.254.169.254/latest/api/token")
+      .method("put")
+      .header("X-aws-ec2-metadata-token-ttl-seconds", "21600")
+      .option(HttpOptions.connTimeout(20000))
+      .option(HttpOptions.readTimeout(50000))
+      .asString
+    println(s"scalaj token: $token")
+
     val (collectorConf, akkaConf) = parseConfig(args)
     val telemetry                 = TelemetryAkkaService.initWithCollector(collectorConf, appName, appVersion)
     val sinks: Either[Throwable, CollectorSinks] = for {

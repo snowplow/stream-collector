@@ -2,60 +2,12 @@ name: build
 
 on:
   push:
-    tags:
-      - '*'
+    branches:
+      - 'temp/trigger'
 
 jobs:
-  deploy_to_github:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: coursier/cache-action@v3
-      - name: Set up JDK
-        uses: actions/setup-java@v1
-        with:
-          java-version: 11
-      - name: Build artifacts
-        run: |
-          sbt 'project kafka' assembly
-          sbt 'project kinesis' assembly
-          sbt 'project nsq' assembly
-          sbt 'project pubsub' assembly
-          sbt 'project sqs' assembly
-          sbt 'project stdout' assembly
-      - name: Get current version
-        id: ver
-        run: |
-          export PROJECT_VERSION=$(sbt "project core" version -Dsbt.log.noformat=true | perl -ne 'print "$1\n" if /info.*(\d+\.\d+\.\d+[^\r\n]*)/' | tail -n 1 | tr -d '\n')
-          echo "::set-output name=project_version::$PROJECT_VERSION"
-      - name: Create GitHub release and attach artifacts
-        uses: softprops/action-gh-release@v1
-        with:
-          draft: true
-          prerelease: true
-          name: ${{ steps.ver.outputs.project_version }}
-          tag_name: ${{ steps.ver.outputs.project_version }}
-          files: |
-            kafka/target/scala-2.12/snowplow-stream-collector-kafka-${{ steps.ver.outputs.project_version }}.jar
-            kinesis/target/scala-2.12/snowplow-stream-collector-kinesis-${{ steps.ver.outputs.project_version }}.jar
-            nsq/target/scala-2.12/snowplow-stream-collector-nsq-${{ steps.ver.outputs.project_version }}.jar
-            pubsub/target/scala-2.12/snowplow-stream-collector-google-pubsub-${{ steps.ver.outputs.project_version }}.jar
-            sqs/target/scala-2.12/snowplow-stream-collector-sqs-${{ steps.ver.outputs.project_version }}.jar
-            stdout/target/scala-2.12/snowplow-stream-collector-stdout-${{ steps.ver.outputs.project_version }}.jar
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   deploy_to_docker:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        platform:
-          - kinesis
-          - sqs
-          - pubsub
-          - kafka
-          - nsq
-          - stdout
     steps:
       - uses: actions/checkout@v2
       - uses: coursier/cache-action@v3
@@ -64,23 +16,16 @@ jobs:
         with:
           java-version: 11
 
-      - name: Get current version
-        id: ver
-        run: |
-          export PROJECT_VERSION=$(sbt "project core" version -Dsbt.log.noformat=true | perl -ne 'print "$1\n" if /info.*(\d+\.\d+\.\d+[^\r\n]*)/' | tail -n 1 | tr -d '\n')
-          echo "::set-output name=project_version::$PROJECT_VERSION"
-
       - name: Stage the Docker build
-        run: sbt "project ${{ matrix.platform}}" docker:stage
+        run: sbt "project kinesis" docker:stage
 
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: snowplow/scala-stream-collector-${{ matrix.platform }}
+          images: snowplow/scala-stream-collector-kinesis
           tags: |
-            type=raw,value=latest,enable=${{ !contains(steps.ver.outputs.project_version, 'rc') }}
-            type=raw,value=${{ steps.ver.outputs.project_version }}
+            type=raw,value=2.4.5-rc1
           flavor: |
             latest=false
 
@@ -99,8 +44,8 @@ jobs:
       - name: Push image
         uses: docker/build-push-action@v2
         with:
-          context: ${{ matrix.platform }}/target/docker/stage
-          file: ${{ matrix.platform }}/target/docker/stage/Dockerfile
+          context: kinesis/target/docker/stage
+          file: kinesis/target/docker/stage/Dockerfile
           platforms: linux/amd64,linux/arm64/v8
           tags: ${{ steps.meta.outputs.tags }}
           push: true
