@@ -1,3 +1,12 @@
+Release 2.6.0 (2022-04-22)
+--------------------------
+Replace all metrics implementations with statsd (#223)
+Enable AWS MSK IAM Authentication (#232)
+Remove warning about missing config option (#222)
+Inspect X-Forwarded-Proto for http -> https redirects (#221)
+Change docker base image to eclipse-temurin:11-jre-focal (#228)
+Publish distroless docker image (#229)
+
 Release 2.5.0 (2022-01-31)
 --------------------------
 Use shorter app name (#217)
