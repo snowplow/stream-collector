@@ -34,7 +34,7 @@ object Dependencies {
     val log4j        = "2.17.0" // CVE-2021-44228
     val config       = "1.4.1"
     val cbor         = "2.11.4" // See snowplow/snowplow/issues/4266
-    val jackson      = "2.10.5.1" // force this version to mitigate security vulnerabilities
+    val jackson      = "2.12.7" // force this version to mitigate security vulnerabilities
     val thrift       = "0.15.0" // force this version to mitigate security vulnerabilities
     val jnrUnixsock  = "0.38.17" // force this version to mitigate security vulnerabilities
     // Scala
