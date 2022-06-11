@@ -185,11 +185,13 @@ class KinesisSink private (
               s"Successfully wrote ${batch.size - failurePairs.size} out of ${batch.size} records to Kinesis stream $streamName."
             )
             if (failurePairs.nonEmpty) {
-              failurePairs.foreach(f =>
-                log.error(
-                  s"Failed writing record to Kinesis stream $streamName, with error code [${f._2.getErrorCode}] and message [${f._2.getErrorMessage}]."
-                )
-              )
+              failurePairs.groupBy(_._2.getErrorCode).foreach {
+                case (errorCode, items) =>
+                  val exampleMsg = items.map(_._2.getErrorMessage).find(_.nonEmpty).getOrElse("")
+                  log.error(
+                    s"Failed writing ${items.size} records to Kinesis stream $streamName, with error code [$errorCode] and example message [$exampleMsg]."
+                  )
+              }
               val failures = failurePairs.map(_._1)
               val errorMessage = {
                 if (buffer.isEmpty || retriesLeft > 1)
@@ -224,10 +226,12 @@ class KinesisSink private (
               s"Successfully wrote ${batch.size - s.size} out of ${batch.size} messages to SQS queue ${sqs.sqsBufferName}."
             )
             if (s.nonEmpty) {
-              s.foreach { f =>
-                log.error(
-                  s"Failed writing message to SQS queue ${sqs.sqsBufferName}, with error code [${f._2.code}] and message [${f._2.message}]."
-                )
+              s.groupBy(_._2.code).foreach {
+                case (errorCode, items) =>
+                  val exampleMsg = items.map(_._2.message).find(_.nonEmpty).getOrElse("")
+                  log.error(
+                    s"Failed writing ${items.size} records to SQS queue ${sqs.sqsBufferName}, with error code [$errorCode] and example message [$exampleMsg]."
+                  )
               }
               val errorMessage = {
                 if (retriesLeft > 1)
