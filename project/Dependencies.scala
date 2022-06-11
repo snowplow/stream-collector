@@ -38,6 +38,7 @@ object Dependencies {
     val thrift       = "0.15.0" // force this version to mitigate security vulnerabilities
     val commonsCodec = "1.13" // force this version to mitigate security vulnerabilities
     val grpcCore     = "1.31.0" // force this version to mitigate security vulnerabilities
+    val jnrUnixsock  = "0.38.17" // force this version to mitigate security vulnerabilities
     // Scala
     val collectorPayload = "0.0.0"
     val tracker          = "1.0.0"
@@ -69,6 +70,7 @@ object Dependencies {
     val log4j          = "org.apache.logging.log4j"         % "log4j-core"              % V.log4j
     val config         = "com.typesafe"                     % "config"                  % V.config
     val cbor           = "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % V.cbor
+    val jnrUnixsocket  = "com.github.jnr"                   % "jnr-unixsocket"          % V.jnrUnixsock
 
     // Scala
     val collectorPayload = "com.snowplowanalytics" % "collector-payload-1"                % V.collectorPayload
