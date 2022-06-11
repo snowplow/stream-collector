@@ -25,7 +25,7 @@ object Dependencies {
   object V {
     // Java
     val awsSdk       = "1.12.128"
-    val pubsub       = "1.115.0"
+    val pubsub       = "1.119.1"
     val kafka        = "2.2.1"
     val mskAuth      = "1.1.1"
     val nsqClient    = "1.3.0"
@@ -36,8 +36,6 @@ object Dependencies {
     val cbor         = "2.11.4" // See snowplow/snowplow/issues/4266
     val jackson      = "2.10.5.1" // force this version to mitigate security vulnerabilities
     val thrift       = "0.15.0" // force this version to mitigate security vulnerabilities
-    val commonsCodec = "1.13" // force this version to mitigate security vulnerabilities
-    val grpcCore     = "1.31.0" // force this version to mitigate security vulnerabilities
     val jnrUnixsock  = "0.38.17" // force this version to mitigate security vulnerabilities
     // Scala
     val collectorPayload = "0.0.0"
