@@ -1,3 +1,14 @@
+Release 2.6.1 (2022-06-13)
+--------------------------
+Reduce number of error messages in kinesis collector logs (#242)
+Bump log4j to 2.17.2 (#241)
+Remove sbt-dependency-graph from plugins.sbt (#235)
+Bump jackson-databind to 2.12.7 (#240)
+Bump aws-java-sdk to 1.12.238 (#239)
+Bump google-cloud-pubsub to 1.119.1 (#238)
+Bump jnr-unixsocket to 0.38.17 (#237)
+Bump akka-http-metrics-datadog to 1.7.1 (#236)
+
 Release 2.6.0 (2022-04-22)
 --------------------------
 Replace all metrics implementations with statsd (#223)
