@@ -1,3 +1,7 @@
+Release 2.6.2 (2022-07-07)
+--------------------------
+Ensure docker image has openssl version >= 1.1.1n-0+deb11u3 (#244)
+
 Release 2.6.1 (2022-06-13)
 --------------------------
 Reduce number of error messages in kinesis collector logs (#242)
