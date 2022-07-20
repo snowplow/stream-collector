@@ -100,7 +100,8 @@ abstract class ConfigSpec extends Specification {
             timeLimit   = 5000
           ),
       sink = sinkConfigRefFactory(app)
-    )
+    ),
+    experimental = ExperimentalConfig(WarmupConfig(false, 2000, 2000))
   )
 
   def sinkConfigRefFactory(app: String): SinkConfig = app match {

@@ -169,6 +169,17 @@ package model {
     redirect: Boolean = false,
     port: Int         = 443
   )
+
+  final case class WarmupConfig(
+    enable: Boolean,
+    numRequests: Int,
+    maxConnections: Int
+  )
+
+  final case class ExperimentalConfig(
+    warmup: WarmupConfig
+  )
+
   final case class CollectorConfig(
     interface: String,
     port: Int,
@@ -190,7 +201,8 @@ package model {
     enableStartupChecks: Boolean,
     terminationDeadline: FiniteDuration,
     preTerminationPeriod: FiniteDuration,
-    preTerminationUnhealthy: Boolean
+    preTerminationUnhealthy: Boolean,
+    experimental: ExperimentalConfig
   ) {
     val cookieConfig = if (cookie.enabled) Some(cookie) else None
     val doNotTrackHttpCookie =

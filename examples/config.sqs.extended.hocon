@@ -257,6 +257,17 @@ collector {
 
   # The akka server's deadline for closing connections during graceful shutdown
   terminationDeadline = 10 seconds
+
+  experimental {
+    # Enable an experimental feature to send some "warm-up" requests to the collector's own /health endpoint during startup.
+    # We have found from experiment this can cut down the number of 502s returned from a load balancer in front of the collector in Kubernetes deployments.
+    # More details in https://github.com/snowplow/stream-collector/issues/249
+    warmup {
+      enable = false
+      numRequests = 2000
+      maxConnections = 2000
+    }
+  }
 }
 
 # Akka has a variety of possible configuration options defined at

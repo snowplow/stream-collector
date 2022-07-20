@@ -165,7 +165,9 @@ trait Collector {
       endpoint(xForwardedProto(collectorRoute.collectorRoute), collectorConf.ssl.port, true, metricRegistry)
 
     def unsecureEndpoint(routes: Route, metricRegistry: Option[HttpMetricsRegistry]): Future[Unit] =
-      endpoint(xForwardedProto(routes), collectorConf.port, false, metricRegistry)
+      endpoint(xForwardedProto(routes), collectorConf.port, false, metricRegistry).flatMap { _ =>
+        Warmup.run(collectorConf.interface, collectorConf.port, collectorConf.experimental.warmup)
+      }
 
     def endpoint(
       routes: Route,
