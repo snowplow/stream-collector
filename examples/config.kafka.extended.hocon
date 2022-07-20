@@ -249,6 +249,14 @@ collector {
 
   # The akka server's deadline for closing connections during graceful shutdown
   terminationDeadline = 10 seconds
+
+  experimental {
+    warmup {
+      enable = false
+      numRequests = 2000
+      maxConnections = 2000
+    }
+  }
 }
 
 # Akka has a variety of possible configuration options defined at
