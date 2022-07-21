@@ -1,3 +1,7 @@
+Release 2.6.3 (2022-07-21)
+--------------------------
+Ensure docker image has latest libfreetype6 version (#247)
+
 Release 2.6.2 (2022-07-07)
 --------------------------
 Ensure docker image has openssl version >= 1.1.1n-0+deb11u3 (#244)
