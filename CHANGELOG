@@ -1,3 +1,7 @@
+Release 2.7.0 (2022-07-27)
+--------------------------
+Send warmup requests to self on startup (#249)
+
 Release 2.6.3 (2022-07-21)
 --------------------------
 Ensure docker image has latest libfreetype6 version (#247)
