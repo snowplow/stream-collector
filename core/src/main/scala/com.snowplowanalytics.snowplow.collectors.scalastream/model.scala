@@ -98,6 +98,7 @@ package model {
     maxRpcTimeout: Long,
     rpcTimeoutMultiplier: Double
   )
+  final case class RabbitMQBackoffPolicyConfig(minBackoff: Long, maxBackoff: Long, multiplier: Double)
   sealed trait SinkConfig
   final case class AWSConfig(accessKey: String, secretKey: String)
   final case class Kinesis(
@@ -128,6 +129,17 @@ package model {
   ) extends SinkConfig
   final case class Nsq(host: String, port: Int) extends SinkConfig
   case object Stdout extends SinkConfig
+  final case class Rabbitmq(
+    username: String,
+    password: String,
+    virtualHost: String,
+    host: String,
+    port: Int,
+    backoffPolicy: RabbitMQBackoffPolicyConfig,
+    routingKeyGood: String,
+    routingKeyBad: String,
+    threadPoolSize: Option[Int]
+  ) extends SinkConfig
   final case class BufferConfig(byteLimit: Long, recordLimit: Long, timeLimit: Long)
   final case class StreamsConfig(
     good: String,

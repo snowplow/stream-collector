@@ -33,6 +33,7 @@ object Dependencies {
     val slf4j        = "1.7.32"
     val log4j        = "2.17.2" // CVE-2021-44228
     val config       = "1.4.1"
+    val rabbitMQ     = "5.15.0"
     val cbor         = "2.11.4" // See snowplow/snowplow/issues/4266
     val jackson      = "2.12.7" // force this version to mitigate security vulnerabilities
     val thrift       = "0.15.0" // force this version to mitigate security vulnerabilities
@@ -69,6 +70,7 @@ object Dependencies {
     val config         = "com.typesafe"                     % "config"                  % V.config
     val cbor           = "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % V.cbor
     val jnrUnixsocket  = "com.github.jnr"                   % "jnr-unixsocket"          % V.jnrUnixsock
+    val rabbitMQ       = "com.rabbitmq"                     % "amqp-client"             % V.rabbitMQ
 
     // Scala
     val collectorPayload = "com.snowplowanalytics" % "collector-payload-1"                % V.collectorPayload

@@ -104,7 +104,7 @@ lazy val allSettings = buildSettings ++
 lazy val root = project
   .in(file("."))
   .settings(buildSettings ++ dynVerSettings)
-  .aggregate(core, kinesis, pubsub, kafka, nsq, stdout, sqs)
+  .aggregate(core, kinesis, pubsub, kafka, nsq, stdout, sqs, rabbitmq)
 
 lazy val core = project
   .settings(moduleName := "snowplow-stream-collector-core")
@@ -237,3 +237,22 @@ lazy val stdoutDistroless = project
   .settings(stdoutSettings ++ dockerSettingsDistroless)
   .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
   .dependsOn(stdout % "test->test;compile->compile")
+
+lazy val rabbitmqSettings =
+  allSettings ++ buildInfoSettings ++ Seq(
+    moduleName := "snowplow-stream-collector-rabbitmq",
+    Docker / packageName := "scala-stream-collector-rabbitmq-experimental",
+    libraryDependencies ++= Seq(Dependencies.Libraries.rabbitMQ)
+  )
+
+lazy val rabbitmq = project
+  .settings(rabbitmqSettings ++ dockerSettings)
+  .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
+  .dependsOn(core % "test->test;compile->compile")
+
+lazy val rabbitmqDistroless = project
+  .in(file("distroless/rabbitmq"))
+  .settings(sourceDirectory := (rabbitmq / sourceDirectory).value)
+  .settings(rabbitmqSettings ++ dockerSettingsDistroless)
+  .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
+  .dependsOn(rabbitmq % "test->test;compile->compile")
