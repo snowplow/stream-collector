@@ -23,6 +23,7 @@ jobs:
           sbt 'project pubsub' assembly
           sbt 'project sqs' assembly
           sbt 'project stdout' assembly
+          sbt 'project rabbitmq' assembly
       - name: Get current version
         id: ver
         run: |
@@ -42,6 +43,7 @@ jobs:
             pubsub/target/scala-2.12/snowplow-stream-collector-google-pubsub-${{ steps.ver.outputs.project_version }}.jar
             sqs/target/scala-2.12/snowplow-stream-collector-sqs-${{ steps.ver.outputs.project_version }}.jar
             stdout/target/scala-2.12/snowplow-stream-collector-stdout-${{ steps.ver.outputs.project_version }}.jar
+            rabbitmq/target/scala-2.12/snowplow-stream-collector-stdout-${{ steps.ver.outputs.project_version }}.jar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -56,6 +58,12 @@ jobs:
           - kafka
           - nsq
           - stdout
+          - rabbitmq
+        include:
+          - suffix: ""
+          - suffix: -experimental
+            platform: rabbitmq
+
     steps:
       - uses: actions/checkout@v2
       - uses: coursier/cache-action@v3
@@ -80,7 +88,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: snowplow/scala-stream-collector-${{ matrix.platform }}
+          images: snowplow/scala-stream-collector-${{ matrix.platform }}${{ matrix.suffix }}
           tags: |
             type=raw,value=latest,enable=${{ !contains(steps.ver.outputs.project_version, 'rc') }}
             type=raw,value=latest-focal,enable=${{ !contains(steps.ver.outputs.project_version, 'rc') }}
@@ -93,7 +101,7 @@ jobs:
         id: distroless-meta
         uses: docker/metadata-action@v3
         with:
-          images: snowplow/scala-stream-collector-${{ matrix.platform }}
+          images: snowplow/scala-stream-collector-${{ matrix.platform }}${{ matrix.suffix }}
           tags: |
             type=raw,value=latest-distroless,enable=${{ !contains(steps.ver.outputs.project_version, 'rc') }}
             type=raw,value=${{ steps.ver.outputs.project_version }}-distroless
