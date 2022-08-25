@@ -3,7 +3,7 @@
 
 integration-up:
 	(cd integration && docker-compose -f ./docker-compose.yml up -d)
-	sleep 5
+	sleep 60
 	echo "waiting for kafka to be ready"
 	docker exec broker cub kafka-ready -b broker:9092 1 120
 	docker exec broker kafka-topics --bootstrap-server broker:9092 --create --topic good && \
