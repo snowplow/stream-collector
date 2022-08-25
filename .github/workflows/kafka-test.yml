@@ -13,7 +13,7 @@ jobs:
         with:
           java-version: 11
       - name: Publish Docker image
-        run: sbt 'project stdout; set Docker / version := "0.0.0"' docker:publishLocal
+        run: sbt 'project kafka; set Docker / version := "0.0.0"' docker:publishLocal
       - name: Run Docker image
         run: docker run -d -v "$PWD"/.github/workflows/kafka-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-kafka:0.0.0 --config /snowplow/config/config.hocon
       - name: Allow time for collector to start
