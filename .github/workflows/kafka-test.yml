@@ -1,0 +1,64 @@
+name: Integration tests - Kafka
+
+on: push
+
+jobs:
+  # tests that good messages go to the good topic in Kafka
+  kafka_success_good_topic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: coursier/cache-action@v3
+      - name: Set up JDK
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Publish Docker image
+        run: sbt 'project kafka; set Docker / version := "0.0.0"' docker:publishLocal
+      - name: Create integration resources
+        run: |
+          (cd integration && docker-compose -f ./docker-compose.yml up -d)
+          sleep 10
+      - name: Run collector
+        run: |
+          docker run --network="integration_net1" --name collector -d -v "$PWD"/.github/workflows/kafka-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-kafka:0.0.0 --config /snowplow/config/config_good.hocon
+          sleep 15
+      - name: Send good events
+        run: |
+          while read p; do
+            curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2  -d "$p" 2>&1 | grep -q 'Set-Cookie'
+          done <"$PWD"/.github/workflows/integration_tests/data.txt
+        shell: bash
+      - name: Check number of events in the good topic
+        run: docker exec -w /bin broker kafka-run-class.sh kafka.tools.GetOffsetShell --broker-list 0.0.0.0:9092 --topic good | grep 'good:0:55'
+      - name: Check no events got to the bad topic
+        run: docker exec -w /bin broker kafka-run-class.sh kafka.tools.GetOffsetShell --broker-list 0.0.0.0:9092 --topic bad | grep 'bad:0:0'
+      - name: Stop Docker containers
+        run: docker stop $(docker ps -aq)
+
+  # tests that oversized messages go to the bad topic in Kafka
+  kafka_success_bad_topic_oversized:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: coursier/cache-action@v3
+      - name: Set up JDK
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Publish Docker image
+        run: sbt 'project kafka; set Docker / version := "0.0.0"' docker:publishLocal
+      - name: Create integration resources
+        run: |
+          (cd integration && docker-compose -f ./docker-compose.yml up -d)
+          sleep 10
+      - name: Run collector
+        run: |
+          docker run --network="integration_net1" --name collector -d -v "$PWD"/.github/workflows/kafka-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-kafka:0.0.0 --config /snowplow/config/config_good.hocon
+          sleep 15
+      - name: Send oversized event to collector
+        run: curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2  -d @"$PWD"/.github/workflows/integration_tests/kafka/1mb_string 2>&1 | grep -q 'Set-Cookie'
+      - name: Consume bad event from Kafka
+        run: timeout 5 docker exec -w /bin broker kafka-console-consumer.sh --topic=bad --from-beginning --bootstrap-server 0.0.0.0:9092 | grep -q "oversized"
+      - name: Stop Docker containers
+        run: docker stop $(docker ps -aq)

@@ -1,7 +1,8 @@
 project/target
 project/project
 target
-
+.idea
 src/main/resources/application.conf
 
 .bsp
+.DS_Store
