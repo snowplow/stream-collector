@@ -29,7 +29,7 @@ jobs:
       - name: Test non-anonymous tracking
         id: non-anonymous
         run: |
-          curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2  -d '{}' 2>&1
+          curl -X POST -i http://localhost:12345/com.snowplowanalytics.snowplow/tp2  -d '{}' 2>&1
       - name: Integration get output
         run: docker exec broker kafka-consumer --topic=good --from-beginning --bootstrap-server broker:9092
       - name: Report outcome
