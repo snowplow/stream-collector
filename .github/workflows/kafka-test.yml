@@ -19,7 +19,7 @@ jobs:
       - name: Allow time for collector to start
         run: sleep 30
       - name: Get collector docker container logs
-        run: docker logs scala-stream-collector-stdout
+        run: docker logs snowplow/scala-stream-collector-kafka
       - name: Setup integration resources
         run: | 
           (cd integration && docker-compose -f ./docker-compose.yml up -d) 
