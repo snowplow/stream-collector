@@ -18,6 +18,8 @@ jobs:
         run: docker run -d -v "$PWD"/.github/workflows/kafka-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-kafka:0.0.0 --config /snowplow/config/config.hocon
       - name: Allow time for collector to start
         run: sleep 30
+      - name: Get collector docker container logs
+        run: docker logs scala-stream-collector-stdout
       - name: Setup integration resources
         run: | 
           (cd integration && docker-compose -f ./docker-compose.yml up -d) 

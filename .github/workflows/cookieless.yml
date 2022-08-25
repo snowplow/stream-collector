@@ -18,8 +18,7 @@ jobs:
         run: docker run -d -v "$PWD"/.github/workflows/ssc-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-stdout:0.0.0 --config /snowplow/config/config.hocon
       - name: Allow time for collector to start
         run: sleep 30
-      - name: Get collector docker container logs
-      - name: docker logs scala-stream-collector-stdout
+      - name: Test non-anonymous tracking
         id: non-anonymous
         run: |
           output=$(curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2  -d '{}' 2>&1 | grep -q 'Set-Cookie')
