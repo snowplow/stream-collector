@@ -10,6 +10,7 @@ services:
 
   broker:
     image: confluentinc/cp-kafka:7.0.1
+    platform: linux/amd64
     container_name: broker
     ports:
       - "9092:9092"
