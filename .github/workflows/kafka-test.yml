@@ -19,7 +19,13 @@ jobs:
       - name: Allow time for collector to start
         run: sleep 30
       - name: Setup integration resources
-        run: make integration-up
+        run: | 
+          (cd integration && docker-compose -f ./docker-compose.yml up -d) 
+          sleep 20
+          echo "waiting for kafka to be ready"
+          docker exec broker cub kafka-ready -b broker:9092 1 120
+          docker exec broker kafka-topics --bootstrap-server broker:9092 --create --topic good && \
+          docker exec broker kafka-topics --bootstrap-server broker:9092 --create --topic bad
       - name: Test non-anonymous tracking
         id: non-anonymous
         run: |
