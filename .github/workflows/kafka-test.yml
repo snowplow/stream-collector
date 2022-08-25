@@ -33,7 +33,7 @@ jobs:
           output=$(curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2 -H 'SP-Anonymous: *' -d '{}' 2>&1 | grep -q 'Set-Cookie')
           echo "::set-output name=exit_code::$?"
       - name: Integration get output
-          run: make integration-success-output
+        run: make integration-success-output
       - name: Report outcome
         if: ${{ steps.non-anonymous.outputs.exit_code == 0 && steps.anonymous.outputs.exit_code == 1 }}
         run: echo "All tests successful!"
