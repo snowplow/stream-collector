@@ -20,8 +20,8 @@ jobs:
       - name: Setup integration resources
         run: | 
           (cd integration && docker-compose -f ./docker-compose.yml up -d) 
-          sleep 20
-          docker-compose logs broker
+          sleep 10
+          (cd integration && docker-compose logs broker) 
           echo "waiting for kafka to be ready"
           docker exec broker cub kafka-ready -b broker:9092 1 120
           docker exec broker kafka-topics --bootstrap-server broker:9092 --create --topic good && \
