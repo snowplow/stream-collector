@@ -5,3 +5,5 @@ target
 src/main/resources/application.conf
 
 .bsp
+
+.localstack/
