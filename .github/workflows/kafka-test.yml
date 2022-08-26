@@ -26,7 +26,7 @@ jobs:
       - name: Network ls
         run: docker network ls
       - name: Run Docker image
-        run: docker run --network="net1" --name collector -d -v "$PWD"/.github/workflows/kafka-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-kafka:0.0.0 --config /snowplow/config/config.hocon
+        run: docker run --network="integration_net1" --name collector -d -v "$PWD"/.github/workflows/kafka-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-kafka:0.0.0 --config /snowplow/config/config.hocon
       - name: Allow time for collector to start
         run: sleep 30
       - name: Get collector docker container logs
