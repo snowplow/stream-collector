@@ -14,10 +14,6 @@ jobs:
           java-version: 11
       - name: Publish Docker image
         run: sbt 'project kafka; set Docker / version := "0.0.0"' docker:publishLocal
-      - name: Run Docker image
-        run: docker run --name collector -d -v "$PWD"/.github/workflows/kafka-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-kafka:0.0.0 --config /snowplow/config/config.hocon
-      - name: Allow time for collector to start
-        run: sleep 30
       - name: Setup integration resources
         run: | 
           (cd integration && docker-compose -f ./docker-compose.yml up -d) 
@@ -27,8 +23,10 @@ jobs:
           docker exec broker cub kafka-ready -b broker:9092 1 120
           docker exec broker kafka-topics --bootstrap-server broker:9092 --create --topic good && \
           docker exec broker kafka-topics --bootstrap-server broker:9092 --create --topic bad
-      - name: Get collector docker container logs
-        run: docker logs collector
+      - name: Run Docker image
+        run: docker run --name collector -d -v "$PWD"/.github/workflows/kafka-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-kafka:0.0.0 --config /snowplow/config/config.hocon
+      - name: Allow time for collector to start
+        run: sleep 30
       - name: Test non-anonymous tracking
         id: non-anonymous
         run: |
