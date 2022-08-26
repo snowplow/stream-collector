@@ -1,0 +1,37 @@
+name: Test cookieless tracking
+
+on: push
+
+jobs:
+  run_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: coursier/cache-action@v3
+      - name: Set up JDK
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Publish Docker image
+        run: sbt 'project stdout; set Docker / version := "0.0.0"' docker:publishLocal
+      - name: Run Docker image
+        run: docker run -d -v "$PWD"/.github/workflows/ssc-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-stdout:0.0.0 --config /snowplow/config/config.hocon
+      - name: Allow time for collector to start
+        run: sleep 30
+      - name: Test non-anonymous tracking
+        id: non-anonymous
+        run: |
+          output=$(curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2  -d '{}' 2>&1 | grep -q 'Set-Cookie')
+          echo "::set-output name=exit_code::$?"
+      - name: Test anonymous tracking
+        id: anonymous
+        if: ${{ steps.non-anonymous.outputs.exit_code == 0 }}
+        run: |
+          set +e
+          output=$(curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2 -H 'SP-Anonymous: *' -d '{}' 2>&1 | grep -q 'Set-Cookie')
+          echo "::set-output name=exit_code::$?"
+      - name: Report outcome
+        if: ${{ steps.non-anonymous.outputs.exit_code == 0 && steps.anonymous.outputs.exit_code == 1 }}
+        run: echo "All tests successful!"
+      - name: Stop Docker container
+        run: docker stop $(docker ps -aq)
