@@ -29,6 +29,8 @@ jobs:
         run: sleep 30
       - name: Get collector docker container logs
         run: docker logs collector
+      - name: PS
+        run: docker ps
       - name: Test non-anonymous tracking
         id: non-anonymous
         run: |
