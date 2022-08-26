@@ -11,11 +11,11 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v1
         with:
-          java-version: 18
+          java-version: 11
       - name: Publish Docker image
         run: sbt 'project kafka; set Docker / version := "0.0.0"' docker:publishLocal
       - name: Run Docker image
-        run: docker run -d -v "$PWD"/.github/workflows/kafka-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-kafka:0.0.0 --config /snowplow/config/config.hocon
+        run: docker run --name collector -d -v "$PWD"/.github/workflows/kafka-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-kafka:0.0.0 --config /snowplow/config/config.hocon
       - name: Allow time for collector to start
         run: sleep 30
       - name: Setup integration resources
@@ -28,11 +28,11 @@ jobs:
           docker exec broker kafka-topics --bootstrap-server broker:9092 --create --topic good && \
           docker exec broker kafka-topics --bootstrap-server broker:9092 --create --topic bad
       - name: Get collector docker container logs
-        run: docker ps
+        run: docker logs collector
       - name: Test non-anonymous tracking
         id: non-anonymous
         run: |
-          output=$(curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2  -d '{}' 2>&1 | grep -q 'Set-Cookie')
+          output=$(curl -X POST -i http://collector:12345/com.snowplowanalytics.snowplow/tp2  -d '{}' 2>&1 | grep -q 'Set-Cookie')
           echo "::set-output name=exit_code::$?"
       - name: Integration get output
         run: docker exec broker kafka-consumer --topic=good --from-beginning --bootstrap-server broker:9092
