@@ -41,8 +41,13 @@ jobs:
       - name: Wait for event in kafka
         run: sleep 10
       - name: Consume
+        id: consume
         run: |
-          timeout 10 docker exec -w /bin broker "kafka-console-consumer" --topic=good --from-beginning --bootstrap-server broker:9092 | grep "test"
+          output=${timeout 10 docker exec -w /bin broker "kafka-console-consumer" --topic=good --from-beginning --bootstrap-server broker:9092}
+          echo "::set-output name=exit_code::$?"
+      - name: Report outcome
+        if: ${{ steps.consume.outputs.exit_code == 1 }}
+        run: echo "All tests successful!"
       - name: Report outcome
         if: ${{ steps.non-anonymous.outputs.exit_code == 0 && steps.anonymous.outputs.exit_code == 1 }}
         run: echo "All tests successful!"
