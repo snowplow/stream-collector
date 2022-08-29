@@ -35,7 +35,8 @@ jobs:
         run: docker ps
       - name: Test non-anonymous tracking
         id: non-anonymous
-        run: |
+        run: &
+          timeout 10 docker exec -w /bin broker "kafka-console-consumer" --topic=good --from-beginning --bootstrap-server broker:9092
           output=$(curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2  -d '{}' 2>&1 | grep -q 'Set-Cookie')
           echo "::set-output name=exit_code::$?"
       - name: docker ls
