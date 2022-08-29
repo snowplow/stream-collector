@@ -3,6 +3,37 @@ name: Integration tests - Kafka
 on: push
 
 jobs:
+  run_kafka:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: coursier/cache-action@v3
+      - name: Set up JDK
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Setup integration resources
+        run: |
+          (cd integration && docker-compose -f ./docker-compose.yml up -d) 
+          sleep 10
+          (cd integration && docker-compose logs broker) 
+          echo "waiting for kafka to be ready"
+          docker exec broker cub kafka-ready -b broker:9092 1 120
+          docker exec broker kafka-topics --bootstrap-server broker:9092 --create --topic good && \
+          docker exec broker kafka-topics --bootstrap-server broker:9092 --create --topic bad
+      - name: Network ls
+        run: docker network ls
+       - name: Allow time for collector to start
+        run: sleep 120
+      - name: Get collector docker container logs
+        run: docker logs collector
+      - name: PS
+        run: docker ps
+      - name: Send event
+        run: timeout 30 docker exec -w /bin broker "kafka-console-consumer" --topic=good --from-beginning --bootstrap-server broker:9092
+      - name: Get kafka logs
+        run: docker exec -w /bin broker kafka-dump-log
+
   run_kafka_test:
     runs-on: ubuntu-latest
     steps:
@@ -35,12 +66,9 @@ jobs:
         run: docker ps
       - name: Test non-anonymous tracking
         id: non-anonymous
-        run: &
-          timeout 10 docker exec -w /bin broker "kafka-console-consumer" --topic=good --from-beginning --bootstrap-server broker:9092
+        run: |
           output=$(curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2  -d '{}' 2>&1 | grep -q 'Set-Cookie')
           echo "::set-output name=exit_code::$?"
-      - name: docker ls
-        run: docker exec -w /bin broker ls -l
       - name: Report outcome
         if: ${{ steps.non-anonymous.outputs.exit_code == 0 && steps.anonymous.outputs.exit_code == 1 }}
         run: echo "All tests successful!"
