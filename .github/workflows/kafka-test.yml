@@ -43,7 +43,7 @@ jobs:
       - name: Consume
         id: consume
         run: |
-          output=$(timeout 10 docker exec -w /bin broker "kafka-console-consumer" --topic=good --from-beginning --bootstrap-server broker:9092)
+          output=$(docker exec -w /bin broker "kafka-console-consumer" --topic=bad --from-beginning --bootstrap-server broker:9092)
           echo "::set-output name=exit_code::$?"
       - name: Report outcome
         if: ${{ steps.consume.outputs.exit_code == 1 }}
