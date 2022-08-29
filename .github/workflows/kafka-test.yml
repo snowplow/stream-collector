@@ -23,7 +23,7 @@ jobs:
           docker exec broker kafka-topics --bootstrap-server broker:9092 --create --topic bad
       - name: Network ls
         run: docker network ls
-       - name: Allow time for collector to start
+      - name: Allow time for collector to start
         run: sleep 120
       - name: Get collector docker container logs
         run: docker logs collector
