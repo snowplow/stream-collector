@@ -41,7 +41,7 @@ jobs:
       - name: docker ls
         run: docker exec -w /bin broker ls -l
       - name: Integration get output
-        run: docker exec -w /bin broker "kafka-console-consumer" --topic=good --from-beginning --bootstrap-server broker:9092
+        run: docker exec -w /bin broker "timeout 10 kafka-console-consumer --topic=good --from-beginning --bootstrap-server broker:9092"
       - name: Report outcome
         if: ${{ steps.non-anonymous.outputs.exit_code == 0 && steps.anonymous.outputs.exit_code == 1 }}
         run: echo "All tests successful!"
