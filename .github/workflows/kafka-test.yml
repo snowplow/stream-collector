@@ -31,6 +31,8 @@ jobs:
         run: sleep 30
       - name: Get collector docker container logs
         run: docker logs collector
+      - name: Get broker docker container logs
+          run: docker logs broker
       - name: PS
         run: docker ps
       - name: Test non-anonymous tracking
