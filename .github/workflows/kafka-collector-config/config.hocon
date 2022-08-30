@@ -54,7 +54,7 @@ collector {
     useIpAddressAsPartitionKey = true
 
     sink {
-      brokers = "localhost:9092"
+      brokers = "0.0.0.0:9092"
     }
 
     buffer {
