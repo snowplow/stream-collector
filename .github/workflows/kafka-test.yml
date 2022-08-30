@@ -43,7 +43,7 @@ jobs:
       - name: Consume
         id: consume
         run: |
-          timeout 10 docker exec -w /bin broker "kafka-console-consumer" --topic=bad --from-beginning --bootstrap-server broker:9092 || code=$?; if [[ $code -ne 124 && $code -ne 0 ]]; then exit $code; fi
+          docker exec -w /bin broker "kafka-console-consumer" --topic=bad --from-beginning --bootstrap-server broker:9092 | grep -q "test"
       - name: Report outcome
         if: ${{ steps.consume.outputs.exit_code == 1 }}
         run: echo "All tests successful!"
