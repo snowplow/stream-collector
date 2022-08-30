@@ -41,7 +41,7 @@ jobs:
       - name: Consume
         id: consume
         run: |
-          timeout 30 docker exec -w /bin broker "kafka-console-consumer" --topic=good --from-beginning --bootstrap-server broker:9092 | grep -q "test"
+          timeout 30 docker exec -w /bin broker "kafka-console-consumer" --topic=good --from-beginning --bootstrap-server broker:9092 2>&1 | head
       - name: Report outcome
         if: ${{ steps.consume.outputs.exit_code == 1 }}
         run: echo "All tests successful!"
