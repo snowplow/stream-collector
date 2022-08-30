@@ -14,45 +14,5 @@ jobs:
           java-version: 11
       - name: Publish Docker image
         run: sbt 'project kafka; set Docker / version := "0.0.0"' docker:publishLocal
-      - name: Setup integration resources
-        run: | 
-          (cd integration && docker-compose -f ./docker-compose.yml up -d) 
-          sleep 10
-          (cd integration && docker-compose logs broker) 
-          echo "waiting for kafka to be ready"
-          docker exec broker cub kafka-ready -b broker:9092 1 120
-          docker exec broker kafka-topics --bootstrap-server broker:9092 --create --topic good && \
-          docker exec broker kafka-topics --bootstrap-server broker:9092 --create --topic bad
-      - name: Network ls
-        run: docker network ls
-      - name: Run Docker image
-        run: docker run --network="integration_net1" --name collector -d -v "$PWD"/.github/workflows/kafka-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-kafka:0.0.0 --config /snowplow/config/config.hocon
-      - name: Allow time for collector to start
-        run: sleep 30
-      - name: Get collector docker container logs
-        run: docker logs collector
-      - name: Get broker docker container logs
-        run: docker logs broker
-      - name: PS
-        run: docker ps
-      - name: Test non-anonymous tracking
-        id: non-anonymous
-        run: |
-          output=$(curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2  -d 'test' 2>&1 | grep -q 'Set-Cookie')
-          echo "::set-output name=exit_code::$?"
-      - name: sleep
-        run: sleep 10
-      - name: log
-        run: docker logs collector
-      - name: Consume
-        id: consume
-        run: |
-          timeout 30 docker exec -w /bin broker "kafka-console-consumer" --topic=good --from-beginning --bootstrap-server 0.0.0.0:9092 | grep -q "test"
-      - name: Report outcome
-        if: ${{ steps.consume.outputs.exit_code == 1 }}
-        run: echo "All tests successful!"
-      - name: Report outcome
-        if: ${{ steps.non-anonymous.outputs.exit_code == 0 && steps.anonymous.outputs.exit_code == 1 }}
-        run: echo "All tests successful!"
-      - name: Stop Docker container
-        run: docker stop $(docker ps -aq)
+      - name: Run integration test
+        run: ./integration_tests/kafka/kafka.sh
