@@ -20,6 +20,7 @@ jobs:
           sleep 10
           (cd integration && docker-compose logs broker) 
           echo "waiting for kafka to be ready"
+          docker logs broker
           docker exec broker cub kafka-ready -b broker:9092 1 120
           echo "kafka is ready, proceeding...
           docker exec broker kafka-topics --bootstrap-server broker:9092 --create --topic good && \
