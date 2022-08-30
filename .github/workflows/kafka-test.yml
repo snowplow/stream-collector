@@ -38,12 +38,10 @@ jobs:
         run: |
           output=$(curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2  -d 'test' 2>&1 | grep -q 'Set-Cookie')
           echo "::set-output name=exit_code::$?"
-      - name: Wait for event in kafka
-        run: sleep 10
       - name: Consume
         id: consume
         run: |
-          docker exec -w /bin broker "kafka-console-consumer" --topic=good --from-beginning --bootstrap-server broker:9092 | grep -q "test"
+          timeout 30 docker exec -w /bin broker "kafka-console-consumer" --topic=good --from-beginning --bootstrap-server broker:9092 | grep -q "test"
       - name: Report outcome
         if: ${{ steps.consume.outputs.exit_code == 1 }}
         run: echo "All tests successful!"
