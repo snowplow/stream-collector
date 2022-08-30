@@ -51,9 +51,10 @@ collector {
   streams {
     good = "good"
     bad = "bad"
-    useIpAddressAsPartitionKey = true
+    useIpAddressAsPartitionKey = false
 
     sink {
+      enabled = kafka
       brokers = "0.0.0.0:9092"
     }
 
