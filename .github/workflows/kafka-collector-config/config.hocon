@@ -55,11 +55,10 @@ collector {
 
     sink {
       enabled = kafka
-      brokers = "0.0.0.0:9092"
+      brokers = "broker:9092"
     }
 
     buffer {
-      byteLimit = 1024
       recordLimit = 1
       timeLimit = 30
     }
