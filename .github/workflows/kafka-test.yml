@@ -21,7 +21,7 @@ jobs:
       - name: Run collector
         run: |
           docker run --network="integration_net1" --name collector -d -v "$PWD"/.github/workflows/kafka-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-kafka:0.0.0 --config /snowplow/config/config.hocon
-          sleep 5
+          sleep 15
           docker logs collector
       - name: Send good event to collector
         run: curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2  -d 'test' 2>&1 | grep -q 'Set-Cookie'
@@ -48,7 +48,7 @@ jobs:
       - name: Run collector
         run: |
           docker run --network="integration_net1" --name collector -d -v "$PWD"/.github/workflows/kafka-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-kafka:0.0.0 --config /snowplow/config/config.hocon
-          sleep 5
+          sleep 15
           docker logs collector
       - name: Send good event to collector
         run: curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2  -d 'test' 2>&1 | grep -q 'Set-Cookie'
