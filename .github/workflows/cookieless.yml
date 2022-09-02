@@ -17,9 +17,7 @@ jobs:
       - name: Run Docker image
         run: docker run --name collector -d -v "$PWD"/.github/workflows/ssc-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-stdout:0.0.0 --config /snowplow/config/config.hocon
       - name: Allow time for collector to start
-        run: |
-          sleep 30
-          docker logs collector
+        run: sleep 30
       - name: Test non-anonymous tracking
         id: non-anonymous
         run: |
