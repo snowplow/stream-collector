@@ -59,7 +59,6 @@ collector {
     }
 
     buffer {
-      byteLimit = 10
       recordLimit = 1
       timeLimit = 30
     }

@@ -52,8 +52,8 @@ jobs:
           sleep 15
           docker logs collector
       - name: Send oversized event to collector
-        run: curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2  -d 'test' 2>&1 | grep -q 'Set-Cookie'
+        run: curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2  -d @"$PWD"/.github/workflows/integration_tests/kafka/1mb_string 2>&1 | grep -q 'Set-Cookie'
       - name: Consume bad event from Kafka
-        run: timeout 5 docker exec -w /bin broker kafka-console-consumer.sh --topic=bad --from-beginning --bootstrap-server 0.0.0.0:9092 | grep -q "test"
+        run: timeout 5 docker exec -w /bin broker kafka-console-consumer.sh --topic=bad --from-beginning --bootstrap-server 0.0.0.0:9092 | grep -q "oversized"
       - name: Stop Docker containers
         run: docker stop $(docker ps -aq)
