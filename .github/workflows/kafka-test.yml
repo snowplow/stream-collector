@@ -28,3 +28,29 @@ jobs:
         run: timeout 5 docker exec -w /bin broker kafka-console-consumer.sh --topic=good --from-beginning --bootstrap-server 0.0.0.0:9092 | grep -q "test"
       - name: Stop Docker containers
         run: docker stop $(docker ps -aq)
+
+  run_kafka_test_2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: coursier/cache-action@v3
+      - name: Set up JDK
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Publish Docker image
+        run: sbt 'project kafka; set Docker / version := "0.0.0"' docker:publishLocal
+      - name: Create integration resources
+        run: |
+          (cd integration && docker-compose -f ./docker-compose.yml up -d)
+          sleep 10
+      - name: Run collector
+        run: |
+          docker run --network="integration_net1" --name collector -d -v "$PWD"/.github/workflows/kafka-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-kafka:0.0.0 --config /snowplow/config/config.hocon
+          sleep 5
+      - name: Send good event to collector
+        run: curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2  -d 'test' 2>&1 | grep -q 'Set-Cookie'
+      - name: Consume good event from Kafka
+        run: timeout 5 docker exec -w /bin broker kafka-console-consumer.sh --topic=good --from-beginning --bootstrap-server 0.0.0.0:9092 | grep -q "test"
+      - name: Stop Docker containers
+        run: docker stop $(docker ps -aq)
