@@ -3,6 +3,7 @@ name: Integration tests - Kafka
 on: push
 
 jobs:
+  # tests that good messages go to the good topic in Kafka
   kafka_success_good_topic:
     runs-on: ubuntu-latest
     steps:
@@ -22,7 +23,6 @@ jobs:
         run: |
           docker run --network="integration_net1" --name collector -d -v "$PWD"/.github/workflows/kafka-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-kafka:0.0.0 --config /snowplow/config/config_good.hocon
           sleep 15
-          docker logs collector
       - name: Send good event to collector
         run: curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2  -d 'test' 2>&1 | grep -q 'Set-Cookie'
       - name: Consume good event from Kafka
@@ -30,7 +30,7 @@ jobs:
       - name: Stop Docker containers
         run: docker stop $(docker ps -aq)
 
-  # tests that oversized messages go to the bad topic
+  # tests that oversized messages go to the bad topic in Kafka
   kafka_success_bad_topic_oversized:
     runs-on: ubuntu-latest
     steps:
@@ -48,9 +48,8 @@ jobs:
           sleep 10
       - name: Run collector
         run: |
-          docker run --network="integration_net1" --name collector -d -v "$PWD"/.github/workflows/kafka-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-kafka:0.0.0 --config /snowplow/config/config_bad.hocon
+          docker run --network="integration_net1" --name collector -d -v "$PWD"/.github/workflows/kafka-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-kafka:0.0.0 --config /snowplow/config/config_good.hocon
           sleep 15
-          docker logs collector
       - name: Send oversized event to collector
         run: curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2  -d @"$PWD"/.github/workflows/integration_tests/kafka/1mb_string 2>&1 | grep -q 'Set-Cookie'
       - name: Consume bad event from Kafka
