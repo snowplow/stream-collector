@@ -18,7 +18,7 @@ jobs:
       - name: Create integration resources
         run: |
           (cd integration && docker-compose -f ./docker-compose.yml up -d)
-          sleep 10
+          for i in $(seq 1 5); do docker exec -w /bin broker kafka-topics.sh --zookeeper "zookeeper:2181" --list --topic "good" | grep "good" && s=0 && break || s=$? && sleep 3; done; (exit $s)
       - name: Run collector
         run: |
           docker run --network="integration_net1" --name collector -d -v "$PWD"/.github/workflows/kafka-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-kafka:0.0.0 --config /snowplow/config/config_good.hocon
@@ -53,7 +53,7 @@ jobs:
       - name: Create integration resources
         run: |
           (cd integration && docker-compose -f ./docker-compose.yml up -d)
-          sleep 10
+          for i in $(seq 1 5); do docker exec -w /bin broker kafka-topics.sh --zookeeper "zookeeper:2181" --list --topic "good" | grep "good" && s=0 && break || s=$? && sleep 3; done; (exit $s)
       - name: Run collector
         run: |
           docker run --network="integration_net1" --name collector -d -v "$PWD"/.github/workflows/kafka-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-kafka:0.0.0 --config /snowplow/config/config_good.hocon
