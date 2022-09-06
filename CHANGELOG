@@ -1,3 +1,7 @@
+Release 2.7.1 (2022-09-06)
+--------------------------
+Ensure docker image has latest zlib1g version (#254)
+
 Release 2.7.0 (2022-07-27)
 --------------------------
 Send warmup requests to self on startup (#249)
