@@ -26,7 +26,7 @@ jobs:
       - name: Send good events
         run: |
           while read p; do
-            curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2  -d "$p" 2>&1 | grep -q 'Set-Cookie'
+            curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2  -d "$p"
           done <"$PWD"/.github/workflows/integration_tests/data.txt
         shell: bash
       - name: Check number of events in the good topic
@@ -57,8 +57,8 @@ jobs:
           docker run --network="integration_net1" --name collector -d -v "$PWD"/.github/workflows/kafka-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-kafka:0.0.0 --config /snowplow/config/config_good.hocon
           sleep 15
       - name: Send oversized event to collector
-        run: curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2  -d @"$PWD"/.github/workflows/integration_tests/kafka/1mb_string 2>&1 | grep -q 'Set-Cookie'
+        run: curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2 -d "$(openssl rand -base64 1000000)"
       - name: Consume bad event from Kafka
-        run: timeout 5 docker exec -w /bin broker kafka-console-consumer.sh --topic=bad --from-beginning --bootstrap-server 0.0.0.0:9092 | grep -q "oversized"
+        run: docker exec -w /bin broker kafka-run-class.sh kafka.tools.GetOffsetShell --broker-list 0.0.0.0:9092 --topic bad | grep 'bad:0:1'
       - name: Stop Docker containers
         run: docker stop $(docker ps -aq)
