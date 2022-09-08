@@ -1,11 +1,13 @@
+version: "3"
+
 services:
-  localstack:
+  localhost.localstack.cloud:
     image: localstack/localstack-light:1.0.4
     ports:
       - "4566-4568:4566-4568"
     volumes:
-      - "./.localstack:/var/lib/localstack"
       - "./localstack:/docker-entrypoint-initaws.d"
+      - "./localstack/tmp"
       - "/var/run/docker.sock:/var/run/docker.sock"
     logging:
       options:
@@ -14,3 +16,9 @@ services:
     environment:
       - SERVICES=kinesis,ec2
       - DEFAULT_REGION=eu-central-1
+      - USE_SSL=1
+    networks:
+      - net1
+
+networks:
+  net1:
