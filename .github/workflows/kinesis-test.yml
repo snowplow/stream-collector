@@ -3,7 +3,7 @@ name: Integration tests - Kinesis
 on: push
 
 jobs:
-  kinesis_no_data_loss:
+  kinesis_no_data_lost:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -12,26 +12,9 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 11
-      - name: Publish Docker image
-        run: sbt 'project kafka; set Docker / version := "0.0.0"' docker:publishLocal
-      - name: Create integration resources
-        run: |
-          (cd integration && docker-compose -f ./docker-compose.yml up -d)
-          sleep 15
-      - name: Run collector
-        run: |
-          docker run -d -e AWS_SECRET_ACCESS_KEY=foobar -e AWS_ACCESS_KEY=foobar --network="integration_net1" -v "$PWD"/.github/workflows/ssc-collector-config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-kinesis:0.0.0 --config /snowplow/config/integration.hocon          sleep 15
-      - name: Send good events
-        run: |
-          while read p; do
-            curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2 -d "$p"
-          done <"$PWD"/.github/workflows/integration_tests/no-data-loss/data.txt
-        shell: bash
-      - name: Wait for events to be sent from the collector to Kinesis
-        run: sleep 5
-      - name: Read from Kinesis
-        run: ./.github/workflows/integration_tests/no-data-loss/consume_kinesis.sh good | grep -q $(tail -1 "$PWD"/.github/workflows/integration_tests/no-data-loss/data.txt)
-      - name: Check no events got to the bad topic
-        run: docker exec -w /bin broker kafka-run-class.sh kafka.tools.GetOffsetShell --broker-list 0.0.0.0:9092 --topic bad | grep 'bad:0:0'
+      - name: Initialize the resources and the collector and send data to the collector
+        run: '"$PWD"/integration/init.sh kinesis "$PWD"/integration/docker-compose.yml integration.hocon "$PWD"/.github/workflows/integration_tests/no-data-loss/data.txt'
+      - name: Read from Kinesis good stream
+        run: ./.github/workflows/integration_tests/no-data-loss/consume_kinesis.sh good
       - name: Stop Docker containers
         run: docker stop $(docker ps -aq)

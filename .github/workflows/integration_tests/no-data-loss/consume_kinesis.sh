@@ -2,9 +2,13 @@
 
 streamName=$1
 
-export PYTHONWARNINGS="ignore:Unverified HTTPS request"
+curl -Is http://localhost:4566
+netstat
 
 shard=$(aws --endpoint-url=http://localhost:4566 kinesis describe-stream --stream-name $streamName --output text | grep SHARDS | awk '{print $2}')
+
+echo "$shard"
+
 iterator=$(aws --endpoint-url=http://localhost:4566 kinesis get-shard-iterator --stream-name $streamName --shard-id $shard --shard-iterator-type TRIM_HORIZON --output text)
 lines=$(aws --endpoint-url=http://localhost:4566 kinesis get-records --shard-iterator $iterator --output text | tail -n +2|awk '{print $3}' & sleep 1; kill $!)
 
