@@ -6,19 +6,14 @@ services:
     ports:
       - "4566-4568:4566-4568"
     volumes:
+      - "./.localstack:/var/lib/localstack"
       - "./localstack:/docker-entrypoint-initaws.d"
-      - "./localstack/tmp"
       - "/var/run/docker.sock:/var/run/docker.sock"
     logging:
       options:
         max-size: 1M
         max-file: "10"
     environment:
-      - SERVICES=kinesis,ec2
+      - SERVICES=kinesis
       - DEFAULT_REGION=eu-central-1
       - USE_SSL=1
-    networks:
-      - net1
-
-networks:
-  net1:
