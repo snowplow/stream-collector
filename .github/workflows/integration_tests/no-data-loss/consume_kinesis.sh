@@ -1,35 +1,31 @@
 #!/bin/bash
 
 streamName=$1
+input_file=$2
 
-curl -Is http://localhost:4566
-netstat
+export AWS_ACCESS_KEY_ID=foobar
+export AWS_SECRET_ACCESS_KEY=foobar
 
-shard=$(aws --endpoint-url=http://localhost:4566 kinesis describe-stream --stream-name $streamName --output text | grep SHARDS | awk '{print $2}')
+shard=$(aws --endpoint-url=http://localhost:4566 kinesis describe-stream --stream-name $streamName --output text --region eu-central-1 | grep SHARDS | awk '{print $2}')
 
-echo "$shard"
+iterator=$(aws --endpoint-url=http://localhost:4566 kinesis get-shard-iterator --stream-name $streamName --shard-id $shard --shard-iterator-type TRIM_HORIZON --output text --region eu-central-1)
+lines=$(aws --endpoint-url=http://localhost:4566 kinesis get-records --shard-iterator $iterator --output text --region eu-central-1 | tail -n +2|awk '{print $3}' & sleep 1)
 
-iterator=$(aws --endpoint-url=http://localhost:4566 kinesis get-shard-iterator --stream-name $streamName --shard-id $shard --shard-iterator-type TRIM_HORIZON --output text)
-lines=$(aws --endpoint-url=http://localhost:4566 kinesis get-records --shard-iterator $iterator --output text | tail -n +2|awk '{print $3}' & sleep 1; kill $!)
-
-while read p; do
-  found=false
-  echo "$p"
-  for l in $lines
+for l in $lines
   do
-    a=$(echo "$l" | base64 -d)
+  found=false
+  while read p; do
+    a=$(echo "$l" | base64 -d | tr -d '\0')
     if [[ "$a" == *"$p"* ]]; then
       found=true
       break
     fi
-  done
+  done <"$input_file"
   if [ $found = true ]
   then
       continue
   fi
   break
-done <"$PWD"/.github/workflows/integration_tests/no-data-loss/data.txt
+done
 
 echo "Found all records in Kinesis"
-
-

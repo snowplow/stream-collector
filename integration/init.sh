@@ -5,9 +5,10 @@ resource_docker_file=$2
 config_file=$3
 data_file=$4
 
-source "$PWD"/integration/init_resources.sh "$flavour" "$resource_docker_file"
+# run sbt and initialise resources (localstack, kafka, etc.)
+source "$PWD"/integration/init_resources.sh "$resource_docker_file"
 
-docker run -d -e AWS_SECRET_ACCESS_KEY=foobar -e AWS_ACCESS_KEY=foobar --network="integration_net1" -v "$PWD"/config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-"$flavour":0.0.0 --config /snowplow/config/"$config_file"
+docker run -d -e AWS_SECRET_ACCESS_KEY=foobar -e AWS_ACCESS_KEY=foobar --network="integration_default" -v "$PWD"/config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-"$flavour":0.0.0 --config /snowplow/config/"$config_file"
 
 sleep 5
 

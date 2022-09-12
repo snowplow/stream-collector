@@ -1,7 +1,6 @@
 #!/bin/bash
 
-flavour=$1
-resource_docker_file=$2
+resource_docker_file=$1
 
 export PYTHONWARNINGS="ignore:Unverified HTTPS request"
 

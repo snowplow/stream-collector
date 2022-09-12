@@ -15,6 +15,6 @@ jobs:
       - name: Initialize the resources and the collector and send data to the collector
         run: '"$PWD"/integration/init.sh kinesis "$PWD"/integration/docker-compose.yml integration.hocon "$PWD"/.github/workflows/integration_tests/no-data-loss/data.txt'
       - name: Read from Kinesis good stream
-        run: ./.github/workflows/integration_tests/no-data-loss/consume_kinesis.sh good
+        run: ./.github/workflows/integration_tests/no-data-loss/consume_kinesis.sh good "$PWD"/.github/workflows/integration_tests/no-data-loss/data.txt
       - name: Stop Docker containers
         run: docker stop $(docker ps -aq)
