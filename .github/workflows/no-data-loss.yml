@@ -42,12 +42,12 @@ jobs:
           sleep 30
 
       - name: Send test events
-        run: python3 ./test/input/send.py ./test/input/data.txt
+        run: python3 "$PWD"/test/input/send.py "$PWD"/test/input/data.txt
 
       - name: Read events from good stream
         id: check
         run: |
-          output=$(./test/output/verify.sh good)
+          output=$("$PWD"/test/output/verify.sh good)
           echo "::set-output name=exit_code::$?"
 
       - name: Report outcome
