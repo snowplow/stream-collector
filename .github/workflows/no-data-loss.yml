@@ -38,19 +38,18 @@ jobs:
 
       - name: Start collector
         run: |
-          echo "$PWD"
-          docker run --network no_data_loss_default --rm -d -v "$PWD"/collector_config:/snowplow/config -p 12345:12345 -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" -e AWS_SECRET_KEY="$AWS_SECRET_ACCESS_KEY" snowplow/scala-stream-collector-kinesis:0.0.0 --config /snowplow/config/config.hocon
+          docker run --network no_data_loss_default --rm -d -v "$PWD"/.github/workflows/integration_tests/no_data_loss/collector_config:/snowplow/config -p 12345:12345 -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" -e AWS_SECRET_KEY="$AWS_SECRET_ACCESS_KEY" snowplow/scala-stream-collector-kinesis:0.0.0 --config /snowplow/config/config.hocon
           sleep 30
 
       - name: Send test events
         run: |
-          echo "$PWD"
-          python3 "$PWD"/test/input/send.py "$PWD"/test/input/data.txt
+          path="$PWD"/.github/workflows/integration_tests/no_data_loss
+          python3 "$path"/test/input/send.py "$path"/test/input/data.txt
 
       - name: Read events from good stream
         id: check
         run: |
-          output=$("$PWD"/test/output/verify.sh good)
+          output=$("$PWD"/.github/workflows/integration_tests/no_data_loss/test/output/verify.sh good)
           echo "::set-output name=exit_code::$?"
 
       - name: Report outcome
