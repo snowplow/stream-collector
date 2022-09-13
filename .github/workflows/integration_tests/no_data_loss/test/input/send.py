@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import argparse
 import json
 import ssl
@@ -42,4 +44,5 @@ parser = argparse.ArgumentParser(description='Send the events from the specified
 parser.add_argument('manifest', help='A manifest of events to process.')
 args = parser.parse_args()
 
-send(args.manifest)
+if __name__ == '__main__':
+    send(args.manifest)

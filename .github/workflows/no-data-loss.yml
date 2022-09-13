@@ -1,0 +1,61 @@
+name: Test no data is lost
+
+on: push
+
+env:
+  AWS_ACCESS_KEY_ID: "test"
+  AWS_SECRET_ACCESS_KEY: "test"
+
+jobs:
+  run_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: coursier/cache-action@v3
+
+      - name: Set up JDK
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+
+      - name: Install Python requirements
+        run: pip install -r .github/workflows/integration_tests/no_data_loss/test/input/requirements.txt
+
+      - name: Publish Docker image
+        run: sbt 'project kinesis; set Docker / version := "0.0.0"' docker:publishLocal
+
+      - name: Start localstack
+        run: |
+          cd .github/workflows/integration_tests/no_data_loss
+          docker-compose up -d
+          sleep 30
+
+      - name: Start collector
+        run: |
+          docker run --network no_data_loss_default --rm -d -v "$PWD"/collector_config:/snowplow/config -p 12345:12345 -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" -e AWS_SECRET_KEY="$AWS_SECRET_ACCESS_KEY" snowplow/scala-stream-collector-kinesis:0.0.0 --config /snowplow/config/config.hocon
+          sleep 30
+
+      - name: Send test events
+        run: python3 ./test/input/send.py ./test/input/data.txt
+
+      - name: Read events from good stream
+        id: check
+        run: |
+          output=$(./test/output/verify.sh good)
+          echo "::set-output name=exit_code::$?"
+
+      - name: Report outcome
+        if: ${{ steps.check.outputs.exit_code == 0 }}
+        run: echo "Success!"
+
+      - name: Stop collector
+        run: docker stop "$(docker ps | grep snowplow/scala-stream-collector-kinesis:0.0.0 | awk '{print $1}')"
+
+      - name: Stop localstack
+        run: docker-compose down
