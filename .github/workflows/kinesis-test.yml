@@ -3,7 +3,7 @@ name: Integration tests - Kinesis
 on: push
 
 jobs:
-  kinesis_no_data_lost:
+  kinesis-integration-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -12,9 +12,5 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 11
-      - name: Initialize the resources and the collector and send data to the collector
-        run: '"$PWD"/integration/init.sh kinesis "$PWD"/integration/docker-compose.yml integration.hocon "$PWD"/.github/workflows/integration_tests/no-data-loss/data.txt'
-      - name: Read from Kinesis good stream
-        run: ./.github/workflows/integration_tests/no-data-loss/consume_kinesis.sh good "$PWD"/.github/workflows/integration_tests/no-data-loss/data.txt
-      - name: Stop Docker containers
-        run: docker stop $(docker ps -aq)
+      - name: Kinesis integration tests
+        run: make kinesis-integration-tests

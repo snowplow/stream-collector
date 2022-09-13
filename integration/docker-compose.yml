@@ -17,3 +17,9 @@ services:
       - SERVICES=kinesis,ec2
       - DEFAULT_REGION=eu-central-1
       - USE_SSL=1
+    networks:
+      - net1
+
+networks:
+  net1:
+
