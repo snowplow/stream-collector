@@ -12,7 +12,7 @@ export PYTHONWARNINGS="ignore:Unverified HTTPS request"
 
 sbt "project $flavour; set Docker / version := \"0.0.0\"" 'Docker / publishLocal'
 
-docker run -d -e AWS_SECRET_ACCESS_KEY=foobar -e AWS_ACCESS_KEY=foobar --network="integration_net1" -v "$PWD"/integration/config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-"$flavour":0.0.0 --config /snowplow/config/"$config_file"
+docker run --name collector -d -e AWS_SECRET_ACCESS_KEY=foobar -e AWS_ACCESS_KEY=foobar --network="integration_net1" -v "$PWD"/integration/config:/snowplow/config -p 12345:12345 snowplow/scala-stream-collector-"$flavour":0.0.0 --config /snowplow/config/"$config_file"
 
 sleep 5
 
