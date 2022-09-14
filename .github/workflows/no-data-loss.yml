@@ -30,7 +30,7 @@ jobs:
         run: pip install -r .github/workflows/integration_tests/no_data_loss/test/input/requirements.txt
 
       - name: Publish Docker image
-        run: sbt 'project kinesis; set Docker / version := "0.0.0"' docker:publishLocal
+        run: sbt 'project kinesis; set Docker / version := "0.0.0"' 'Docker / publishLocal'
 
       - name: Start localstack
         run: |
