@@ -3,7 +3,7 @@ name: Integration tests - Kinesis
 on: push
 
 jobs:
-  kinesis-integration-tests:
+  kinesis-no-data-loss:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -12,5 +12,30 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 11
-      - name: Kinesis integration tests
-        run: make kinesis-integration-tests
+      - name: Create resources and start the collector
+        run: make kinesis-no-data-loss-integration-up
+      - name: Send data to the collector
+        run: make kinesis-no-data-loss-send-data
+      - name: Consume data from Kinesis
+        run: make kinesis-no-data-loss-consume
+      - name: Tear down all docker containers
+        run: make integration-down
+  kinesis-oversized:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: coursier/cache-action@v3
+      - name: Set up JDK
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Create resources and start the collector
+        run: make kinesis-oversized-integration-up
+      - name: Send data to the collector
+        run: make kinesis-oversized-send-data
+      - name: Consume data from Kinesis
+        run: make kinesis-oversized-consume
+      - name: Tear down all docker containers and clean up
+        run: |
+          make integration-down
+          make kinesis-oversized-cleanup
