@@ -32,6 +32,7 @@ import org.testcontainers.containers.output.Slf4jLogConsumer
 import java.io.File
 import scala.util.{Failure, Success}
 
+// Before running this test locally, execute `sbt 'project Kinesis' 'Docker / stage'`
 class NoDataLossSpec extends AnyFlatSpec with TestContainerForAll {
   val composeFile = ComposeFile(Left(new File(".github/workflows/integration_tests/no_data_loss/docker-compose.yml")))
   val exposedServices =

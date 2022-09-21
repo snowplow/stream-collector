@@ -12,6 +12,8 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 11
+      - name: Stage Docker build (for NoDataLossSpec)
+        run: sbt 'project kinesis' 'Docker / stage'
       - name: Run tests
         run: sbt test
       - name: Check formatting

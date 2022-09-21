@@ -116,6 +116,7 @@ lazy val kinesisSettings =
   allSettings ++ buildInfoSettings ++ Seq(
     moduleName := "snowplow-stream-collector-kinesis",
     Docker / packageName := "scala-stream-collector-kinesis",
+    Docker / stagingDirectory := new File(".github/workflows/integration_tests/no_data_loss/docker/stage"),
     libraryDependencies ++= Seq(
       Dependencies.Libraries.kinesis,
       Dependencies.Libraries.sts,
