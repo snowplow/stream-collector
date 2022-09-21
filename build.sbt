@@ -119,7 +119,9 @@ lazy val kinesisSettings =
     libraryDependencies ++= Seq(
       Dependencies.Libraries.kinesis,
       Dependencies.Libraries.sts,
-      Dependencies.Libraries.sqs
+      Dependencies.Libraries.sqs,
+      Dependencies.Libraries.scalatest,
+      Dependencies.Libraries.tcScalatest
     )
   )
 

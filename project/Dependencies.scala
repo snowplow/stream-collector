@@ -19,7 +19,8 @@ object Dependencies {
   val resolutionRepos = Seq(
     "Snowplow Analytics Maven repo".at("http://maven.snplow.com/releases/").withAllowInsecureProtocol(true),
     // For uaParser utils
-    "user-agent-parser repo".at("https://clojars.org/repo/")
+    "user-agent-parser repo".at("https://clojars.org/repo/"),
+    "Sonatype OSS Snapshots".at("https://oss.sonatype.org/content/repositories/snapshots/")
   )
 
   object V {
@@ -37,17 +38,21 @@ object Dependencies {
     val jackson      = "2.12.7" // force this version to mitigate security vulnerabilities
     val thrift       = "0.15.0" // force this version to mitigate security vulnerabilities
     val jnrUnixsock  = "0.38.17" // force this version to mitigate security vulnerabilities
+
     // Scala
     val collectorPayload = "0.0.0"
     val tracker          = "1.0.0"
-    val akkaHttp         = "10.2.7"
+    val akkaHttp         = "10.2.9"
     val akka             = "2.6.16"
     val scopt            = "4.0.1"
     val pureconfig       = "0.15.0"
     val akkaHttpMetrics  = "1.7.1"
     val badRows          = "2.1.1"
+
     // Scala (test only)
-    val specs2 = "4.11.0"
+    val specs2         = "4.11.0"
+    val scalatest      = "3.2.13"
+    val testcontainers = "0.40.10"
   }
 
   object Libraries {
@@ -82,9 +87,11 @@ object Dependencies {
     val akkaHttpMetrics  = "fr.davit"              %% "akka-http-metrics-datadog"         % V.akkaHttpMetrics
 
     // Scala (test only)
-    val specs2            = "org.specs2"        %% "specs2-core"         % V.specs2   % Test
-    val akkaTestkit       = "com.typesafe.akka" %% "akka-testkit"        % V.akka     % Test
-    val akkaHttpTestkit   = "com.typesafe.akka" %% "akka-http-testkit"   % V.akkaHttp % Test
-    val akkaStreamTestkit = "com.typesafe.akka" %% "akka-stream-testkit" % V.akka     % Test
+    val specs2            = "org.specs2"        %% "specs2-core"                        % V.specs2         % Test
+    val akkaTestkit       = "com.typesafe.akka" %% "akka-testkit"                       % V.akka           % Test
+    val akkaHttpTestkit   = "com.typesafe.akka" %% "akka-http-testkit"                  % V.akkaHttp       % Test
+    val akkaStreamTestkit = "com.typesafe.akka" %% "akka-stream-testkit"                % V.akka           % Test
+    val scalatest         = "org.scalatest"     %% "scalatest"                          % V.scalatest      % Test
+    val tcScalatest       = "com.dimafeng"      %% "testcontainers-scala-scalatest"     % V.testcontainers % Test
   }
 }
