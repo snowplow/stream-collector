@@ -19,7 +19,7 @@ services:
       - snowplow
 
   snowplow.collector:
-    build: ./docker/stage
+    build: ../../../../kinesis/target/docker/stage
     ports:
       - "12345:12345"
     volumes:
