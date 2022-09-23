@@ -104,7 +104,7 @@ lazy val allSettings = buildSettings ++
 lazy val root = project
   .in(file("."))
   .settings(buildSettings ++ dynVerSettings)
-  .aggregate(core, kinesis, pubsub, kafka, nsq, stdout, sqs, rabbitmq)
+  .aggregate(core, kinesis, pubsub, kafka, nsq, stdout, sqs, rabbitmq, integrationTests)
 
 lazy val core = project
   .settings(moduleName := "snowplow-stream-collector-core")
@@ -256,3 +256,21 @@ lazy val rabbitmqDistroless = project
   .settings(rabbitmqSettings ++ dockerSettingsDistroless)
   .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
   .dependsOn(rabbitmq % "test->test;compile->compile")
+
+lazy val integrationTestsDependencies = Seq(
+  Dependencies.Libraries.akkaStream,
+  Dependencies.Libraries.akkaHttp,
+  Dependencies.Libraries.kinesis,
+  Dependencies.Libraries.scalatest,
+  Dependencies.Libraries.tcScalatest,
+  Dependencies.Libraries.slf4j
+)
+
+lazy val integrationTestsSettings = BuildSettings.formatting ++ Seq(
+  libraryDependencies ++= integrationTestsDependencies
+)
+
+lazy val integrationTests = project
+  .in(file("integration"))
+  .settings(integrationTestsSettings)
+  .settings((Test / test) := (Test / test).dependsOn(kinesis / Docker / stage).value)

@@ -12,7 +12,7 @@
  * implied.  See the Apache License Version 2.0 for the specific language
  * governing permissions and limitations there under.
  */
-package com.snowplowanalytics.snowplow.collectors.scalastream.sinks
+package com.snowplowanalytics.snowplow.collectors.scalastream.integration
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -32,8 +32,7 @@ import org.testcontainers.containers.output.Slf4jLogConsumer
 import java.io.File
 import scala.util.{Failure, Success}
 
-// Before running this test locally, execute `sbt 'project Kinesis' 'Docker / stage'`
-class NoDataLossSpec extends AnyFlatSpec with TestContainerForAll {
+class NoDataLossKinesisSpec extends AnyFlatSpec with TestContainerForAll {
   val composeFile = ComposeFile(Left(new File(".github/workflows/integration_tests/no_data_loss/docker-compose.yml")))
   val exposedServices =
     List(ExposedService("localhost.localstack.cloud", 4566), ExposedService("snowplow.collector", 12345))
