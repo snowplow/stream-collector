@@ -24,6 +24,7 @@ import org.specs2.mutable.Specification
 import org.specs2.specification.core.{Fragment, Fragments}
 
 import java.nio.file.Paths
+import java.time.ZoneId
 import scala.concurrent.duration.DurationInt
 
 abstract class ConfigSpec extends Specification {
@@ -101,7 +102,8 @@ abstract class ConfigSpec extends Specification {
           ),
       sink = sinkConfigRefFactory(app)
     ),
-    experimental = ExperimentalConfig(WarmupConfig(false, 2000, 2000))
+    experimental = ExperimentalConfig(WarmupConfig(false, 2000, 2000)),
+    timezone     = Some(ZoneId.of("UTC"))
   )
 
   def sinkConfigRefFactory(app: String): SinkConfig = app match {

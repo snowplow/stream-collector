@@ -16,19 +16,17 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import java.net.{MalformedURLException, URL}
 import java.nio.charset.StandardCharsets.UTF_8
-import java.time.Instant
+import java.time.{Instant, ZoneId, ZoneOffset, ZonedDateTime}
 import java.util.UUID
 import org.apache.commons.codec.binary.Base64
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
-
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model.headers.CacheDirectives._
 import cats.data.NonEmptyList
 import cats.implicits._
-
 import com.snowplowanalytics.snowplow.badrows._
 import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
@@ -142,7 +140,8 @@ class CollectorService(
             request,
             nuid,
             ct,
-            spAnonymous
+            spAnonymous,
+            config.timezone
           )
         // we don't store events in case we're bouncing
         if (!bounce && !doNotTrack) sinkEvent(event, partitionKey)
@@ -236,12 +235,13 @@ class CollectorService(
     request: HttpRequest,
     networkUserId: String,
     contentType: Option[String],
-    spAnonymous: Option[String]
+    spAnonymous: Option[String],
+    zoneId: Option[ZoneId]
   ): CollectorPayload = {
     val e = new CollectorPayload(
       "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0",
       ipAddress,
-      System.currentTimeMillis,
+      ZonedDateTime.now(zoneId.getOrElse(ZoneOffset.UTC)).toInstant.toEpochMilli,
       "UTF-8",
       collector
     )

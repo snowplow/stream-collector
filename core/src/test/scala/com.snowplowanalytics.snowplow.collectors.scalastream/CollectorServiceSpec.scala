@@ -361,7 +361,7 @@ class CollectorServiceSpec extends Specification {
         val xff = `X-Forwarded-For`(RemoteAddress(InetAddress.getByName("127.0.0.1")))
         val ct  = Some("image/gif")
         val r   = HttpRequest().withHeaders(l :: hs)
-        val e   = service.buildEvent(Some("q"), Some("b"), "p", Some("ua"), Some("ref"), "h", "ip", r, "nuid", ct, None)
+        val e   = service.buildEvent(Some("q"), Some("b"), "p", Some("ua"), Some("ref"), "h", "ip", r, "nuid", ct, None, None)
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
         e.ipAddress shouldEqual "ip"
         e.encoding shouldEqual "UTF-8"
@@ -393,7 +393,8 @@ class CollectorServiceSpec extends Specification {
             r,
             nuid,
             ct,
-            Some("*")
+            Some("*"),
+            None
           )
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
         e.ipAddress shouldEqual "unknown"
@@ -426,7 +427,8 @@ class CollectorServiceSpec extends Specification {
             r,
             nuid,
             ct,
-            Some("*")
+            Some("*"),
+            None
           )
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
         e.ipAddress shouldEqual "unknown"
@@ -459,7 +461,8 @@ class CollectorServiceSpec extends Specification {
             r,
             nuid,
             ct,
-            Some("*")
+            Some("*"),
+            None
           )
         e.networkUserId shouldEqual "00000000-0000-0000-0000-000000000000"
       }
@@ -468,7 +471,7 @@ class CollectorServiceSpec extends Specification {
         val ct = Some("image/gif")
         val r  = HttpRequest().withHeaders(l :: hs)
         val e =
-          service.buildEvent(None, Some("b"), "p", Some("ua"), Some("ref"), "h", "ip", r, "nuid", ct, None)
+          service.buildEvent(None, Some("b"), "p", Some("ua"), Some("ref"), "h", "ip", r, "nuid", ct, None, None)
         e.networkUserId shouldEqual "nuid"
       }
     }

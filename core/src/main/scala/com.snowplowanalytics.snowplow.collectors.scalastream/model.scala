@@ -21,6 +21,8 @@ import akka.http.scaladsl.model.headers.HttpCookiePair
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.Sink
 
 import io.circe.Json
+import java.time.ZoneId
+
 
 package model {
 
@@ -214,7 +216,8 @@ package model {
     terminationDeadline: FiniteDuration,
     preTerminationPeriod: FiniteDuration,
     preTerminationUnhealthy: Boolean,
-    experimental: ExperimentalConfig
+    experimental: ExperimentalConfig,
+    timezone: Option[ZoneId]
   ) {
     val cookieConfig = if (cookie.enabled) Some(cookie) else None
     val doNotTrackHttpCookie =
