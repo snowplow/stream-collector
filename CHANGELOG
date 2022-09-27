@@ -1,3 +1,7 @@
+Release 2.8.0 (2022-09-27)
+--------------------------
+Add RabbitMQ asset (#251)
+
 Release 2.7.1 (2022-09-06)
 --------------------------
 Ensure docker image has latest zlib1g version (#254)
