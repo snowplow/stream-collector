@@ -81,63 +81,23 @@ lazy val dockerSettingsDistroless = Seq(
   Docker / daemonUserUid := None,
   Docker / defaultLinuxInstallLocation := "/opt/snowplow",
   dockerEntrypoint := Seq(
-    "java",
+    "/usr/lib/jvm/java-11-openjdk-amd64/bin/java",
     "-jar",
     s"/opt/snowplow/lib/${(packageJavaLauncherJar / artifactPath).value.getName}"
   ),
   dockerPermissionStrategy := DockerPermissionStrategy.CopyChown,
 
+  Docker / mappings := (Docker / mappings).value ++ Seq(new File("docker/install.sh") -> "install.sh"),
+
   Docker / dockerCommands := {
     Seq(
-      Cmd("FROM", "debian:bullseye-slim", "AS", "bullseye"),
-      Cmd("FROM", dockerBaseImage.value),
+      Cmd("FROM", "debian:bullseye-slim", "AS", "bullseye"), // Provides standard linux executables for the install script
+      Cmd("COPY", "install.sh", "/usr/bin/"),
+      Cmd("FROM", dockerBaseImage.value, "AS", "java"), // Provides a java installation
+      Cmd("FROM", "gcr.io/distroless/base:nonroot"), // The true base image
       Cmd("USER", "0"),
-      Cmd("RUN",
-        // Temporarily mount the executables needed to remove files from the image
-        "--mount=type=bind,from=bullseye,source=/usr/bin/,target=/usr/bin",
-        "--mount=type=bind,from=bullseye,source=/bin/,target=/bin",
-        "--mount=type=bind,from=bullseye,source=/lib/x86_64-linux-gnu/libselinux.so.1,target=/lib/x86_64-linux-gnu/libselinux.so.1",
-        // ...and remove all system libraries that are not needed by the JVM process
-        "/bin/rm", "-r",
-        "/usr/lib/x86_64-linux-gnu/audit/sotruss-lib.so*",
-        "/usr/lib/x86_64-linux-gnu/engines-1.1/afalg.so*",
-        "/usr/lib/x86_64-linux-gnu/engines-1.1/padlock.so*",
-        "/usr/lib/x86_64-linux-gnu/glib-2.0/",
-        "/usr/lib/x86_64-linux-gnu/libbrotlicommon.so*",
-        "/usr/lib/x86_64-linux-gnu/libbrotlidec.so*",
-        "/usr/lib/x86_64-linux-gnu/libbrotlienc.so*",
-        "/usr/lib/x86_64-linux-gnu/libcrypto.so*",
-        "/usr/lib/x86_64-linux-gnu/libexpatw.so*",
-        "/usr/lib/x86_64-linux-gnu/libfontconfig.so*",
-        "/usr/lib/x86_64-linux-gnu/libfreetype.so*",
-        "/usr/lib/x86_64-linux-gnu/libgio-*.so*",
-        "/usr/lib/x86_64-linux-gnu/libglib-*.so*",
-        "/usr/lib/x86_64-linux-gnu/libgmodule-*.so*",
-        "/usr/lib/x86_64-linux-gnu/libgobject-*.so*",
-        "/usr/lib/x86_64-linux-gnu/libgomp.so*",
-        "/usr/lib/x86_64-linux-gnu/libgraphite2.so*",
-        "/usr/lib/x86_64-linux-gnu/libgthread-*.so*",
-        "/usr/lib/x86_64-linux-gnu/libharfbuzz.so*",
-        "/usr/lib/x86_64-linux-gnu/libjpeg.so*",
-        "/usr/lib/x86_64-linux-gnu/liblcms2.so*",
-        "/usr/lib/x86_64-linux-gnu/libpcreposix.so*",
-        "/usr/lib/x86_64-linux-gnu/libpng16.so*",
-        "/usr/lib/x86_64-linux-gnu/libssl.so*",
-        "/usr/lib/x86_64-linux-gnu/libuuid.so*",
-        "/lib/x86_64-linux-gnu/libBrokenLocale-*.so*",
-        "/lib/x86_64-linux-gnu/libSegFault.so*",
-        "/lib/x86_64-linux-gnu/libanl-*.so*",
-        "/lib/x86_64-linux-gnu/libcrypt.so.*",
-        "/lib/x86_64-linux-gnu/libexpat.so*",
-        "/lib/x86_64-linux-gnu/libmemusage.so*",
-        "/lib/x86_64-linux-gnu/libmvec-*.so*",
-        "/lib/x86_64-linux-gnu/libnsl-*.so*",
-        "/lib/x86_64-linux-gnu/libnss_hesiod-*.so*",
-        "/lib/x86_64-linux-gnu/libpcprofile.so*",
-        "/lib/x86_64-linux-gnu/libpcre.so*",
-        "/lib/x86_64-linux-gnu/libutil-*.so*",
-        "/lib/x86_64-linux-gnu/libthread_db-*.so"
-      )
+      // Mount the filesystems of the build images and run the install script:
+      ExecCmd("RUN --mount=type=bind,from=bullseye,source=/,target=/bullseye --mount=type=bind,from=java,source=/,target=/java", "/bullseye/usr/bin/install.sh")
     ) ++ (Docker / dockerCommands).value.tail
   }
 )
