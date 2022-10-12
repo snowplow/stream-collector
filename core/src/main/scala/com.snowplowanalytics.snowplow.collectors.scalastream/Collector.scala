@@ -190,43 +190,49 @@ trait Collector {
           }
       }
 
-    collectorConf.ssl match {
+    val binds = collectorConf.ssl match {
       case SSLConfig(true, true, _) =>
-        unsecureEndpoint(redirectRoutes, metricRegistry)
-        secureEndpoint(metricRegistry)
-        ()
+        List(
+          unsecureEndpoint(redirectRoutes, metricRegistry),
+          secureEndpoint(metricRegistry)
+        )
       case SSLConfig(true, false, _) =>
-        unsecureEndpoint(collectorRoute.collectorRoute, metricRegistry)
-        secureEndpoint(metricRegistry)
-        ()
+        List(
+          unsecureEndpoint(collectorRoute.collectorRoute, metricRegistry),
+          secureEndpoint(metricRegistry)
+        )
       case _ =>
-        unsecureEndpoint(collectorRoute.collectorRoute, metricRegistry)
-        ()
+        List(unsecureEndpoint(collectorRoute.collectorRoute, metricRegistry))
     }
 
-    Runtime
-      .getRuntime
-      .addShutdownHook(new Thread(() => {
-        log.warn("Received shutdown signal")
-        if (collectorConf.preTerminationUnhealthy) {
-          log.warn("setting health endpoint to unhealthy")
-          health.toUnhealthy()
-        }
-        log.warn(s"Sleeping for ${collectorConf.preTerminationPeriod}")
-        Thread.sleep(collectorConf.preTerminationPeriod.toMillis)
-        log.warn("Initiating http server termination")
-        try {
-          // The actor system is already configured to shutdown within `terminationDeadline` so we await for double that.
-          Await.result(system.terminate(), collectorConf.terminationDeadline * 2)
-          log.warn("Server terminated")
-        } catch {
-          case NonFatal(t) =>
-            log.error("Caught exception awaiting server termination", t)
-        }
-        val shutdowns = List(shutdownSink(sinks.good, "good"), shutdownSink(sinks.bad, "bad"))
-        Await.result(Future.sequence(shutdowns), Duration.Inf)
-        ()
-      }))
+    Future.sequence(binds).foreach { _ =>
+      Runtime
+        .getRuntime
+        .addShutdownHook(new Thread(() => {
+          log.warn("Received shutdown signal")
+          if (collectorConf.preTerminationUnhealthy) {
+            log.warn("Setting health endpoint to unhealthy")
+            health.toUnhealthy()
+          }
+          log.warn(s"Sleeping for ${collectorConf.preTerminationPeriod}")
+          Thread.sleep(collectorConf.preTerminationPeriod.toMillis)
+          log.warn("Initiating http server termination")
+          try {
+            // The actor system is already configured to shutdown within `terminationDeadline` so we await for double that.
+            Await.result(system.terminate(), collectorConf.terminationDeadline * 2)
+            log.warn("Server terminated")
+          } catch {
+            case NonFatal(t) =>
+              log.error("Caught exception awaiting server termination", t)
+          }
+          val shutdowns = List(shutdownSink(sinks.good, "good"), shutdownSink(sinks.bad, "bad"))
+          Await.result(Future.sequence(shutdowns), Duration.Inf)
+          ()
+        }))
+
+      log.info("Setting health endpoint to healthy")
+      health.toHealthy()
+    }
   }
 
   private def shutdownSink(sink: Sink, label: String)(implicit ec: ExecutionContext): Future[Unit] =

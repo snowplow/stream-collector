@@ -14,8 +14,6 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
-import java.util.concurrent.atomic.AtomicBoolean
-
 trait HealthService {
   def isHealthy: Boolean
 }
@@ -23,11 +21,15 @@ trait HealthService {
 object HealthService {
 
   class Settable extends HealthService {
-    private val ref = new AtomicBoolean(true)
+    @volatile private var state: Boolean = false
 
-    override def isHealthy: Boolean = ref.get
+    override def isHealthy: Boolean = state
 
-    def toUnhealthy(): Unit = ref.set(false)
+    def toUnhealthy(): Unit =
+      state = false
+
+    def toHealthy(): Unit =
+      state = true
   }
 
 }
