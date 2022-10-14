@@ -185,7 +185,8 @@ package model {
   final case class WarmupConfig(
     enable: Boolean,
     numRequests: Int,
-    maxConnections: Int
+    maxConnections: Int,
+    maxCycles: Int
   )
 
   final case class ExperimentalConfig(

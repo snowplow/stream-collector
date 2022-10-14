@@ -20,6 +20,8 @@ import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.stream.scaladsl.{Sink, Source}
 import akka.actor.ActorSystem
 
+import cats.implicits._
+
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -38,30 +40,46 @@ object Warmup {
     if (config.enable) {
       logger.info(s"Starting warm up of $interface:$port.  It is expected to see a few failures during warmup.")
 
-      val cxnSettings = ConnectionPoolSettings(system)
-        .withMaxConnections(config.maxConnections)
-        .withMaxOpenRequests(Integer.highestOneBit(config.maxConnections) * 2) // must exceed maxConnections and must be a power of 2
-        .withMaxRetries(0)
+      def runNextCycle(counter: Int): Future[Unit] = {
+        val maxConnections = config.maxConnections * counter
+        val numRequests    = config.numRequests * counter
 
-      Source(1 to config.numRequests)
-        .map(_ => (HttpRequest(uri = s"/health"), ()))
-        .via(Http().cachedHostConnectionPool[Unit](interface, port, cxnSettings))
-        .map(_._1)
-        .runWith(Sink.seq)
-        .map { results =>
-          val numFails = results.count(_.isFailure)
-          results
-            .collect {
-              case Failure(e) => e.getMessage
-            }
-            .toSet
-            .foreach { message: String =>
-              logger.info(message)
-            }
+        val cxnSettings = ConnectionPoolSettings(system)
+          .withMaxConnections(maxConnections)
+          .withMaxOpenRequests(Integer.highestOneBit(maxConnections) * 2) // must exceed maxConnections and must be a power of 2
+          .withMaxRetries(0)
 
-          logger.info(
-            s"Finished warming up $interface:$port. Sent ${config.numRequests} requests with $numFails failures."
-          )
-        }
+        Source(1 to numRequests)
+          .map(_ => (HttpRequest(uri = s"/health"), ()))
+          .via(Http().cachedHostConnectionPool[Unit](interface, port, cxnSettings))
+          .map(_._1)
+          .runWith(Sink.seq)
+          .map { results =>
+            val numFails = results.count(_.isFailure)
+            results
+              .collect {
+                case Failure(e) => e.getMessage
+              }
+              .toSet
+              .foreach { message: String =>
+                logger.info(message)
+              }
+
+            logger.info(
+              s"Finished warmup cycle $counter of $interface:$port with $maxConnections max client TCP connections. Sent ${numRequests} requests with $numFails failures."
+            )
+            numFails
+          }
+          .flatMap { numFails =>
+            if (numFails === 0 || counter >= config.maxCycles) {
+              logger.info(s"Finished all warmup cycles of $interface:$port")
+              Future.successful(())
+            } else
+              runNextCycle(counter + 1)
+          }
+      }
+
+      runNextCycle(1)
     } else Future.successful(())
+
 }

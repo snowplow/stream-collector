@@ -66,6 +66,6 @@ object TestUtils {
       terminationDeadline     = 10.seconds,
       preTerminationPeriod    = 10.seconds,
       preTerminationUnhealthy = false,
-      experimental            = ExperimentalConfig(WarmupConfig(false, 2000, 2000))
+      experimental            = ExperimentalConfig(WarmupConfig(false, 2000, 2000, 3))
     )
 }
