@@ -101,7 +101,7 @@ abstract class ConfigSpec extends Specification {
           ),
       sink = sinkConfigRefFactory(app)
     ),
-    experimental = ExperimentalConfig(WarmupConfig(false, 2000, 2000))
+    experimental = ExperimentalConfig(WarmupConfig(false, 2000, 2000, 3))
   )
 
   def sinkConfigRefFactory(app: String): SinkConfig = app match {
