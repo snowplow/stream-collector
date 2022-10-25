@@ -119,7 +119,6 @@ lazy val kinesisSettings =
     libraryDependencies ++= Seq(
       Dependencies.Libraries.kinesis,
       Dependencies.Libraries.sts,
-      Dependencies.Libraries.cbor,
       Dependencies.Libraries.sqs
     )
   )
@@ -143,7 +142,6 @@ lazy val sqsSettings =
     libraryDependencies ++= Seq(
       Dependencies.Libraries.sqs,
       Dependencies.Libraries.sts,
-      Dependencies.Libraries.cbor
     )
   )
 

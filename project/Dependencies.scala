@@ -24,7 +24,7 @@ object Dependencies {
 
   object V {
     // Java
-    val awsSdk       = "1.12.238"
+    val awsSdk       = "1.12.327"
     val pubsub       = "1.119.1"
     val kafka        = "2.2.1"
     val mskAuth      = "1.1.1"
@@ -34,7 +34,6 @@ object Dependencies {
     val log4j        = "2.17.2" // CVE-2021-44228
     val config       = "1.4.1"
     val rabbitMQ     = "5.15.0"
-    val cbor         = "2.11.4" // See snowplow/snowplow/issues/4266
     val jackson      = "2.12.7" // force this version to mitigate security vulnerabilities
     val thrift       = "0.15.0" // force this version to mitigate security vulnerabilities
     val jnrUnixsock  = "0.38.17" // force this version to mitigate security vulnerabilities
@@ -45,7 +44,6 @@ object Dependencies {
     val akka             = "2.6.16"
     val scopt            = "4.0.1"
     val pureconfig       = "0.15.0"
-    val json4s           = "3.6.11"
     val akkaHttpMetrics  = "1.7.1"
     val badRows          = "2.1.1"
     // Scala (test only)
@@ -68,7 +66,6 @@ object Dependencies {
     val log4jOverSlf4j = "org.slf4j"                        % "log4j-over-slf4j"        % V.slf4j
     val log4j          = "org.apache.logging.log4j"         % "log4j-core"              % V.log4j
     val config         = "com.typesafe"                     % "config"                  % V.config
-    val cbor           = "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % V.cbor
     val jnrUnixsocket  = "com.github.jnr"                   % "jnr-unixsocket"          % V.jnrUnixsock
     val rabbitMQ       = "com.rabbitmq"                     % "amqp-client"             % V.rabbitMQ
 
@@ -81,7 +78,6 @@ object Dependencies {
     val akkaHttp         = "com.typesafe.akka"     %% "akka-http"                         % V.akkaHttp
     val akkaStream       = "com.typesafe.akka"     %% "akka-stream"                       % V.akka
     val akkaSlf4j        = "com.typesafe.akka"     %% "akka-slf4j"                        % V.akka
-    val json4sJackson    = "org.json4s"            %% "json4s-jackson"                    % V.json4s
     val pureconfig       = "com.github.pureconfig" %% "pureconfig"                        % V.pureconfig
     val akkaHttpMetrics  = "fr.davit"              %% "akka-http-metrics-datadog"         % V.akkaHttpMetrics
 
