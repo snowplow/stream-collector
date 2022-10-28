@@ -1,3 +1,9 @@
+Release 2.8.1 (2022-10-28)
+--------------------------
+Bump aws sdk to 1.12.327 (#266)
+Warmup process should iterate until success (#264)
+Health endpoint should return 503 during warmup phase (#263)
+
 Release 2.8.0 (2022-09-27)
 --------------------------
 Add RabbitMQ asset (#251)
