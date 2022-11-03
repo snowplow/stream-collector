@@ -1,3 +1,7 @@
+Release 2.8.2 (2022-11-03)
+--------------------------
+Ensure docker images have latest libexpat version (#268)
+
 Release 2.8.1 (2022-10-28)
 --------------------------
 Bump aws sdk to 1.12.327 (#266)
