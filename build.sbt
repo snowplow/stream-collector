@@ -263,11 +263,13 @@ lazy val integrationTestsDependencies = Seq(
   Dependencies.Libraries.kinesis,
   Dependencies.Libraries.scalatest,
   Dependencies.Libraries.tcScalatest,
-  Dependencies.Libraries.slf4j
+  Dependencies.Libraries.slf4j,
+  Dependencies.Libraries.eventGen
 )
 
 lazy val integrationTestsSettings = BuildSettings.formatting ++ Seq(
-  libraryDependencies ++= integrationTestsDependencies
+  libraryDependencies ++= integrationTestsDependencies,
+  resolvers ++= Dependencies.resolutionRepos
 )
 
 lazy val integrationTests = project
