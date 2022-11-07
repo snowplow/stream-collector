@@ -81,7 +81,7 @@ lazy val dockerSettingsDistroless = Seq(
   Docker / daemonUserUid := None,
   Docker / defaultLinuxInstallLocation := "/opt/snowplow",
   dockerEntrypoint := Seq(
-    "/usr/lib/jvm/java-11-openjdk-amd64/bin/java",
+    "/usr/lib/jvm/java-11-openjdk/bin/java",
     "-jar",
     s"/opt/snowplow/lib/${(packageJavaLauncherJar / artifactPath).value.getName}"
   ),
@@ -97,7 +97,7 @@ lazy val dockerSettingsDistroless = Seq(
       Cmd("FROM", "gcr.io/distroless/base:nonroot"), // The true base image
       Cmd("USER", "0"),
       // Mount the filesystems of the build images and run the install script:
-      ExecCmd("RUN --mount=type=bind,from=bullseye,source=/,target=/bullseye --mount=type=bind,from=java,source=/,target=/java", "/bullseye/usr/bin/install.sh")
+      ExecCmd("RUN --mount=type=bind,from=bullseye,source=/,target=/bullseye --mount=type=bind,from=java,source=/,target=/java", "/bullseye/bin/sh", "/bullseye/usr/bin/install.sh")
     ) ++ (Docker / dockerCommands).value.tail
   }
 )

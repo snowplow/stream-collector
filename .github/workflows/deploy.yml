@@ -134,6 +134,6 @@ jobs:
         with:
           context: distroless/${{ matrix.platform }}/target/docker/stage
           file: distroless/${{ matrix.platform }}/target/docker/stage/Dockerfile
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64/v8
           tags: ${{ steps.distroless-meta.outputs.tags }}
           push: true
