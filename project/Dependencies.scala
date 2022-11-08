@@ -53,7 +53,7 @@ object Dependencies {
     val specs2         = "4.11.0"
     val scalatest      = "3.2.13"
     val testcontainers = "0.40.10"
-    val eventGen = "0.3.1-rc1"
+    val eventGen       = "0.3.1"
 
   }
 
@@ -89,12 +89,12 @@ object Dependencies {
     val akkaHttpMetrics  = "fr.davit"              %% "akka-http-metrics-datadog"         % V.akkaHttpMetrics
 
     // Scala (test only)
-    val specs2            = "org.specs2"        %% "specs2-core"                        % V.specs2         % Test
-    val akkaTestkit       = "com.typesafe.akka" %% "akka-testkit"                       % V.akka           % Test
-    val akkaHttpTestkit   = "com.typesafe.akka" %% "akka-http-testkit"                  % V.akkaHttp       % Test
-    val akkaStreamTestkit = "com.typesafe.akka" %% "akka-stream-testkit"                % V.akka           % Test
-    val scalatest         = "org.scalatest"     %% "scalatest"                          % V.scalatest      % Test
-    val tcScalatest       = "com.dimafeng"      %% "testcontainers-scala-scalatest"     % V.testcontainers % Test
-    val eventGen = "com.snowplowanalytics" %% "snowplow-event-generator-core" % V.eventGen % Test
+    val specs2            = "org.specs2"            %% "specs2-core"                    % V.specs2         % Test
+    val akkaTestkit       = "com.typesafe.akka"     %% "akka-testkit"                   % V.akka           % Test
+    val akkaHttpTestkit   = "com.typesafe.akka"     %% "akka-http-testkit"              % V.akkaHttp       % Test
+    val akkaStreamTestkit = "com.typesafe.akka"     %% "akka-stream-testkit"            % V.akka           % Test
+    val scalatest         = "org.scalatest"         %% "scalatest"                      % V.scalatest      % Test
+    val tcScalatest       = "com.dimafeng"          %% "testcontainers-scala-scalatest" % V.testcontainers % Test
+    val eventGen          = "com.snowplowanalytics" %% "snowplow-event-generator-core"  % V.eventGen       % Test
   }
 }
