@@ -14,10 +14,6 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream.integration
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.headers.RawHeader
-import akka.http.scaladsl.model.{ContentTypes, HttpMethods, HttpRequest, Uri}
 import com.amazonaws.auth.{AWSStaticCredentialsProvider, BasicAWSCredentials}
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
 import com.amazonaws.services.kinesis.AmazonKinesisClientBuilder
@@ -33,7 +29,12 @@ import com.snowplowanalytics.snowplow.eventgen.tracker.{HttpRequest => SnowplowH
 import org.scalacheck.Gen
 
 import java.io.File
+import java.net.http.{HttpClient, HttpRequest}
+import java.net.http.HttpRequest.BodyPublishers
+import java.net.URI
+import java.net.http.HttpResponse.BodyHandlers
 import java.util.concurrent.ScheduledThreadPoolExecutor
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.MILLISECONDS
 import scala.util.{Failure, Success}
 
@@ -63,46 +64,40 @@ class NoDataLossKinesisSpec extends AnyFlatSpec with TestContainerForAll {
       .withEndpointConfiguration(new EndpointConfiguration("http://localhost:4566", "eu-central-1"))
       .build
 
-    //Akka
-    implicit val system           = ActorSystem()
-    implicit val executionContext = system.dispatcher
-
     val executorService = new ScheduledThreadPoolExecutor(10)
 
-    val requestStubs = (for {
-      n <- Gen.chooseNum(10, 50)
-      reqs <- Gen.listOfN(n, SnowplowHttpReq.gen(1, 5, java.time.Instant.now))
-    } yield reqs).apply(org.scalacheck.Gen.Parameters.default, org.scalacheck.rng.Seed(scala.util.Random.nextLong())).getOrElse(List.empty)
+    val httpClient = HttpClient.newBuilder().build()
 
     def toRequest(req: SnowplowHttpReq): HttpRequest = {
       val method = req.method match {
-        case Post(_) => HttpMethods.POST
-        case Get(_) => HttpMethods.GET
-        case Head(_) => HttpMethods.HEAD
+        case Post(_) => "POST"
+        case Get(_)  => "GET"
+        case Head(_) => "HEAD"
       }
 
       val path = req.method.path.toString
-      val querystring = req.qs.map(_.toString())
-      val uri = Uri.from("http", "", "0.0.0.0", 12345, path, querystring)
+      val querystring = req.qs.map(_.toString()).getOrElse("")
+      val uri = new URI("http", "", "0.0.0.0", 12345, path, querystring, "")
 
-      val headers = req.headers.toList.filterNot(_._1 == "Content-Type").map { case (k, v) => RawHeader(k, v) } // annoyingly, Content-Type can't be passed in as RawHeader
+      val headers = req.headers.toList.flatMap { case (k, v) => List(k, v) }
 
-      val payload = req.body.map (_.toString () ).getOrElse ("")
+      val payload = req.body.map(b => BodyPublishers.ofString(b.toString)).getOrElse(BodyPublishers.noBody())
 
-      HttpRequest()
-        .withMethod(method)
-        .withUri(uri)
-        .withHeaders(headers)
-        .withEntity(ContentTypes.`application/json`, payload)
+      HttpRequest
+        .newBuilder()
+        .uri(uri)
+        .headers(headers: _*)
+        .method(method, payload)
+        .build()
     }
-
-    val requests = requestStubs.map(toRequest)
 
     def scheduleRequest(request: HttpRequest, attempts: Int): Unit = {
       val Backoff = 500L
       executorService.schedule(
         new Runnable {
-          override def run(): Unit = if (attempts >= 5) throw new RuntimeException(s"Still failing after 5 attempts: $request") else sendRequest(request, attempts)
+          override def run(): Unit =
+            if (attempts >= 5) throw new RuntimeException(s"Still failing after 5 attempts: $request")
+            else sendRequest(request, attempts)
         },
         Backoff,
         MILLISECONDS
@@ -111,9 +106,9 @@ class NoDataLossKinesisSpec extends AnyFlatSpec with TestContainerForAll {
     }
 
     def sendRequest(request: HttpRequest, attempts: Int): Unit = {
-      val responseFuture = Http().singleRequest(request)
+      val responseFuture = scala.compat.java8.FutureConverters.toScala(httpClient.sendAsync(request, BodyHandlers.ofString()))
       responseFuture.onComplete {
-        case Success(response) => println(s"Got ${response.status} for request $request")
+        case Success(response) => println(s"Got ${response.statusCode} for request $request")
         case Failure(reason) =>
           println(s"Ooops! $request failed because of ${reason.getMessage}!")
           scheduleRequest(request, attempts + 1)
@@ -121,6 +116,15 @@ class NoDataLossKinesisSpec extends AnyFlatSpec with TestContainerForAll {
     }
 
     val _ = {
+      val requestStubs = (for {
+        n    <- Gen.chooseNum(10, 50)
+        reqs <- Gen.listOfN(n, SnowplowHttpReq.gen(1, 5, java.time.Instant.now))
+      } yield reqs)
+        .apply(org.scalacheck.Gen.Parameters.default, org.scalacheck.rng.Seed(scala.util.Random.nextLong()))
+        .getOrElse(List.empty)
+
+      val requests = requestStubs.map(toRequest)
+
       requests.foreach(sendRequest(_, 1))
       Thread.sleep(10000)
 
