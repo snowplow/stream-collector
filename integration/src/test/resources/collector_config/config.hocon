@@ -55,7 +55,7 @@ collector {
     sink {
       enabled = "kinesis"
       region = "eu-central-1"
-      customEndpoint = "localhost.localstack.cloud:4566"
+      customEndpoint = "http://localstack:4566"
 
       aws {
         accessKey = env

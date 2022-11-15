@@ -119,9 +119,7 @@ lazy val kinesisSettings =
     libraryDependencies ++= Seq(
       Dependencies.Libraries.kinesis,
       Dependencies.Libraries.sts,
-      Dependencies.Libraries.sqs,
-      Dependencies.Libraries.scalatest,
-      Dependencies.Libraries.tcScalatest
+      Dependencies.Libraries.sqs
     )
   )
 
@@ -143,7 +141,7 @@ lazy val sqsSettings =
     Docker / packageName := "scala-stream-collector-sqs",
     libraryDependencies ++= Seq(
       Dependencies.Libraries.sqs,
-      Dependencies.Libraries.sts,
+      Dependencies.Libraries.sts
     )
   )
 
@@ -258,19 +256,19 @@ lazy val rabbitmqDistroless = project
   .dependsOn(rabbitmq % "test->test;compile->compile")
 
 lazy val integrationTestsDependencies = Seq(
-  Dependencies.Libraries.akkaStream,
-  Dependencies.Libraries.akkaHttp,
   Dependencies.Libraries.kinesis,
-  Dependencies.Libraries.scalatest,
-  Dependencies.Libraries.tcScalatest,
+  Dependencies.Libraries.testcontainers,
+  Dependencies.Libraries.specs2,
   Dependencies.Libraries.slf4j,
-  Dependencies.Libraries.eventGen
+  Dependencies.Libraries.eventGen,
+  Dependencies.Libraries.scalaJava8Compat
 )
 
 lazy val integrationTestsSettings = BuildSettings.formatting ++ Seq(
   libraryDependencies ++= integrationTestsDependencies,
   resolvers ++= Dependencies.resolutionRepos
 )
+
 
 lazy val integrationTests = project
   .in(file("integration"))

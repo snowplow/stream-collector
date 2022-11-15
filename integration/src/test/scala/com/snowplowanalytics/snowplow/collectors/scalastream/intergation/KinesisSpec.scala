@@ -12,56 +12,52 @@
  * implied.  See the Apache License Version 2.0 for the specific language
  * governing permissions and limitations there under.
  */
-package com.snowplowanalytics.snowplow.collectors.scalastream.integration
+package com.snowplowanalytics.snowplow.collectors.scalastream.intergation
 
 import com.amazonaws.auth.{AWSStaticCredentialsProvider, BasicAWSCredentials}
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
 import com.amazonaws.services.kinesis.AmazonKinesisClientBuilder
 import com.amazonaws.services.kinesis.model.GetRecordsRequest
-import com.dimafeng.testcontainers.DockerComposeContainer.ComposeFile
-import com.dimafeng.testcontainers.{ContainerDef, DockerComposeContainer, ExposedService, ServiceLogConsumer}
-import com.dimafeng.testcontainers.scalatest.TestContainerForAll
-import com.snowplowanalytics.snowplow.eventgen.tracker.HttpRequest.Method.{Get, Head, Post}
-import org.scalatest.flatspec.AnyFlatSpec
-import org.slf4j.LoggerFactory
-import org.testcontainers.containers.output.Slf4jLogConsumer
 import com.snowplowanalytics.snowplow.eventgen.tracker.{HttpRequest => SnowplowHttpReq}
+import com.snowplowanalytics.snowplow.eventgen.tracker.HttpRequest.Method.{Get, Head, Post}
 import org.scalacheck.Gen
+import org.specs2.mutable.Specification
+import org.specs2.specification.{AfterAll, BeforeAll}
 
-import java.io.File
+import java.net.URI
 import java.net.http.{HttpClient, HttpRequest}
 import java.net.http.HttpRequest.BodyPublishers
-import java.net.URI
 import java.net.http.HttpResponse.BodyHandlers
 import java.util.concurrent.ScheduledThreadPoolExecutor
+import scala.compat.java8.FutureConverters.CompletionStageOps
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.MILLISECONDS
 import scala.util.{Failure, Success}
 
-class NoDataLossKinesisSpec extends AnyFlatSpec with TestContainerForAll {
-  val composeFile = ComposeFile(Left(new File(".github/workflows/integration_tests/no_data_loss/docker-compose.yml")))
-  val exposedServices =
-    List(ExposedService("localhost.localstack.cloud", 4566), ExposedService("snowplow.collector", 12345))
+class KinesisSpec extends Specification with BeforeAll with AfterAll {
+  val localstack = Containers.localstack
+  val collector  = Containers.collector(localstack)
 
-  lazy val lsLogger = LoggerFactory.getLogger(getClass)
-  val lsLog         = new Slf4jLogConsumer(lsLogger)
+  def beforeAll: Unit = {
+    Containers.start(localstack, "localstack")
+    Containers.start(collector, "collector")
+    ()
+  }
 
-  lazy val cLogger = LoggerFactory.getLogger(getClass)
-  val cLog         = new Slf4jLogConsumer(cLogger)
+  def afterAll: Unit = {
+    Containers.stop(localstack)
+    Containers.stop(collector)
+    ()
+  }
 
-  val logConsumers =
-    List(ServiceLogConsumer("localhost.localstack.cloud", lsLog), ServiceLogConsumer("snowplow.collector", cLog))
+  "The Kinesis collector should" >> {
+    lazy val localstackPort = Containers.getExposedPort(localstack, 4566)
+    lazy val collectorPort  = Containers.getExposedPort(collector, 12345)
 
-  override val containerDef: ContainerDef = DockerComposeContainer.Def(
-    composeFiles    = composeFile,
-    exposedServices = exposedServices
-  )
-
-  it should "ensure no data is lost" in withContainers { _ =>
     lazy val kinesisClient = AmazonKinesisClientBuilder
       .standard()
       .withCredentials(new AWSStaticCredentialsProvider(new BasicAWSCredentials("test", "test")))
-      .withEndpointConfiguration(new EndpointConfiguration("http://localhost:4566", "eu-central-1"))
+      .withEndpointConfiguration(new EndpointConfiguration(s"http://localhost:$localstackPort", "eu-central-1"))
       .build
 
     val executorService = new ScheduledThreadPoolExecutor(10)
@@ -75,20 +71,15 @@ class NoDataLossKinesisSpec extends AnyFlatSpec with TestContainerForAll {
         case Head(_) => "HEAD"
       }
 
-      val path = req.method.path.toString
+      val path        = req.method.path.toString
       val querystring = req.qs.map(_.toString()).getOrElse("")
-      val uri = new URI("http", "", "0.0.0.0", 12345, path, querystring, "")
+      val uri         = new URI("http", "", "0.0.0.0", collectorPort, path, querystring, "")
 
       val headers = req.headers.toList.flatMap { case (k, v) => List(k, v) }
 
       val payload = req.body.map(b => BodyPublishers.ofString(b.toString)).getOrElse(BodyPublishers.noBody())
 
-      HttpRequest
-        .newBuilder()
-        .uri(uri)
-        .headers(headers: _*)
-        .method(method, payload)
-        .build()
+      HttpRequest.newBuilder().uri(uri).headers(headers: _*).method(method, payload).build()
     }
 
     def scheduleRequest(request: HttpRequest, attempts: Int): Unit = {
@@ -106,7 +97,7 @@ class NoDataLossKinesisSpec extends AnyFlatSpec with TestContainerForAll {
     }
 
     def sendRequest(request: HttpRequest, attempts: Int): Unit = {
-      val responseFuture = scala.compat.java8.FutureConverters.toScala(httpClient.sendAsync(request, BodyHandlers.ofString()))
+      val responseFuture = httpClient.sendAsync(request, BodyHandlers.ofString()).toScala
       responseFuture.onComplete {
         case Success(response) => println(s"Got ${response.statusCode} for request $request")
         case Failure(reason) =>
@@ -115,7 +106,7 @@ class NoDataLossKinesisSpec extends AnyFlatSpec with TestContainerForAll {
       }
     }
 
-    val _ = {
+    "ensure no good events are lost" in {
       val requestStubs = (for {
         n    <- Gen.chooseNum(10, 50)
         reqs <- Gen.listOfN(n, SnowplowHttpReq.gen(1, 5, java.time.Instant.now))
@@ -126,14 +117,13 @@ class NoDataLossKinesisSpec extends AnyFlatSpec with TestContainerForAll {
       val requests = requestStubs.map(toRequest)
 
       requests.foreach(sendRequest(_, 1))
-      Thread.sleep(10000)
 
       val shardId           = kinesisClient.describeStream("good").getStreamDescription.getShards.get(0).getShardId
       val iterator          = kinesisClient.getShardIterator("good", shardId, "TRIM_HORIZON").getShardIterator
       val getRecordsRequest = new GetRecordsRequest().withShardIterator(iterator)
       val numRecords        = kinesisClient.getRecords(getRecordsRequest).getRecords.size()
 
-      assert(numRecords == requests.size)
+      numRecords shouldEqual requests.size
     }
   }
 }

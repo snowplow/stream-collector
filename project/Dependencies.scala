@@ -48,10 +48,10 @@ object Dependencies {
     val pureconfig       = "0.15.0"
     val akkaHttpMetrics  = "1.7.1"
     val badRows          = "2.1.1"
+    val scalaJava8Compat = "1.0.2"
 
     // Scala (test only)
     val specs2         = "4.11.0"
-    val scalatest      = "3.2.13"
     val testcontainers = "0.40.10"
     val eventGen       = "0.3.1"
 
@@ -77,24 +77,24 @@ object Dependencies {
     val rabbitMQ       = "com.rabbitmq"                     % "amqp-client"             % V.rabbitMQ
 
     // Scala
-    val collectorPayload = "com.snowplowanalytics" % "collector-payload-1"                % V.collectorPayload
-    val badRows          = "com.snowplowanalytics" %% "snowplow-badrows"                  % V.badRows
-    val trackerCore      = "com.snowplowanalytics" %% "snowplow-scala-tracker-core"       % V.tracker
-    val trackerEmitterId = "com.snowplowanalytics" %% "snowplow-scala-tracker-emitter-id" % V.tracker
-    val scopt            = "com.github.scopt"      %% "scopt"                             % V.scopt
-    val akkaHttp         = "com.typesafe.akka"     %% "akka-http"                         % V.akkaHttp
-    val akkaStream       = "com.typesafe.akka"     %% "akka-stream"                       % V.akka
-    val akkaSlf4j        = "com.typesafe.akka"     %% "akka-slf4j"                        % V.akka
-    val pureconfig       = "com.github.pureconfig" %% "pureconfig"                        % V.pureconfig
-    val akkaHttpMetrics  = "fr.davit"              %% "akka-http-metrics-datadog"         % V.akkaHttpMetrics
+    val collectorPayload = "com.snowplowanalytics"  % "collector-payload-1"                % V.collectorPayload
+    val badRows          = "com.snowplowanalytics"  %% "snowplow-badrows"                  % V.badRows
+    val trackerCore      = "com.snowplowanalytics"  %% "snowplow-scala-tracker-core"       % V.tracker
+    val trackerEmitterId = "com.snowplowanalytics"  %% "snowplow-scala-tracker-emitter-id" % V.tracker
+    val scopt            = "com.github.scopt"       %% "scopt"                             % V.scopt
+    val akkaHttp         = "com.typesafe.akka"      %% "akka-http"                         % V.akkaHttp
+    val akkaStream       = "com.typesafe.akka"      %% "akka-stream"                       % V.akka
+    val akkaSlf4j        = "com.typesafe.akka"      %% "akka-slf4j"                        % V.akka
+    val pureconfig       = "com.github.pureconfig"  %% "pureconfig"                        % V.pureconfig
+    val akkaHttpMetrics  = "fr.davit"               %% "akka-http-metrics-datadog"         % V.akkaHttpMetrics
+    val scalaJava8Compat = "org.scala-lang.modules" %% "scala-java8-compat"                % V.scalaJava8Compat
 
     // Scala (test only)
-    val specs2            = "org.specs2"            %% "specs2-core"                    % V.specs2         % Test
-    val akkaTestkit       = "com.typesafe.akka"     %% "akka-testkit"                   % V.akka           % Test
-    val akkaHttpTestkit   = "com.typesafe.akka"     %% "akka-http-testkit"              % V.akkaHttp       % Test
-    val akkaStreamTestkit = "com.typesafe.akka"     %% "akka-stream-testkit"            % V.akka           % Test
-    val scalatest         = "org.scalatest"         %% "scalatest"                      % V.scalatest      % Test
-    val tcScalatest       = "com.dimafeng"          %% "testcontainers-scala-scalatest" % V.testcontainers % Test
-    val eventGen          = "com.snowplowanalytics" %% "snowplow-event-generator-core"  % V.eventGen       % Test
+    val specs2            = "org.specs2"            %% "specs2-core"                   % V.specs2         % Test
+    val akkaTestkit       = "com.typesafe.akka"     %% "akka-testkit"                  % V.akka           % Test
+    val akkaHttpTestkit   = "com.typesafe.akka"     %% "akka-http-testkit"             % V.akkaHttp       % Test
+    val akkaStreamTestkit = "com.typesafe.akka"     %% "akka-stream-testkit"           % V.akka           % Test
+    val testcontainers    = "com.dimafeng"          %% "testcontainers-scala-core"     % V.testcontainers % Test
+    val eventGen          = "com.snowplowanalytics" %% "snowplow-event-generator-core" % V.eventGen       % Test
   }
 }
