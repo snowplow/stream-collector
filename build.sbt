@@ -259,6 +259,9 @@ lazy val integrationTestsDependencies = Seq(
   Dependencies.Libraries.kinesis,
   Dependencies.Libraries.testcontainers,
   Dependencies.Libraries.specs2,
+  Dependencies.Libraries.specs2Cats,
+  Dependencies.Libraries.specs2CE,
+  Dependencies.Libraries.catsEffect,
   Dependencies.Libraries.slf4j,
   Dependencies.Libraries.eventGen,
   Dependencies.Libraries.scalaJava8Compat

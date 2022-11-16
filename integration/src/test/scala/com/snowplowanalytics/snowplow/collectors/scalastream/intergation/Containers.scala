@@ -14,6 +14,7 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream.intergation
 
+import cats.effect.{Resource, Sync}
 import com.dimafeng.testcontainers.GenericContainer
 import org.slf4j.LoggerFactory
 import org.testcontainers.containers.output.Slf4jLogConsumer
@@ -75,6 +76,9 @@ object Containers {
     container.underlyingUnsafeContainer.dependsOn(dep)
     container.container
   }
+
+  def mkContainer[F[_]: Sync](container: JGenericContainer[_], loggerName: String): Resource[F, JGenericContainer[_]] =
+    Resource.make(Sync[F].delay(start(container, loggerName)))(c => Sync[F].delay(stop(c)))
 
   def start(container: JGenericContainer[_], loggerName: String): JGenericContainer[_] = {
     val logger = LoggerFactory.getLogger(loggerName)
