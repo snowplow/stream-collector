@@ -50,7 +50,7 @@ object Dependencies {
     val badRows          = "2.1.1"
     val scalaJava8Compat = "1.0.2"
     val catsEffect       = "2.5.0"
-    
+
     // Scala (test only)
     val specs2         = "4.17.0"
     val specs2Cats = "4.11.0"

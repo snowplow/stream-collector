@@ -30,21 +30,22 @@ class KinesisSpec extends Specification with CatsIO {
 
       val resources = for {
         localstack <- Containers.mkContainer[IO](localstack, "localstack")
-        collector <- Containers.mkContainer[IO](collector, "collector")
-        kinesis <- Kinesis.mkKinesisClient[IO](localstackPort)
+        collector  <- Containers.mkContainer[IO](collector, "collector")
+        kinesis    <- Kinesis.mkKinesisClient[IO](localstackPort)
         httpClient <- Http.mkHttpClient[IO]
-        executor <- Http.mkExecutor[IO]
+        executor   <- Http.mkExecutor[IO]
       } yield (localstack, collector, kinesis, httpClient, executor)
 
-      resources.use { case (_, _, kinesis, httpClient, executor) =>
-        val requestStubs = EventGenerator.makeStubs(10, 50)
-        val requests = requestStubs.map(Http.makeRequest(_, collectorPort))
+      resources.use {
+        case (_, _, kinesis, httpClient, executor) =>
+          val requestStubs = EventGenerator.makeStubs(10, 50)
+          val requests     = requestStubs.map(Http.makeRequest(_, collectorPort))
 
-        for {
-          _ <- Http.send[IO](requests)(httpClient, executor)
-          _ <- Sync[IO].delay(Thread.sleep(10000)) // allow time for all records to be written before trying to read them
-          numRecords <- Kinesis.getResult[IO](kinesis)
-        } yield (numRecords shouldEqual requests.size)
+          for {
+            _          <- Http.send[IO](requests)(httpClient, executor)
+            _          <- Sync[IO].delay(Thread.sleep(10000)) // allow time for all records to be written before trying to read them
+            numRecords <- Kinesis.getResult[IO](kinesis)
+          } yield (numRecords shouldEqual requests.size)
       }
     }
   }

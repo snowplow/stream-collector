@@ -55,7 +55,8 @@ object TestUtils {
   object Http {
     def mkHttpClient[F[_]: Sync]: Resource[F, HttpClient] = Resource.pure(HttpClient.newBuilder().build())
 
-    def mkExecutor[F[_]: Sync]: Resource[F, ScheduledThreadPoolExecutor] = Resource.pure(new ScheduledThreadPoolExecutor(10))
+    def mkExecutor[F[_]: Sync]: Resource[F, ScheduledThreadPoolExecutor] =
+      Resource.pure(new ScheduledThreadPoolExecutor(10))
 
     def makeRequest(reqStub: RequestStub, collectorPort: Int): HttpRequest = {
       val method = reqStub.method match {
