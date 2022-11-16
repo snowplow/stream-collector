@@ -43,6 +43,7 @@ class KinesisSpec extends Specification with CatsIO {
 
         for {
           _ <- Http.send[IO](requests)(httpClient, executor)
+          _ = Thread.sleep(10000) // allow time for all records to be written before trying to read them
           numRecords <- Kinesis.getResult[IO](kinesis)
         } yield (numRecords shouldEqual requests.size)
       }
