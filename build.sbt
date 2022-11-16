@@ -272,7 +272,6 @@ lazy val integrationTestsSettings = BuildSettings.formatting ++ Seq(
   resolvers ++= Dependencies.resolutionRepos
 )
 
-
 lazy val integrationTests = project
   .in(file("integration"))
   .settings(integrationTestsSettings)
