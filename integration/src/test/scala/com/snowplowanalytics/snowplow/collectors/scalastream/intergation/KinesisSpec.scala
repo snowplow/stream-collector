@@ -14,10 +14,9 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream.intergation
 
-import cats.effect.IO
+import cats.effect.{IO, Sync}
 import cats.effect.testing.specs2.CatsIO
 import com.snowplowanalytics.snowplow.collectors.scalastream.intergation.TestUtils._
-
 import org.specs2.mutable.Specification
 
 class KinesisSpec extends Specification with CatsIO {
@@ -43,7 +42,7 @@ class KinesisSpec extends Specification with CatsIO {
 
         for {
           _ <- Http.send[IO](requests)(httpClient, executor)
-          _ = Thread.sleep(10000) // allow time for all records to be written before trying to read them
+          _ <- Sync[IO].delay(Thread.sleep(10000)) // allow time for all records to be written before trying to read them
           numRecords <- Kinesis.getResult[IO](kinesis)
         } yield (numRecords shouldEqual requests.size)
       }
