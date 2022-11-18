@@ -51,7 +51,10 @@ class KinesisSpec extends Specification with CatsIO {
             _       <- Sync[IO].delay(Thread.sleep(10000)) // allow time for all records to be written before trying to read them
             numGood <- Kinesis.getResult[IO](kinesis, "good")
             numBad  <- Kinesis.getResult[IO](kinesis, "bad")
-          } yield (numGood + numBad shouldEqual requests.size)
+          } yield {
+            numGood shouldEqual good.size
+            numBad shouldEqual bad.size
+          }
       }
     }
   }
