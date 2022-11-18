@@ -43,9 +43,9 @@ object TestUtils {
         .build
     )
 
-    def getResult[F[_]: Sync](kinesis: AmazonKinesis): F[Int] = {
-      val shardId           = kinesis.describeStream("good").getStreamDescription.getShards.get(0).getShardId
-      val iterator          = kinesis.getShardIterator("good", shardId, "TRIM_HORIZON").getShardIterator
+    def getResult[F[_]: Sync](kinesis: AmazonKinesis, streamName: String): F[Int] = {
+      val shardId           = kinesis.describeStream(streamName).getStreamDescription.getShards.get(0).getShardId
+      val iterator          = kinesis.getShardIterator(streamName, shardId, "TRIM_HORIZON").getShardIterator
       val getRecordsRequest = new GetRecordsRequest().withShardIterator(iterator)
 
       Sync[F].delay(kinesis.getRecords(getRecordsRequest).getRecords.size())
@@ -58,56 +58,82 @@ object TestUtils {
     def mkExecutor[F[_]: Sync]: Resource[F, ScheduledThreadPoolExecutor] =
       Resource.pure(new ScheduledThreadPoolExecutor(10))
 
-    def makeRequest(reqStub: RequestStub, collectorPort: Int): HttpRequest = {
-      val method = reqStub.method match {
-        case Post(_) => "POST"
-        case Get(_)  => "GET"
-        case Head(_) => "HEAD"
+    object Request {
+      trait RequestType {
+        def querystring: RequestStub => String
+        def payload: RequestStub => HttpRequest.BodyPublisher
       }
 
-      val path        = reqStub.method.path.toString
-      val querystring = reqStub.qs.map(_.toString()).getOrElse("")
-      val uri         = new URI("http", "", "0.0.0.0", collectorPort, path, querystring, "")
-      val headers     = reqStub.headers.toList.flatMap { case (k, v) => List(k, v) }
-      val payload     = reqStub.body.map(b => BodyPublishers.ofString(b.toString)).getOrElse(BodyPublishers.noBody())
+      object RequestType {
+        final case object Good extends RequestType {
+          override def querystring: RequestStub => String = _.qs.map(_.toString()).getOrElse("")
+          override def payload: RequestStub => HttpRequest.BodyPublisher =
+            _.body.map(b => BodyPublishers.ofString(b.toString)).getOrElse(BodyPublishers.noBody())
+        }
 
-      HttpRequest.newBuilder().uri(uri).headers(headers: _*).method(method, payload).build()
-    }
+        final case object Bad extends RequestType {
+          override def querystring: RequestStub => String = _ => ""
+          override def payload: RequestStub => HttpRequest.BodyPublisher = _.body match {
+            case None => BodyPublishers.noBody()
+            case Some(_) =>
+              val newBody = "s" * 1000001
+              BodyPublishers.ofString(newBody)
+          }
+        }
+      }
 
-    def scheduleRequest(
-      request: HttpRequest,
-      attempts: Int
-    )(httpClient: HttpClient, executor: ScheduledThreadPoolExecutor): Unit = {
-      val Backoff = 500L
-      executor.schedule(
-        new Runnable {
-          override def run(): Unit =
-            if (attempts >= 5) throw new RuntimeException(s"Still failing after 5 attempts: $request")
-            else sendRequest(request, attempts)(httpClient, executor)
-        },
-        Backoff,
-        MILLISECONDS
-      )
-      ()
-    }
+      def make(reqStub: RequestStub, collectorPort: Int, reqType: RequestType): HttpRequest = {
+        val method = reqStub.method match {
+          case Post(_) => "POST"
+          case Get(_)  => "GET"
+          case Head(_) => "HEAD"
+        }
 
-    def sendRequest(
-      request: HttpRequest,
-      attempts: Int
-    )(httpClient: HttpClient, executor: ScheduledThreadPoolExecutor): Unit = {
-      val responseFuture = httpClient.sendAsync(request, BodyHandlers.ofString()).toScala
-      responseFuture.onComplete {
-        case Success(response) => println(s"Got ${response.statusCode} for request $request")
-        case Failure(reason) =>
-          println(s"Ooops! $request failed because of ${reason.getMessage}!")
-          scheduleRequest(request, attempts + 1)(httpClient, executor)
+        val path        = reqStub.method.path.toString
+        val querystring = reqType.querystring(reqStub)
+        val uri         = new URI("http", "", "0.0.0.0", collectorPort, path, querystring, "")
+        val headers     = reqStub.headers.toList.flatMap { case (k, v) => List(k, v) }
+        val payload     = reqType.payload(reqStub)
+
+        HttpRequest.newBuilder().uri(uri).headers(headers: _*).method(method, payload).build()
+      }
+
+      def schedule(
+        request: HttpRequest,
+        attempts: Int
+      )(httpClient: HttpClient, executor: ScheduledThreadPoolExecutor): Unit = {
+        val Backoff = 500L
+        executor.schedule(
+          new Runnable {
+            override def run(): Unit =
+              if (attempts >= 5) throw new RuntimeException(s"Still failing after 5 attempts: $request")
+              else send(request, attempts)(httpClient, executor)
+          },
+          Backoff,
+          MILLISECONDS
+        )
+        ()
+      }
+
+      def send(
+        request: HttpRequest,
+        attempts: Int,
+        verbose: Boolean = false
+      )(httpClient: HttpClient, executor: ScheduledThreadPoolExecutor): Unit = {
+        val responseFuture = httpClient.sendAsync(request, BodyHandlers.ofString()).toScala
+        responseFuture.onComplete {
+          case Success(response) => if (verbose) println(s"Got ${response.statusCode} for request $request") else ()
+          case Failure(reason) =>
+            if (verbose) println(s"Ooops! $request failed because of ${reason.getMessage}!") else ()
+            schedule(request, attempts + 1)(httpClient, executor)
+        }
       }
     }
 
     def send[F[_]: Sync](
       requests: List[HttpRequest]
     )(httpClient: HttpClient, executor: ScheduledThreadPoolExecutor): F[Unit] =
-      Sync[F].delay(requests.foreach(sendRequest(_, 1)(httpClient, executor)))
+      Sync[F].delay(requests.foreach(Request.send(_, 1)(httpClient, executor)))
   }
 
   object EventGenerator {
