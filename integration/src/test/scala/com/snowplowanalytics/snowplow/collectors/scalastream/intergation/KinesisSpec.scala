@@ -31,8 +31,8 @@ class KinesisSpec extends Specification with CatsIO {
       lazy val collectorPort  = Containers.getExposedPort(collector, 12345)
 
       val resources = for {
-        localstack <- Containers.mkContainer[IO](localstack, "localstack")
-        collector  <- Containers.mkContainer[IO](collector, "collector")
+        localstack <- Containers.mkContainer[IO](localstack)
+        collector  <- Containers.mkContainer[IO](collector)
         kinesis    <- Kinesis.mkKinesisClient[IO](localstackPort)
         httpClient <- Http.mkHttpClient[IO]
         executor   <- Http.mkExecutor[IO]

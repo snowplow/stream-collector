@@ -77,14 +77,23 @@ object Containers {
     container.container
   }
 
-  def mkContainer[F[_]: Sync](container: JGenericContainer[_], loggerName: String): Resource[F, JGenericContainer[_]] =
+  def mkContainer[F[_]: Sync](
+    container: JGenericContainer[_],
+    loggerName: Option[String] = None
+  ): Resource[F, JGenericContainer[_]] =
     Resource.make(Sync[F].delay(start(container, loggerName)))(c => Sync[F].delay(stop(c)))
 
-  def start(container: JGenericContainer[_], loggerName: String): JGenericContainer[_] = {
-    val logger = LoggerFactory.getLogger(loggerName)
-    val logs   = new Slf4jLogConsumer(logger)
+  def start(container: JGenericContainer[_], loggerName: Option[String]): JGenericContainer[_] = {
     container.start()
-    container.followOutput(logs)
+
+    loggerName match {
+      case Some(ln) =>
+        val logger = LoggerFactory.getLogger(ln)
+        val logs   = new Slf4jLogConsumer(logger)
+        container.followOutput(logs)
+      case _ => ()
+    }
+
     container
   }
 
