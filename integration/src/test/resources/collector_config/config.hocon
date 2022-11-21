@@ -1,4 +1,6 @@
 collector {
+  enableStartupChecks = false
+
   interface = 0.0.0.0
   port = 12345
 
@@ -56,6 +58,9 @@ collector {
       enabled = "kinesis"
       region = "eu-central-1"
       customEndpoint = "http://localstack:4566"
+
+      sqsGoodBuffer = "good"
+      sqsBadBuffer = "bad"
 
       aws {
         accessKey = env

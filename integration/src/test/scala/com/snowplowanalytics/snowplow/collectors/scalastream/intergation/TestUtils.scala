@@ -48,7 +48,7 @@ object TestUtils {
       val iterator          = kinesis.getShardIterator(streamName, shardId, "TRIM_HORIZON").getShardIterator
       val getRecordsRequest = new GetRecordsRequest().withShardIterator(iterator)
 
-      Sync[F].delay(kinesis.getRecords(getRecordsRequest).getRecords.size())
+      Sync[F].delay(kinesis.getRecords(getRecordsRequest).getRecords.size)
     }
   }
 
@@ -76,7 +76,7 @@ object TestUtils {
           override def payload: RequestStub => HttpRequest.BodyPublisher = _.body match {
             case None => BodyPublishers.noBody()
             case Some(_) =>
-              val newBody = "s" * 1000001
+              val newBody = "s" * 192001
               BodyPublishers.ofString(newBody)
           }
         }

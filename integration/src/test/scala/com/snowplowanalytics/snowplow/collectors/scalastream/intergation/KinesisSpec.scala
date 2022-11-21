@@ -18,6 +18,7 @@ import cats.effect.{IO, Sync}
 import cats.effect.testing.specs2.CatsIO
 import com.snowplowanalytics.snowplow.collectors.scalastream.intergation.TestUtils.Http.Request.RequestType.{Bad, Good}
 import com.snowplowanalytics.snowplow.collectors.scalastream.intergation.TestUtils._
+import com.snowplowanalytics.snowplow.eventgen.tracker.HttpRequest.Method.Post
 import org.specs2.mutable.Specification
 
 class KinesisSpec extends Specification with CatsIO {
@@ -42,7 +43,15 @@ class KinesisSpec extends Specification with CatsIO {
           val requestStubs = EventGenerator.makeStubs(10, 50)
           val good         = requestStubs.map(Http.Request.make(_, collectorPort, Good))
           val bad =
-            requestStubs.map(Http.Request.make(_, collectorPort, Bad)).filterNot(req => !(req.method() == "POST"))
+            requestStubs
+              .filter(req =>
+                req.method match {
+                  case Post(_) if req.body.isDefined => true
+                  case _                             => false
+                }
+              )
+              .map(Http.Request.make(_, collectorPort, Bad))
+
           val requests = good ++ bad
 
           for {
