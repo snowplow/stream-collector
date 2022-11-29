@@ -25,7 +25,7 @@ class KinesisSpec extends Specification with CatsIO {
   "The Kinesis collector should" >> {
     "ensure all events are written to the sink" in {
       val localstack = Containers.localstack
-      val collector  = Containers.collector(localstack)
+      val collector  = Containers.collector("kinesis", Some(localstack))
 
       lazy val localstackPort = Containers.getExposedPort(localstack, 4566)
       lazy val collectorPort  = Containers.getExposedPort(collector, 12345)
@@ -35,11 +35,10 @@ class KinesisSpec extends Specification with CatsIO {
         collector  <- Containers.mkContainer[IO](collector)
         kinesis    <- Kinesis.mkKinesisClient[IO](localstackPort)
         httpClient <- Http.mkHttpClient[IO]
-        executor   <- Http.mkExecutor[IO]
-      } yield (localstack, collector, kinesis, httpClient, executor)
+      } yield (localstack, collector, kinesis, httpClient)
 
       resources.use {
-        case (_, _, kinesis, httpClient, executor) =>
+        case (_, _, kinesis, httpClient) =>
           val requestStubs = EventGenerator.makeStubs(10, 50)
           val good         = requestStubs.map(Http.Request.make(_, collectorPort, Good))
           val bad =
@@ -56,7 +55,7 @@ class KinesisSpec extends Specification with CatsIO {
 
           for {
             _       <- Sync[IO].delay(println(s"Sending ${good.size} good and ${bad.size} bad events."))
-            _       <- Http.send[IO](requests)(httpClient, executor)
+            _       <- Http.sendAll[IO](requests, httpClient)
             _       <- Sync[IO].delay(Thread.sleep(10000)) // allow time for all records to be written before trying to read them
             numGood <- Kinesis.getResult[IO](kinesis, "good")
             numBad  <- Kinesis.getResult[IO](kinesis, "bad")

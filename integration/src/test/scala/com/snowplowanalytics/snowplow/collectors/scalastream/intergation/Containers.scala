@@ -54,14 +54,14 @@ object Containers {
     container.container
   }
 
-  def collector(dep: JGenericContainer[_]): JGenericContainer[_] = {
+  def collector(flavour: String, dep: Option[JGenericContainer[_]] = None): JGenericContainer[_] = {
     val imageFromDockerfile = new ImageFromDockerfile()
-      .withDockerfile(java.nio.file.Path.of("kinesis", "target", "docker", "stage", "Dockerfile"))
+      .withDockerfile(java.nio.file.Path.of(flavour, "target", "docker", "stage", "Dockerfile"))
     val container = GenericContainer(
       dockerImage  = imageFromDockerfile,
       exposedPorts = Seq(12345),
       env          = Map("AWS_ACCESS_KEY_ID" -> "test", "AWS_SECRET_KEY" -> "test"),
-      command      = Seq("--config", "/snowplow/config/config.hocon"),
+      command      = Seq("--config", s"/snowplow/config/$flavour.hocon"),
       waitStrategy = Wait.forLogMessage(".*REST interface bound to.*", 1),
       fileSystemBind = Seq(
         GenericContainer.FileSystemBind(
@@ -73,7 +73,12 @@ object Containers {
     )
     container.underlyingUnsafeContainer.withNetwork(network)
     container.underlyingUnsafeContainer.withNetworkAliases("collector")
-    container.underlyingUnsafeContainer.dependsOn(dep)
+
+    dep match {
+      case Some(c) => container.underlyingUnsafeContainer.dependsOn(c)
+      case _       => ()
+    }
+
     container.container
   }
 

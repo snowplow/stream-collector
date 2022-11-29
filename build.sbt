@@ -275,4 +275,4 @@ lazy val integrationTestsSettings = BuildSettings.formatting ++ Seq(
 lazy val integrationTests = project
   .in(file("integration"))
   .settings(integrationTestsSettings)
-  .settings((Test / test) := (Test / test).dependsOn(kinesis / Docker / stage).value)
+  .settings((Test / test) := (Test / test).dependsOn(kinesis / Docker / stage, stdout / Docker / stage).value)

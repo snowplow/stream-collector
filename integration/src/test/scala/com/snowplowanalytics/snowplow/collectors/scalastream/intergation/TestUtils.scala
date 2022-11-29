@@ -14,7 +14,8 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream.intergation
 
-import cats.effect.{Resource, Sync}
+import cats.effect.{ContextShift, Resource, Sync, Timer}
+import cats.implicits._
 import com.amazonaws.auth.{AWSStaticCredentialsProvider, BasicAWSCredentials}
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
 import com.amazonaws.services.kinesis.model.GetRecordsRequest
@@ -26,16 +27,13 @@ import org.scalacheck.Gen
 import java.net.URI
 import java.net.http.HttpRequest.BodyPublishers
 import java.net.http.HttpResponse.BodyHandlers
-import java.net.http.{HttpClient, HttpRequest}
-import java.util.concurrent.ScheduledThreadPoolExecutor
-import scala.compat.java8.FutureConverters.CompletionStageOps
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.MILLISECONDS
-import scala.util.{Failure, Success}
+import java.net.http.{HttpClient, HttpRequest, HttpResponse}
+import scala.concurrent.duration.DurationInt
+import scala.jdk.CollectionConverters.iterableAsScalaIterableConverter
 
 object TestUtils {
   object Kinesis {
-    def mkKinesisClient[F[_]: Sync](localstackPort: Int): Resource[F, AmazonKinesis] = Resource.pure(
+    def mkKinesisClient[F[_]: Sync](localstackPort: Int): Resource[F, AmazonKinesis] = Resource.pure[F, AmazonKinesis](
       AmazonKinesisClientBuilder
         .standard()
         .withCredentials(new AWSStaticCredentialsProvider(new BasicAWSCredentials("test", "test")))
@@ -53,27 +51,25 @@ object TestUtils {
   }
 
   object Http {
-    def mkHttpClient[F[_]: Sync]: Resource[F, HttpClient] = Resource.pure(HttpClient.newBuilder().build())
-
-    def mkExecutor[F[_]: Sync]: Resource[F, ScheduledThreadPoolExecutor] =
-      Resource.pure(new ScheduledThreadPoolExecutor(10))
+    def mkHttpClient[F[_]: Sync]: Resource[F, HttpClient] =
+      Resource.pure[F, HttpClient](HttpClient.newBuilder().build())
 
     object Request {
       trait RequestType {
         def querystring: RequestStub => String
-        def payload: RequestStub => HttpRequest.BodyPublisher
+        def payload: RequestStub     => HttpRequest.BodyPublisher
       }
 
       object RequestType {
         final case object Good extends RequestType {
           override def querystring: RequestStub => String = _.qs.map(_.toString()).getOrElse("")
-          override def payload: RequestStub => HttpRequest.BodyPublisher =
+          override def payload: RequestStub     => HttpRequest.BodyPublisher =
             _.body.map(b => BodyPublishers.ofString(b.toString)).getOrElse(BodyPublishers.noBody())
         }
 
         final case object Bad extends RequestType {
           override def querystring: RequestStub => String = _ => ""
-          override def payload: RequestStub => HttpRequest.BodyPublisher = _.body match {
+          override def payload: RequestStub     => HttpRequest.BodyPublisher = _.body match {
             case None => BodyPublishers.noBody()
             case Some(_) =>
               val newBody = "s" * 192001
@@ -98,42 +94,41 @@ object TestUtils {
         HttpRequest.newBuilder().uri(uri).headers(headers: _*).method(method, payload).build()
       }
 
-      def schedule(
-        request: HttpRequest,
-        attempts: Int
-      )(httpClient: HttpClient, executor: ScheduledThreadPoolExecutor): Unit = {
-        val Backoff = 500L
-        executor.schedule(
-          new Runnable {
-            override def run(): Unit =
-              if (attempts >= 5) throw new RuntimeException(s"Still failing after 5 attempts: $request")
-              else send(request, attempts)(httpClient, executor)
-          },
-          Backoff,
-          MILLISECONDS
-        )
-        ()
-      }
+      def send[F[_]: Sync](request: HttpRequest, httpClient: HttpClient): F[HttpResponse[String]] =
+        Sync[F].delay(httpClient.send(request, BodyHandlers.ofString()))
 
-      def send(
-        request: HttpRequest,
-        attempts: Int,
-        verbose: Boolean = false
-      )(httpClient: HttpClient, executor: ScheduledThreadPoolExecutor): Unit = {
-        val responseFuture = httpClient.sendAsync(request, BodyHandlers.ofString()).toScala
-        responseFuture.onComplete {
-          case Success(response) => if (verbose) println(s"Got ${response.statusCode} for request $request") else ()
-          case Failure(reason) =>
-            if (verbose) println(s"Ooops! $request failed because of ${reason.getMessage}!") else ()
-            schedule(request, attempts + 1)(httpClient, executor)
+      def withRetry[F[_]: Sync: Timer: ContextShift](
+        f: F[HttpResponse[String]],
+        maxRetries: Int
+      ): F[HttpResponse[String]] = {
+        val Backoff = 500.milliseconds
+        f.handleErrorWith { error =>
+          if (maxRetries > 0)
+            Timer[F].sleep(Backoff) *> withRetry(f, maxRetries - 1)
+          else Sync[F].raiseError(error)
         }
       }
+
+      def sendWithRetry[F[_]: Sync: Timer: ContextShift](
+        request: HttpRequest,
+        httpClient: HttpClient,
+        maxRetries: Int
+      ): F[HttpResponse[String]] = withRetry(send(request, httpClient), maxRetries)
     }
 
-    def send[F[_]: Sync](
-      requests: List[HttpRequest]
-    )(httpClient: HttpClient, executor: ScheduledThreadPoolExecutor): F[Unit] =
-      Sync[F].delay(requests.foreach(Request.send(_, 1)(httpClient, executor)))
+    def sendAll[F[_]: Sync: Timer: ContextShift](
+      requests: List[HttpRequest],
+      httpClient: HttpClient
+    ): F[List[HttpResponse[String]]] =
+      requests.traverse[F, HttpResponse[String]](req => Request.sendWithRetry(req, httpClient, 5))
+
+    def sendOne[F[_]: Sync](request: HttpRequest, httpClient: HttpClient): F[HttpResponse[String]] =
+      Request.send(request, httpClient)
+
+    def getCode(response: HttpResponse[_]): Int = response.statusCode()
+
+    def getHeader(response: HttpResponse[_], headerName: String): List[String] =
+      response.headers().allValues(headerName).asScala.toList
   }
 
   object EventGenerator {
