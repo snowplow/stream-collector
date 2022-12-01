@@ -25,7 +25,7 @@ class KinesisSpec extends Specification with CatsIO {
   "The Kinesis collector should" >> {
     "ensure all events are written to the sink" in {
       val localstack = Containers.localstack
-      val collector  = Containers.collector("kinesis", Some(localstack))
+      val collector  = Containers.collector("kinesis", "config", Some(localstack))
 
       lazy val localstackPort = Containers.getExposedPort(localstack, 4566)
       lazy val collectorPort  = Containers.getExposedPort(collector, 12345)

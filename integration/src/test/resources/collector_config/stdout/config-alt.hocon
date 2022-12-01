@@ -19,8 +19,8 @@ collector {
 
   cookie {
     enabled = true
-    expiration = "365 days"
-    name = "sp"
+    expiration = "7 days"
+    name = "alt"
     secure = false
     httpOnly = false
   }

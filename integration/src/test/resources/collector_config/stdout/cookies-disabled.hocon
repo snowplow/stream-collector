@@ -1,0 +1,84 @@
+collector {
+  enableStartupChecks = false
+
+  interface = 0.0.0.0
+  port = 12345
+
+  paths { }
+
+  p3p {
+    policyRef = "/w3c/p3p.xml"
+    CP = "NOI DSP COR NID PSA OUR IND COM NAV STA"
+  }
+
+  crossDomain {
+    enabled = false
+    domains = [ "*" ]
+    secure = true
+  }
+
+  cookie {
+    enabled = false
+  }
+
+  doNotTrackCookie {
+    enabled = false
+    name = "dnt"
+    value = "dnt"
+  }
+
+  cookieBounce {
+    enabled = false
+    name = "n3pc"
+    fallbackNetworkUserId = "00000000-0000-4000-A000-000000000000"
+  }
+
+  redirectMacro {
+    enabled = false
+  }
+
+  rootResponse {
+    enabled = false
+    statusCode = 302
+  }
+
+  cors {
+    accessControlMaxAge = 5 seconds
+  }
+
+  streams {
+    good = "good"
+    bad = "bad"
+
+    sink {
+      enabled = "stdout"
+    }
+
+    buffer {
+      byteLimit = 1024
+      recordLimit = 1
+      timeLimit = 30
+    }
+  }
+
+  telemetry{
+    disabled = true
+  }
+}
+
+akka {
+  loglevel = DEBUG
+  loggers = ["akka.event.slf4j.Slf4jLogger"]
+
+  http.server {
+    remote-address-header = on
+    raw-request-uri-header = on
+
+    parsing {
+      max-uri-length = 32768
+      uri-parsing-mode = relaxed
+    }
+
+    max-connections = 2048
+  }
+}

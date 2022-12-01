@@ -28,6 +28,8 @@ import java.net.URI
 import java.net.http.HttpRequest.BodyPublishers
 import java.net.http.HttpResponse.BodyHandlers
 import java.net.http.{HttpClient, HttpRequest, HttpResponse}
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.iterableAsScalaIterableConverter
 
@@ -114,6 +116,21 @@ object TestUtils {
         httpClient: HttpClient,
         maxRetries: Int
       ): F[HttpResponse[String]] = withRetry(send(request, httpClient), maxRetries)
+
+      def addDNT(stub: RequestStub): RequestStub = addHeader(stub, "Cookie", "dnt=dnt", ";")
+
+      def addOrigin(stub: RequestStub, originDomain: String): RequestStub = addHeader(stub, "Origin", originDomain, ",")
+
+      def addHeader(stub: RequestStub, headerName: String, headerValue: String, sep: String): RequestStub = {
+        val headers = stub.headers
+        val newHeaderValue = headers.get(headerName) match {
+          case Some(v) => s"$v$sep$headerValue"
+          case _       => headerValue
+        }
+        val newHeaders = headers ++ Map(headerName -> newHeaderValue)
+
+        stub.copy(headers = newHeaders)
+      }
     }
 
     def sendAll[F[_]: Sync: Timer: ContextShift](
@@ -139,5 +156,14 @@ object TestUtils {
       } yield reqs)
         .apply(org.scalacheck.Gen.Parameters.default, org.scalacheck.rng.Seed(scala.util.Random.nextLong()))
         .getOrElse(List.empty)
+  }
+
+  object Epoch {
+    def fromString(s: String): Long = {
+      val formatter = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss z")
+      ZonedDateTime.parse(s, formatter).toInstant.toEpochMilli
+    }
+
+    def now: Long = ZonedDateTime.now().toInstant.toEpochMilli
   }
 }
