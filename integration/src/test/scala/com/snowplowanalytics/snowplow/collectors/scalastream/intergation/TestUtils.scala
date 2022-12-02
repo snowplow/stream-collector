@@ -20,14 +20,17 @@ import com.amazonaws.auth.{AWSStaticCredentialsProvider, BasicAWSCredentials}
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
 import com.amazonaws.services.kinesis.model.GetRecordsRequest
 import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClientBuilder}
+import com.snowplowanalytics.snowplow.eventgen.collector.Api
 import com.snowplowanalytics.snowplow.eventgen.tracker.{HttpRequest => RequestStub}
 import com.snowplowanalytics.snowplow.eventgen.tracker.HttpRequest.Method.{Get, Head, Post}
+import org.apache.commons.codec.binary.{Base64 => ABase64}
 import org.scalacheck.Gen
 
 import java.net.URI
 import java.net.http.HttpRequest.BodyPublishers
 import java.net.http.HttpResponse.BodyHandlers
 import java.net.http.{HttpClient, HttpRequest, HttpResponse}
+import java.nio.charset.StandardCharsets
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import scala.concurrent.duration.DurationInt
@@ -131,6 +134,16 @@ object TestUtils {
 
         stub.copy(headers = newHeaders)
       }
+
+      def setPath(stub: RequestStub, newPath: Api): RequestStub = {
+        val newMethod = stub.method match {
+          case Post(_) => Post(newPath)
+          case Get(_)  => Get(newPath)
+          case Head(_) => Head(newPath)
+        }
+
+        stub.copy(method = newMethod)
+      }
     }
 
     def sendAll[F[_]: Sync: Timer: ContextShift](
@@ -165,5 +178,12 @@ object TestUtils {
     }
 
     def now: Long = ZonedDateTime.now().toInstant.toEpochMilli
+  }
+
+  object Base64 {
+    def decode(s: String): String = {
+      val decoded = ABase64.decodeBase64(s)
+      new String(decoded, StandardCharsets.UTF_8)
+    }
   }
 }
