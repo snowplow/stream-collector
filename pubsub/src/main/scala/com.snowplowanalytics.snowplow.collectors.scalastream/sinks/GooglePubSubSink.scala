@@ -14,17 +14,28 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 package sinks
 
 import java.util.concurrent.Executors
-import com.google.api.core.{ApiFutureCallback, ApiFutures}
-import com.google.api.gax.batching.BatchingSettings
-import com.google.api.gax.retrying.RetrySettings
-import com.google.api.gax.rpc.{ApiException, FixedHeaderProvider}
-import com.google.cloud.pubsub.v1.{Publisher, TopicAdminClient}
-import com.google.pubsub.v1.{ProjectName, ProjectTopicName, PubsubMessage}
-import com.google.protobuf.ByteString
-import org.threeten.bp.Duration
 
 import scala.collection.JavaConverters._
 import scala.util._
+
+import org.threeten.bp.Duration
+
+import com.google.api.core.{ApiFutureCallback, ApiFutures}
+import com.google.api.gax.batching.BatchingSettings
+import com.google.api.gax.retrying.RetrySettings
+import com.google.api.gax.core.{CredentialsProvider, NoCredentialsProvider}
+import com.google.api.gax.grpc.GrpcTransportChannel
+import com.google.api.gax.rpc.{
+  ApiException,
+  FixedHeaderProvider,
+  FixedTransportChannelProvider,
+  TransportChannelProvider
+}
+import com.google.cloud.pubsub.v1.{Publisher, TopicAdminClient, TopicAdminSettings}
+import com.google.pubsub.v1.{ProjectName, ProjectTopicName, PubsubMessage, TopicName}
+import com.google.protobuf.ByteString
+
+import io.grpc.ManagedChannelBuilder
 
 import cats.syntax.either._
 
@@ -100,17 +111,28 @@ object GooglePubSubSink {
     for {
       batching <- batchingSettings(bufferConfig).asRight
       retry = retrySettings(googlePubSubConfig.backoffPolicy)
-      publisher <- createPublisher(googlePubSubConfig.googleProjectId, topicName, batching, retry)
-      _ <- if (enableStartupChecks) topicExists(googlePubSubConfig.googleProjectId, topicName).flatMap { b =>
-        if (b) ().asRight
-        else new IllegalArgumentException(s"Google PubSub topic $topicName doesn't exist").asLeft
+      customProviders = sys.env.get("PUBSUB_EMULATOR_HOST").map { hostPort =>
+        val channel             = ManagedChannelBuilder.forTarget(hostPort).usePlaintext().build()
+        val channelProvider     = FixedTransportChannelProvider.create(GrpcTransportChannel.create(channel))
+        val credentialsProvider = NoCredentialsProvider.create()
+        (channelProvider, credentialsProvider)
+      }
+      _ <- if (enableStartupChecks) {
+        val topicAdmin = createTopicAdmin(customProviders)
+        try {
+          topicExists(topicAdmin, googlePubSubConfig.googleProjectId, topicName)
+        } finally {
+          Either.catchNonFatal(topicAdmin.close())
+          ()
+        }
       } else ().asRight
+      publisher <- createPublisher(googlePubSubConfig.googleProjectId, topicName, batching, retry, customProviders)
     } yield new GooglePubSubSink(maxBytes, publisher, topicName)
 
   private val UserAgent = s"snowplow/stream-collector-${generated.BuildInfo.version}"
 
   /**
-    * Instantiates a Publisher on an existing topic with the given configuration options.
+    * Instantiates a Publisher on a topic with the given configuration options.
     * This can fail if the publisher can't be created.
     * @return a PubSub publisher or an error
     */
@@ -118,16 +140,20 @@ object GooglePubSubSink {
     projectId: String,
     topicName: String,
     batchingSettings: BatchingSettings,
-    retrySettings: RetrySettings
-  ): Either[Throwable, Publisher] =
-    Either.catchNonFatal(
-      Publisher
-        .newBuilder(ProjectTopicName.of(projectId, topicName))
-        .setBatchingSettings(batchingSettings)
-        .setRetrySettings(retrySettings)
-        .setHeaderProvider(FixedHeaderProvider.create("User-Agent", UserAgent))
-        .build()
-    )
+    retrySettings: RetrySettings,
+    customProviders: Option[(TransportChannelProvider, CredentialsProvider)]
+  ): Either[Throwable, Publisher] = {
+    val builder = Publisher
+      .newBuilder(ProjectTopicName.of(projectId, topicName))
+      .setBatchingSettings(batchingSettings)
+      .setRetrySettings(retrySettings)
+      .setHeaderProvider(FixedHeaderProvider.create("User-Agent", UserAgent))
+    customProviders.foreach {
+      case (channelProvider, credentialsProvider) =>
+        builder.setChannelProvider(channelProvider).setCredentialsProvider(credentialsProvider)
+    }
+    Either.catchNonFatal(builder.build()).leftMap(e => new RuntimeException("Couldn't build PubSub publisher", e))
+  }
 
   private def batchingSettings(bufferConfig: BufferConfig): BatchingSettings =
     BatchingSettings
@@ -150,14 +176,32 @@ object GooglePubSubSink {
       .setMaxRpcTimeout(Duration.ofMillis(backoffPolicy.maxRpcTimeout))
       .build()
 
+  private def createTopicAdmin(
+    customProviders: Option[(TransportChannelProvider, CredentialsProvider)]
+  ): TopicAdminClient =
+    customProviders match {
+      case Some((channelProvider, credentialsProvider)) =>
+        TopicAdminClient.create(
+          TopicAdminSettings
+            .newBuilder()
+            .setTransportChannelProvider(channelProvider)
+            .setCredentialsProvider(credentialsProvider)
+            .build()
+        )
+      case None =>
+        TopicAdminClient.create()
+    }
+
   /** Checks that a PubSub topic exists **/
-  private def topicExists(projectId: String, topicName: String): Either[Throwable, Boolean] =
-    for {
-      topicAdminClient <- Either.catchNonFatal(TopicAdminClient.create())
-      topics <- Either
-        .catchNonFatal(topicAdminClient.listTopics(ProjectName.of(projectId)))
-        .map(_.iterateAll.asScala.toList)
-      exists = topics.map(_.getName).exists(_.contains(topicName))
-      _ <- Either.catchNonFatal(topicAdminClient.close())
-    } yield exists
+  private def topicExists(topicAdmin: TopicAdminClient, projectId: String, topicName: String): Either[Throwable, Unit] =
+    Either
+      .catchNonFatal(topicAdmin.listTopics(ProjectName.of(projectId)))
+      .leftMap(new RuntimeException(s"Can't list topics", _))
+      .map(_.iterateAll.asScala.toList.map(_.getName()))
+      .flatMap { topics =>
+        if (topics.contains(TopicName.of(projectId, topicName).toString()))
+          ().asRight
+        else
+          new IllegalStateException(s"PubSub topic $topicName doesn't exist").asLeft
+      }
 }
