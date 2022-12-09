@@ -7,4 +7,3 @@ src/main/resources/application.conf
 .bsp
 
 .localstack/
-.github/workflows/integration_tests/no_data_loss/docker/

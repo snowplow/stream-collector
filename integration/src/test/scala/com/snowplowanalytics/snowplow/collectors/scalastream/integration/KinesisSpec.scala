@@ -12,33 +12,47 @@
  * implied.  See the Apache License Version 2.0 for the specific language
  * governing permissions and limitations there under.
  */
-package com.snowplowanalytics.snowplow.collectors.scalastream.intergation
+package com.snowplowanalytics.snowplow.collectors.scalastream.integration
 
 import cats.effect.{IO, Sync}
 import cats.effect.testing.specs2.CatsIO
-import com.snowplowanalytics.snowplow.collectors.scalastream.intergation.TestUtils.Http.Request.RequestType.{Bad, Good}
-import com.snowplowanalytics.snowplow.collectors.scalastream.intergation.TestUtils._
+import com.snowplowanalytics.snowplow.collectors.scalastream.integration.utils._
+import com.snowplowanalytics.snowplow.collectors.scalastream.integration.utils.Http.Request.RequestType.{Bad, Good}
 import com.snowplowanalytics.snowplow.eventgen.tracker.HttpRequest.Method.Post
 import org.specs2.mutable.Specification
 
 class KinesisSpec extends Specification with CatsIO {
-  "The Kinesis collector should" >> {
-    "ensure all events are written to the sink" in {
-      val localstack = Containers.localstack
-      val collector  = Containers.collector("kinesis", "config", Some(localstack))
+  "The Kinesis collector" should {
+    "ensure all good and bad events are written to the sink" in {
+      val testConfig = Map(
+        "COLLECTOR_COOKIE_ENABLED"               -> "true",
+        "COLLECTOR_COOKIE_EXPIRATION"            -> "365 days",
+        "COLLECTOR_COOKIE_NAME"                  -> "sp",
+        "COLLECTOR_COOKIE_SECURE"                -> "false",
+        "COLLECTOR_COOKIE_HTTP_ONLY"             -> "false",
+        "COLLECTOR_STREAMS_SINK_REGION"          -> "eu-central-1",
+        "COLLECTOR_STREAMS_SINK_CUSTOM_ENDPOINT" -> "http://localstack:4566",
+        "COLLECTOR_STREAMS_SINK_SQS_GOOD"        -> "good",
+        "COLLECTOR_STREAMS_SINK_SQS_BAD"         -> "bad",
+        "COLLECTOR_STREAMS_SINK_AWS_ACCESS_KEY"  -> "env",
+        "COLLECTOR_STREAMS_SINK_AWS_SECRET_KEY"  -> "env"
+      )
 
-      lazy val localstackPort = Containers.getExposedPort(localstack, 4566)
-      lazy val collectorPort  = Containers.getExposedPort(collector, 12345)
+      val localstack = Containers.localstack
+      val collector  = Containers.collector("kinesis", testConfig, Some(localstack))
+
+      lazy val localstackPort = Containers.getExposedPort(localstack, Containers.LocalstackExposedPort)
+      lazy val collectorPort  = Containers.getExposedPort(collector, Containers.CollectorExposedPort)
 
       val resources = for {
-        localstack <- Containers.mkContainer[IO](localstack)
-        collector  <- Containers.mkContainer[IO](collector)
+        _          <- Containers.mkContainer[IO](localstack)
+        _          <- Containers.mkContainer[IO](collector)
         kinesis    <- Kinesis.mkKinesisClient[IO](localstackPort)
         httpClient <- Http.mkHttpClient[IO]
-      } yield (localstack, collector, kinesis, httpClient)
+      } yield (kinesis, httpClient)
 
       resources.use {
-        case (_, _, kinesis, httpClient) =>
+        case (kinesis, httpClient) =>
           val requestStubs = EventGenerator.makeStubs(10, 50)
           val good         = requestStubs.map(Http.Request.make(_, collectorPort, Good))
           val bad =
@@ -57,8 +71,8 @@ class KinesisSpec extends Specification with CatsIO {
             _       <- Sync[IO].delay(println(s"Sending ${good.size} good and ${bad.size} bad events."))
             _       <- Http.sendAll[IO](requests, httpClient)
             _       <- Sync[IO].delay(Thread.sleep(10000)) // allow time for all records to be written before trying to read them
-            numGood <- Kinesis.getResult[IO](kinesis, "good")
-            numBad  <- Kinesis.getResult[IO](kinesis, "bad")
+            numGood <- Kinesis.getResult[IO](kinesis, Kinesis.GoodStreamName)
+            numBad  <- Kinesis.getResult[IO](kinesis, Kinesis.BadStreamName)
           } yield {
             numGood shouldEqual good.size
             numBad shouldEqual bad.size

@@ -1,0 +1,46 @@
+collector {
+  interface = 0.0.0.0
+  port = 12345
+
+  telemetry {
+    disabled = true
+  }
+
+  streams {
+    good = "good"
+    bad = "bad"
+
+    sink {
+      region = ${?COLLECTOR_STREAMS_SINK_REGION}
+      customEndpoint = ${?COLLECTOR_STREAMS_SINK_CUSTOM_ENDPOINT}
+
+      # We need to set these for the Kinesis collector, to force the lower max event size. It makes it easier to generate oversized payloads.
+      sqsGoodBuffer = ${?COLLECTOR_STREAMS_SINK_SQS_GOOD}
+      sqsBadBuffer = ${?COLLECTOR_STREAMS_SINK_SQS_BAD}
+
+      aws {
+        accessKey = ${?COLLECTOR_STREAMS_SINK_AWS_ACCESS_KEY}
+        secretKey = ${?COLLECTOR_STREAMS_SINK_AWS_SECRET_KEY}
+      }
+    }
+  }
+
+  cookie {
+    enabled = ${?COLLECTOR_COOKIE_ENABLED}
+    expiration = ${?COLLECTOR_COOKIE_EXPIRATION}
+    name = ${?COLLECTOR_COOKIE_NAME}
+    secure = ${?COLLECTOR_COOKIE_SECURE}
+    httpOnly = ${?COLLECTOR_COOKIE_HTTP_ONLY}
+    sameSite = ${?COLLECTOR_COOKIE_SAME_SITE}
+    domains += ${?COLLECTOR_COOKIE_DOMAIN_1}
+    domains += ${?COLLECTOR_COOKIE_DOMAIN_2}
+    domains += ${?COLLECTOR_COOKIE_DOMAIN_3}
+    fallbackDomain = ${?COLLECTOR_COOKIE_FALLBACK_DOMAIN}
+  }
+
+  doNotTrackCookie {
+    enabled = ${?COLLECTOR_DO_NOT_TRACK_COOKIE_ENABLED}
+    name = ${?COLLECTOR_DO_NOT_TRACK_COOKIE_NAME}
+    value = ${?COLLECTOR_DO_NOT_TRACK_COOKIE_VALUE}
+  }
+}

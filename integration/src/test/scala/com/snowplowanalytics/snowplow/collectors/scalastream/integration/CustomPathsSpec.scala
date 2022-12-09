@@ -12,31 +12,36 @@
  * implied.  See the Apache License Version 2.0 for the specific language
  * governing permissions and limitations there under.
  */
-package com.snowplowanalytics.snowplow.collectors.scalastream.intergation
+package com.snowplowanalytics.snowplow.collectors.scalastream.integration
 
 import cats.effect.IO
 import cats.effect.testing.specs2.CatsIO
-import cats.syntax.all._
-import com.snowplowanalytics.snowplow.collectors.scalastream.intergation.CustomPathsSpec._
-import com.snowplowanalytics.snowplow.collectors.scalastream.intergation.TestUtils.Http.Request.RequestType.Good
-import com.snowplowanalytics.snowplow.collectors.scalastream.intergation.TestUtils.{Base64, EventGenerator, Http}
+import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
+import org.specs2.matcher.Matchers.beTrue
+import com.snowplowanalytics.snowplow.collectors.scalastream.integration.CustomPathsSpec._
+import com.snowplowanalytics.snowplow.collectors.scalastream.integration.utils.Http.Request.RequestType.Good
+import com.snowplowanalytics.snowplow.collectors.scalastream.integration.utils._
 import com.snowplowanalytics.snowplow.eventgen.collector.Api
+import org.apache.thrift.TDeserializer
 import org.specs2.matcher.MatchResult
-import org.specs2.matcher.Matchers.beRight
 import org.specs2.matcher.MustMatchers.theValue
 import org.specs2.mutable.Specification
+import org.testcontainers.containers.output.OutputFrame.OutputType
 import org.testcontainers.containers.{GenericContainer => JGenericContainer}
-import org.testcontainers.containers.output.{OutputFrame, WaitingConsumer}
-
-import java.util.concurrent.{TimeUnit, TimeoutException}
-import java.util.function.Predicate
 
 class CustomPathsSpec extends Specification with CatsIO {
   "The collector" should {
     "correctly translate mapped custom paths" in {
-      val collector    = Containers.collector("stdout", "custom-paths")
+      val JavaOpts =
+        "-Dcollector.paths./test/track=/com.snowplowanalytics.snowplow/tp2 -Dcollector.paths./test/redirect=/r/tp2 -Dcollector.paths./test/iglu=/com.snowplowanalytics.iglu/v1"
+
+      val testConfig = Map(
+        "COLLECTOR_COOKIE_ENABLED" -> "false",
+        "JAVA_OPTS"                -> JavaOpts
+      )
+      val collector    = Containers.collector("stdout", testConfig)
       val requestStubs = EventGenerator.makeStubs(3, 3)
-      val paths        = List(Api("com.acme", "track"), Api("com.acme", "redirect"), Api("com.acme", "iglu"))
+      val paths        = List(Api("test", "track"), Api("test", "redirect"), Api("test", "iglu"))
 
       val resources = for {
         collector  <- Containers.mkContainer[IO](collector)
@@ -45,7 +50,7 @@ class CustomPathsSpec extends Specification with CatsIO {
 
       resources.use {
         case (collector, httpClient) =>
-          val collectorPort = Containers.getExposedPort(collector, 12345)
+          val collectorPort = Containers.getExposedPort(collector, Containers.CollectorExposedPort)
           val requests = requestStubs
             .zip(paths)
             .map { case (stub, path) => Http.Request.setPath(stub, path) }
@@ -58,19 +63,17 @@ class CustomPathsSpec extends Specification with CatsIO {
 }
 
 object CustomPathsSpec {
-  def matchLogs(container: JGenericContainer[_]): MatchResult[Either[TimeoutException, Unit]] = {
-    val logConsumer = new WaitingConsumer
-    val p = new Predicate[OutputFrame] {
-      override def test(t: OutputFrame): Boolean = {
-        val decoded = Base64.decode(t.getUtf8String)
-
-        decoded.contains("/com.snowplowanalytics.snowplow/tp2") ||
-          decoded.contains("/r/tp2") ||
-          decoded.contains("/com.snowplowanalytics.iglu/v1")
-      }
+  def matchLogs(container: JGenericContainer[_]): MatchResult[Any] = {
+    val logs    = container.getLogs(OutputType.STDOUT).split("\n").toList
+    val decoded = logs.map(Base64.decode)
+    val collectorPayloads = decoded.map { e =>
+      val target = new CollectorPayload()
+      new TDeserializer().deserialize(target, e)
+      target
     }
 
-    container.followOutput(logConsumer)
-    Either.catchOnly[TimeoutException](logConsumer.waitUntil(p, 1, TimeUnit.SECONDS, 3)) must beRight
+    val expectedPaths = List("/com.snowplowanalytics.snowplow/tp2", "/r/tp2", "/com.snowplowanalytics.iglu/v1")
+
+    collectorPayloads.zip(expectedPaths).map { case (cp, ep) => cp.path == ep }.forall(_ == true) must beTrue
   }
 }

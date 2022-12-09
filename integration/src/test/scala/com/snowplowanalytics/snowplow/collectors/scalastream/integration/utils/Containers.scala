@@ -12,10 +12,11 @@
  * implied.  See the Apache License Version 2.0 for the specific language
  * governing permissions and limitations there under.
  */
-package com.snowplowanalytics.snowplow.collectors.scalastream.intergation
+package com.snowplowanalytics.snowplow.collectors.scalastream.integration.utils
 
 import cats.effect.{Resource, Sync}
 import com.dimafeng.testcontainers.GenericContainer
+import com.snowplowanalytics.snowplow.collectors.scalastream.integration.CollectorConfig
 import org.slf4j.LoggerFactory
 import org.testcontainers.containers.output.Slf4jLogConsumer
 import org.testcontainers.containers.wait.strategy.Wait
@@ -23,13 +24,16 @@ import org.testcontainers.containers.{BindMode, Network, GenericContainer => JGe
 import org.testcontainers.images.builder.ImageFromDockerfile
 
 object Containers {
+  val LocalstackExposedPort = 4566
+  val CollectorExposedPort  = 12345
+
   private val network = Network.newNetwork()
 
   def localstack: JGenericContainer[_] = {
     val container = GenericContainer(
       dockerImage  = "localstack/localstack-light:1.2.0",
-      exposedPorts = Seq(4566, 4567, 4568),
-      env          = Map("SERVICES" -> "kinesis", "DEFAULT_REGION" -> "eu-central-1", "USE_SSL" -> "1"),
+      exposedPorts = Seq(LocalstackExposedPort),
+      env          = Map("USE_SSL" -> "1"),
       waitStrategy = Wait.forLogMessage(".*AWS kinesis.CreateStream.*", 2),
       fileSystemBind = Seq(
         GenericContainer.FileSystemBind(
@@ -41,11 +45,6 @@ object Containers {
           "integration/src/test/resources/localstack",
           "/docker-entrypoint-initaws.d",
           BindMode.READ_ONLY
-        ),
-        GenericContainer.FileSystemBind(
-          "/var/run/docker.sock",
-          "/var/run/docker.sock",
-          BindMode.READ_WRITE
         )
       )
     )
@@ -54,31 +53,30 @@ object Containers {
     container.container
   }
 
-  def collector(flavour: String, configName: String, dep: Option[JGenericContainer[_]] = None): JGenericContainer[_] = {
+  def collector(
+    flavour: String,
+    testConfig: CollectorConfig,
+    dependsOn: Option[JGenericContainer[_]] = None
+  ): JGenericContainer[_] = {
     val imageFromDockerfile = new ImageFromDockerfile()
       .withDockerfile(java.nio.file.Path.of(flavour, "target", "docker", "stage", "Dockerfile"))
     val container = GenericContainer(
       dockerImage  = imageFromDockerfile,
-      exposedPorts = Seq(12345),
-      env          = Map("AWS_ACCESS_KEY_ID" -> "test", "AWS_SECRET_KEY" -> "test"),
-      command      = Seq("--config", s"/snowplow/config/$flavour/$configName.hocon"),
+      exposedPorts = Seq(CollectorExposedPort),
+      env          = Map("AWS_ACCESS_KEY_ID" -> "test", "AWS_SECRET_KEY" -> "test") ++ testConfig,
+      command      = Seq("--config", s"/snowplow/config/collector.hocon"),
       waitStrategy = Wait.forLogMessage(".*REST interface bound to.*", 1),
       fileSystemBind = Seq(
         GenericContainer.FileSystemBind(
-          "integration/src/test/resources/collector_config",
-          "/snowplow/config",
+          s"integration/src/test/resources/collector_config/collector.hocon",
+          "/snowplow/config/collector.hocon",
           BindMode.READ_ONLY
         )
       )
     )
     container.underlyingUnsafeContainer.withNetwork(network)
     container.underlyingUnsafeContainer.withNetworkAliases("collector")
-
-    dep match {
-      case Some(c) => container.underlyingUnsafeContainer.dependsOn(c)
-      case _       => ()
-    }
-
+    dependsOn.foreach(container.underlyingUnsafeContainer.dependsOn(_))
     container.container
   }
 
@@ -91,12 +89,10 @@ object Containers {
   def start(container: JGenericContainer[_], loggerName: Option[String]): JGenericContainer[_] = {
     container.start()
 
-    loggerName match {
-      case Some(ln) =>
-        val logger = LoggerFactory.getLogger(ln)
-        val logs   = new Slf4jLogConsumer(logger)
-        container.followOutput(logs)
-      case _ => ()
+    loggerName.foreach { ln =>
+      val logger = LoggerFactory.getLogger(ln)
+      val logs   = new Slf4jLogConsumer(logger)
+      container.followOutput(logs)
     }
 
     container

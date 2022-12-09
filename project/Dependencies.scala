@@ -19,8 +19,7 @@ object Dependencies {
   val resolutionRepos = Seq(
     "Snowplow Analytics Maven repo".at("http://maven.snplow.com/releases/").withAllowInsecureProtocol(true),
     // For uaParser utils
-    "user-agent-parser repo".at("https://clojars.org/repo/"),
-    "Sonatype OSS Snapshots".at("https://oss.sonatype.org/content/repositories/snapshots/")
+    "user-agent-parser repo".at("https://clojars.org/repo/")
   )
 
   object V {
