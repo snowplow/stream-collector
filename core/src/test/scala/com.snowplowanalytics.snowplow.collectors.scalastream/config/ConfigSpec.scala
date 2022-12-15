@@ -30,7 +30,7 @@ abstract class ConfigSpec extends Specification {
 
   def configRefFactory(app: String): CollectorConfig = CollectorConfig(
     interface = "0.0.0.0",
-    port      = 80,
+    port      = 8080,
     paths     = Map.empty[String, String],
     p3p = P3PConfig(
       policyRef = "/w3c/p3p.xml",
@@ -110,7 +110,7 @@ abstract class ConfigSpec extends Specification {
     case "pubsub" =>
       GooglePubSub(
         maxBytes        = 10000000,
-        googleProjectId = "googleProjectId",
+        googleProjectId = "google-project-id",
         backoffPolicy = GooglePubSubBackoffPolicyConfig(
           minBackoff           = 1000,
           maxBackoff           = 1000,

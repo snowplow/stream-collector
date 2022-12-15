@@ -54,6 +54,31 @@ lazy val buildInfoSettings = Seq(
   buildInfoKeys := Seq[BuildInfoKey](organization, moduleName, name, version, "shortName" -> "ssc", scalaVersion)
 )
 
+// Make package (build) metadata available within source code.
+lazy val scalifiedSettings = Seq(
+  Compile / sourceGenerators += Def.task {
+    val file = (Compile / sourceManaged).value / "settings.scala"
+    IO.write(
+      file,
+      """package %s
+        |object ProjectMetadata {
+        |  val organization = "%s"
+        |  val name = "%s"
+        |  val version = "%s"
+        |}
+        |"""
+        .stripMargin
+        .format(
+          buildInfoPackage.value,
+          organization.value,
+          name.value,
+          version.value
+        )
+    )
+    Seq(file)
+  }.taskValue
+)
+
 lazy val buildSettings = Seq(
   organization := "com.snowplowanalytics",
   name := "snowplow-stream-collector",
@@ -172,9 +197,21 @@ lazy val pubsub = project
 lazy val pubsubDistroless = project
   .in(file("distroless/pubsub"))
   .settings(sourceDirectory := (pubsub / sourceDirectory).value)
-  .settings(pubsubSettings ++ dockerSettingsDistroless)
+  .settings(pubsubSettings ++ dockerSettingsDistroless ++ scalifiedSettings)
   .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
   .dependsOn(pubsub % "test->test;compile->compile")
+  .settings(libraryDependencies ++= Seq(
+    // integration tests dependencies
+    Dependencies.Libraries.specs2It,
+    Dependencies.Libraries.specs2CEIt,
+    Dependencies.Libraries.testcontainersIt,
+    Dependencies.Libraries.catsRetryIt,
+    Dependencies.Libraries.http4sClientIt
+  ))
+  .settings(Defaults.itSettings)
+  .configs(IntegrationTest)
+  .settings((IntegrationTest / test) := (IntegrationTest / test).dependsOn(Docker / publishLocal).value)
+  .settings((IntegrationTest / testOnly) := (IntegrationTest / testOnly).dependsOn(Docker / publishLocal).evaluated)
 
 lazy val kafkaSettings =
   allSettings ++ buildInfoSettings ++ Seq(

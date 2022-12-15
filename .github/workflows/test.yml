@@ -12,7 +12,9 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 11
-      - name: Run tests
-        run: sbt test
       - name: Check formatting
         run: sbt scalafmtCheckAll
+      - name: Run unit tests
+        run: sbt test
+      - name: Run integration tests PubSub
+        run: sbt "project pubsubDistroless" IntegrationTest/test
