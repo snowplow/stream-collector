@@ -20,7 +20,7 @@
 collector {
   # The collector runs as a web service specified on the following interface and port.
   interface = "0.0.0.0"
-  port = 80
+  port = 8080
 
   # optional SSL/TLS configuration
   ssl {
