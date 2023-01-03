@@ -211,6 +211,12 @@ collector {
       timeLimit   = 1000
     }
   }
+
+  # Optional. Maximum number of bytes that a single record can contain.
+  # If a record is bigger, a size violation bad row is emitted instead
+  # Default: 10 MB
+  maxBytes = 10000000
+
   # Telemetry sends heartbeat events to external pipeline.
   # Unless disable parameter set to true, this feature will be enabled. Deleting whole section will not disable it.
   # Schema URI: iglu:com.snowplowanalytics.oss/oss_context/jsonschema/1-0-1

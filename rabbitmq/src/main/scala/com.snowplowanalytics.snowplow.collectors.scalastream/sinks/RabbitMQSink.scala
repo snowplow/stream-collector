@@ -24,6 +24,7 @@ import com.rabbitmq.client.Channel
 import com.snowplowanalytics.snowplow.collectors.scalastream.model.RabbitMQBackoffPolicyConfig
 
 class RabbitMQSink(
+  val maxBytes: Int,
   channel: Channel,
   exchangeName: String,
   backoffPolicy: RabbitMQBackoffPolicyConfig,
@@ -31,8 +32,6 @@ class RabbitMQSink(
 ) extends Sink {
 
   implicit val ec = executionContext
-
-  override val MaxBytes = 128000000
 
   override def storeRawEvents(events: List[Array[Byte]], key: String): Unit =
     if (events.nonEmpty) {
@@ -72,6 +71,7 @@ class RabbitMQSink(
 
 object RabbitMQSink {
   def init(
+    maxBytes: Int,
     channel: Channel,
     exchangeName: String,
     backoffPolicy: RabbitMQBackoffPolicyConfig,
@@ -79,5 +79,5 @@ object RabbitMQSink {
   ): Either[Throwable, RabbitMQSink] =
     for {
       _ <- Either.catchNonFatal(channel.exchangeDeclarePassive(exchangeName))
-    } yield new RabbitMQSink(channel, exchangeName, backoffPolicy, executionContext)
+    } yield new RabbitMQSink(maxBytes, channel, exchangeName, backoffPolicy, executionContext)
 }

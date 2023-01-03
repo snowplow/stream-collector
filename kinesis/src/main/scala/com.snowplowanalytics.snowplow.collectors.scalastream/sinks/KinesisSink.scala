@@ -42,6 +42,7 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink.S
   * Kinesis Sink for the Scala Stream Collector.
   */
 class KinesisSink private (
+  val maxBytes: Int,
   client: AmazonKinesis,
   kinesisConfig: Kinesis,
   bufferConfig: BufferConfig,
@@ -61,15 +62,6 @@ class KinesisSink private (
         s"No SQS buffer for surge protection set up (consider setting a SQS Buffer in config.hocon)."
       )
   }
-
-  // Records must not exceed MaxBytes.
-  // The limit is 1MB for Kinesis.
-  // When SQS buffer is enabled MaxBytes has to be 256k,
-  // but we encode the message with Base64 for SQS, so the limit drops to 192k.
-  private val WithBuffer     = maybeSqs.isDefined
-  private val SqsLimit       = 192000 // 256000 / 4 * 3
-  private val KinesisLimit   = 1000000
-  override val MaxBytes: Int = if (WithBuffer) SqsLimit else KinesisLimit
 
   private val ByteThreshold   = bufferConfig.byteLimit
   private val RecordThreshold = bufferConfig.recordLimit
@@ -279,7 +271,7 @@ class KinesisSink private (
     */
   def writeBatchToSqs(batch: List[Events], sqs: SqsClientAndName): Future[List[(Events, BatchResultErrorInfo)]] =
     Future {
-      val splitBatch = split(batch, getByteSize, MaxSqsBatchSizeN, SqsLimit)
+      val splitBatch = split(batch, getByteSize, MaxSqsBatchSizeN, maxBytes)
       splitBatch.map(toSqsMessages).flatMap { msgGroup =>
         val entries = msgGroup.map(_._2)
         val batchRequest =
@@ -389,6 +381,7 @@ object KinesisSink {
     * during its construction.
     */
   def createAndInitialize(
+    kinesisMaxBytes: Int,
     kinesisConfig: Kinesis,
     bufferConfig: BufferConfig,
     streamName: String,
@@ -405,8 +398,11 @@ object KinesisSink {
 
     clients.map {
       case (kinesisClient, sqsClientAndName) =>
+        val maxBytes =
+          if (sqsClientAndName.isDefined) kinesisConfig.sqsMaxBytes else kinesisMaxBytes
         val ks =
           new KinesisSink(
+            maxBytes,
             kinesisClient,
             kinesisConfig,
             bufferConfig,

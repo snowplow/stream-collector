@@ -24,8 +24,9 @@ import org.slf4j.LoggerFactory
 // Define an interface for all sinks to use to store events.
 trait Sink {
 
-  // Maximum number of bytes that a single record can contain
-  val MaxBytes: Int
+  // Maximum number of bytes that a single record can contain.
+  // If a record is bigger, a size violation bad row is emitted instead
+  val maxBytes: Int
 
   lazy val log = LoggerFactory.getLogger(getClass())
 

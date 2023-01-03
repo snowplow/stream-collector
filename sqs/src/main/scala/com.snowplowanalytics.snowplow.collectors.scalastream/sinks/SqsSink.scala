@@ -45,6 +45,7 @@ import scala.collection.mutable.ListBuffer
   *  SQS sink for the Scala Stream Collector
   */
 class SqsSink private (
+  val maxBytes: Int,
   client: AmazonSQS,
   sqsConfig: Sqs,
   bufferConfig: BufferConfig,
@@ -52,10 +53,6 @@ class SqsSink private (
   executorService: ScheduledExecutorService
 ) extends Sink {
   import SqsSink._
-
-  // Records must not exceed 256K when writing to SQS.
-  // Since messages can be base64-encoded, they must meet that limit after encoding.
-  override val MaxBytes = 192000 // 256000 / 4 * 3
 
   private val ByteThreshold: Long   = bufferConfig.byteLimit
   private val RecordThreshold: Long = bufferConfig.recordLimit
@@ -266,6 +263,7 @@ object SqsSink {
     * during its construction.
     */
   def createAndInitialize(
+    maxBytes: Int,
     sqsConfig: Sqs,
     bufferConfig: BufferConfig,
     queueName: String,
@@ -279,7 +277,7 @@ object SqsSink {
     } yield client
 
     client.map { c =>
-      val sqsSink = new SqsSink(c, sqsConfig, bufferConfig, queueName, executorService)
+      val sqsSink = new SqsSink(maxBytes, c, sqsConfig, bufferConfig, queueName, executorService)
       sqsSink.EventStorage.scheduleFlush()
       sqsSink
     }

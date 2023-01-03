@@ -38,8 +38,23 @@ object SqsCollector extends Collector {
       goodQueue  = collectorConf.streams.good
       badQueue   = collectorConf.streams.bad
       bufferConf = collectorConf.streams.buffer
-      good <- SqsSink.createAndInitialize(sqs, bufferConf, goodQueue, collectorConf.enableStartupChecks, es)
-      bad  <- SqsSink.createAndInitialize(sqs, bufferConf, badQueue, collectorConf.enableStartupChecks, es)
+      maxBytes   = collectorConf.maxBytes
+      good <- SqsSink.createAndInitialize(
+        maxBytes,
+        sqs,
+        bufferConf,
+        goodQueue,
+        collectorConf.enableStartupChecks,
+        es
+      )
+      bad <- SqsSink.createAndInitialize(
+        maxBytes,
+        sqs,
+        bufferConf,
+        badQueue,
+        collectorConf.enableStartupChecks,
+        es
+      )
     } yield CollectorSinks(good, bad)
 
     sinks match {

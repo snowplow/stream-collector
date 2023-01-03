@@ -101,6 +101,15 @@ abstract class ConfigSpec extends Specification {
           ),
       sink = sinkConfigRefFactory(app)
     ),
+    maxBytes = app match {
+      case "kafka"    => 1000000
+      case "kinesis"  => 1000000
+      case "nsq"      => 1000000
+      case "pubsub"   => 10000000
+      case "rabbitmq" => 128000000
+      case "sqs"      => 192000
+      case "stdout"   => 1000000000
+    },
     experimental = ExperimentalConfig(WarmupConfig(false, 2000, 2000, 3))
   )
 
@@ -148,6 +157,7 @@ abstract class ConfigSpec extends Specification {
         ),
         sqsBadBuffer   = None,
         sqsGoodBuffer  = None,
+        sqsMaxBytes    = 192000,
         customEndpoint = None
       )
   }

@@ -54,10 +54,12 @@ object TestUtils {
           backoffPolicy  = KinesisBackoffPolicyConfig(3000L, 60000L),
           customEndpoint = None,
           sqsGoodBuffer  = Some("good-buffer"),
-          sqsBadBuffer   = Some("bad-buffer")
+          sqsBadBuffer   = Some("bad-buffer"),
+          sqsMaxBytes    = 192000
         ),
         buffer = BufferConfig(4000000L, 500L, 60000L)
       ),
+      maxBytes                = 1000000,
       monitoring              = MonitoringConfig(MetricsConfig(StatsdConfig(false, "localhost", 8125, 10.seconds))),
       telemetry               = None,
       enableStartupChecks     = true,

@@ -108,7 +108,8 @@ package model {
     backoffPolicy: KinesisBackoffPolicyConfig,
     customEndpoint: Option[String],
     sqsGoodBuffer: Option[String],
-    sqsBadBuffer: Option[String]
+    sqsBadBuffer: Option[String],
+    sqsMaxBytes: Int
   ) extends SinkConfig {
     val endpoint = customEndpoint.getOrElse(region match {
       case cn @ "cn-north-1"     => s"https://kinesis.$cn.amazonaws.com.cn"
@@ -206,6 +207,7 @@ package model {
     rootResponse: RootResponseConfig,
     cors: CORSConfig,
     streams: StreamsConfig,
+    maxBytes: Int,
     monitoring: MonitoringConfig,
     telemetry: Option[TelemetryConfig],
     ssl: SSLConfig = SSLConfig(),

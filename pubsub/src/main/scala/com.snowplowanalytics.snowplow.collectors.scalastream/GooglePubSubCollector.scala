@@ -36,8 +36,21 @@ object GooglePubSubCollector extends Collector {
       goodStream = collectorConf.streams.good
       badStream  = collectorConf.streams.bad
       bufferConf = collectorConf.streams.buffer
-      good <- GooglePubSubSink.createAndInitialize(pc, bufferConf, goodStream, collectorConf.enableStartupChecks)
-      bad  <- GooglePubSubSink.createAndInitialize(pc, bufferConf, badStream, collectorConf.enableStartupChecks)
+      maxBytes   = collectorConf.maxBytes
+      good <- GooglePubSubSink.createAndInitialize(
+        maxBytes,
+        pc,
+        bufferConf,
+        goodStream,
+        collectorConf.enableStartupChecks
+      )
+      bad <- GooglePubSubSink.createAndInitialize(
+        maxBytes,
+        pc,
+        bufferConf,
+        badStream,
+        collectorConf.enableStartupChecks
+      )
     } yield CollectorSinks(good, bad)
 
     sinks match {

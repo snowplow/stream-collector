@@ -21,8 +21,7 @@ package sinks
 
 import org.apache.commons.codec.binary.Base64
 
-class StdoutSink(streamName: String) extends Sink {
-  override val MaxBytes = Int.MaxValue
+class StdoutSink(val maxBytes: Int, streamName: String) extends Sink {
 
   // Print a Base64-encoded event.
   override def storeRawEvents(events: List[Array[Byte]], key: String): Unit =

@@ -28,9 +28,10 @@ object StdoutCollector extends Collector {
   def main(args: Array[String]): Unit = {
     val (collectorConf, akkaConf) = parseConfig(args)
     val telemetry                 = TelemetryAkkaService.initWithCollector(collectorConf, BuildInfo.moduleName, appVersion)
+    val maxBytes                  = collectorConf.maxBytes
     val sinks = {
       val (good, bad) = collectorConf.streams.sink match {
-        case Stdout => (new StdoutSink("out"), new StdoutSink("err"))
+        case Stdout => (new StdoutSink(maxBytes, "out"), new StdoutSink(maxBytes, "err"))
         case _      => throw new IllegalArgumentException("Configured sink is not stdout")
       }
       CollectorSinks(good, bad)

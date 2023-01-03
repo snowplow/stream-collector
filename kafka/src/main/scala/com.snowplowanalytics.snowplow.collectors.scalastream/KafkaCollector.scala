@@ -31,9 +31,10 @@ object KafkaCollector extends Collector {
       val goodStream = collectorConf.streams.good
       val badStream  = collectorConf.streams.bad
       val bufferConf = collectorConf.streams.buffer
+      val maxBytes   = collectorConf.maxBytes
       val (good, bad) = collectorConf.streams.sink match {
         case kc: Kafka =>
-          (new KafkaSink(kc, bufferConf, goodStream), new KafkaSink(kc, bufferConf, badStream))
+          (new KafkaSink(maxBytes, kc, bufferConf, goodStream), new KafkaSink(maxBytes, kc, bufferConf, badStream))
         case _ => throw new IllegalArgumentException("Configured sink is not Kafka")
       }
       CollectorSinks(good, bad)

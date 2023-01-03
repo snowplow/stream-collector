@@ -30,8 +30,9 @@ object NsqCollector extends Collector {
     val sinks = {
       val goodStream = collectorConf.streams.good
       val badStream  = collectorConf.streams.bad
+      val maxBytes   = collectorConf.maxBytes
       val (good, bad) = collectorConf.streams.sink match {
-        case nc: Nsq => (new NsqSink(nc, goodStream), new NsqSink(nc, badStream))
+        case nc: Nsq => (new NsqSink(maxBytes, nc, goodStream), new NsqSink(maxBytes, nc, badStream))
         case _       => throw new IllegalArgumentException("Configured sink is not NSQ")
       }
       CollectorSinks(good, bad)

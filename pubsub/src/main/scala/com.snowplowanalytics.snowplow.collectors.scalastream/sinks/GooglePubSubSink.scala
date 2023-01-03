@@ -33,11 +33,8 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 /**
   * Google PubSub Sink for the Scala Stream Collector
   */
-class GooglePubSubSink private (publisher: Publisher, topicName: String) extends Sink {
+class GooglePubSubSink private (val maxBytes: Int, publisher: Publisher, topicName: String) extends Sink {
   private val logExecutor = Executors.newSingleThreadExecutor()
-
-  // maximum size of a pubsub message is 10MB
-  override val MaxBytes: Int = 10000000
 
   // Is the collector detecting an outage downstream
   @volatile private var outage: Boolean = false
@@ -94,6 +91,7 @@ class GooglePubSubSink private (publisher: Publisher, topicName: String) extends
 /** GooglePubSubSink companion object with factory method */
 object GooglePubSubSink {
   def createAndInitialize(
+    maxBytes: Int,
     googlePubSubConfig: GooglePubSub,
     bufferConfig: BufferConfig,
     topicName: String,
@@ -107,7 +105,7 @@ object GooglePubSubSink {
         if (b) ().asRight
         else new IllegalArgumentException(s"Google PubSub topic $topicName doesn't exist").asLeft
       } else ().asRight
-    } yield new GooglePubSubSink(publisher, topicName)
+    } yield new GooglePubSubSink(maxBytes, publisher, topicName)
 
   private val UserAgent = s"snowplow/stream-collector-${generated.BuildInfo.version}"
 
