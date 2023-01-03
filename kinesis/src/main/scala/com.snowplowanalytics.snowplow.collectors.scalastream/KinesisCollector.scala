@@ -41,6 +41,7 @@ object KinesisCollector extends Collector {
       sqsGood    = kc.sqsGoodBuffer
       sqsBad     = kc.sqsBadBuffer
       good <- KinesisSink.createAndInitialize(
+        kc.maxBytes,
         kc,
         bufferConf,
         goodStream,
@@ -48,7 +49,15 @@ object KinesisCollector extends Collector {
         collectorConf.enableStartupChecks,
         es
       )
-      bad <- KinesisSink.createAndInitialize(kc, bufferConf, badStream, sqsBad, collectorConf.enableStartupChecks, es)
+      bad <- KinesisSink.createAndInitialize(
+        kc.maxBytes,
+        kc,
+        bufferConf,
+        badStream,
+        sqsBad,
+        collectorConf.enableStartupChecks,
+        es
+      )
     } yield CollectorSinks(good, bad)
 
     sinks match {

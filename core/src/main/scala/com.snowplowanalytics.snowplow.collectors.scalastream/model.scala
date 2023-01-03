@@ -99,16 +99,20 @@ package model {
     rpcTimeoutMultiplier: Double
   )
   final case class RabbitMQBackoffPolicyConfig(minBackoff: Long, maxBackoff: Long, multiplier: Double)
-  sealed trait SinkConfig
+  sealed trait SinkConfig {
+    val maxBytes: Int
+  }
   final case class AWSConfig(accessKey: String, secretKey: String)
   final case class Kinesis(
+    maxBytes: Int,
     region: String,
     threadPoolSize: Int,
     aws: AWSConfig,
     backoffPolicy: KinesisBackoffPolicyConfig,
     customEndpoint: Option[String],
     sqsGoodBuffer: Option[String],
-    sqsBadBuffer: Option[String]
+    sqsBadBuffer: Option[String],
+    sqsMaxBytes: Int
   ) extends SinkConfig {
     val endpoint = customEndpoint.getOrElse(region match {
       case cn @ "cn-north-1"     => s"https://kinesis.$cn.amazonaws.com.cn"
@@ -116,20 +120,28 @@ package model {
       case _                     => s"https://kinesis.$region.amazonaws.com"
     })
   }
-  final case class Sqs(region: String, threadPoolSize: Int, aws: AWSConfig, backoffPolicy: SqsBackoffPolicyConfig)
-      extends SinkConfig
+  final case class Sqs(
+    maxBytes: Int,
+    region: String,
+    threadPoolSize: Int,
+    aws: AWSConfig,
+    backoffPolicy: SqsBackoffPolicyConfig
+  ) extends SinkConfig
   final case class GooglePubSub(
+    maxBytes: Int,
     googleProjectId: String,
     backoffPolicy: GooglePubSubBackoffPolicyConfig
   ) extends SinkConfig
   final case class Kafka(
+    maxBytes: Int,
     brokers: String,
     retries: Int,
     producerConf: Option[Map[String, String]]
   ) extends SinkConfig
-  final case class Nsq(host: String, port: Int) extends SinkConfig
-  case object Stdout extends SinkConfig
+  final case class Nsq(maxBytes: Int, host: String, port: Int) extends SinkConfig
+  final case class Stdout(maxBytes: Int) extends SinkConfig
   final case class Rabbitmq(
+    maxBytes: Int,
     username: String,
     password: String,
     virtualHost: String,

@@ -26,11 +26,10 @@ import scala.collection.mutable.ListBuffer
 // same methods from AbstractSink as the other sinks.
 class TestSink extends Sink {
 
+  override val maxBytes = Int.MaxValue
+
   private val buf: ListBuffer[Array[Byte]] = ListBuffer()
   def storedRawEvents: List[Array[Byte]]   = buf.toList
-
-  // Effectively no limit to the record size
-  override val MaxBytes = Int.MaxValue
 
   override def storeRawEvents(events: List[Array[Byte]], key: String): Unit =
     buf ++= events

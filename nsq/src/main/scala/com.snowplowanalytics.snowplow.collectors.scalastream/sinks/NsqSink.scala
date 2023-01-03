@@ -29,8 +29,7 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.model._
   * @param nsqConfig Configuration for Nsq
   * @param topicName Nsq topic name
   */
-class NsqSink(nsqConfig: Nsq, topicName: String) extends Sink {
-  override val MaxBytes = Int.MaxValue
+class NsqSink(val maxBytes: Int, nsqConfig: Nsq, topicName: String) extends Sink {
 
   private val producer = new NSQProducer().addAddress(nsqConfig.host, nsqConfig.port).start()
 

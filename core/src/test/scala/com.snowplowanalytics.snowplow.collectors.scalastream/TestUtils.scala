@@ -48,13 +48,15 @@ object TestUtils {
         bad                        = "bad",
         useIpAddressAsPartitionKey = false,
         sink = Kinesis(
+          maxBytes       = 1000000,
           region         = "us-east-1",
           threadPoolSize = 12,
           aws            = AWSConfig("cpf", "cpf"),
           backoffPolicy  = KinesisBackoffPolicyConfig(3000L, 60000L),
           customEndpoint = None,
           sqsGoodBuffer  = Some("good-buffer"),
-          sqsBadBuffer   = Some("bad-buffer")
+          sqsBadBuffer   = Some("bad-buffer"),
+          sqsMaxBytes    = 192000
         ),
         buffer = BufferConfig(4000000L, 500L, 60000L)
       ),

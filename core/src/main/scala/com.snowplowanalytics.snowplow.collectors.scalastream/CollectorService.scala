@@ -263,7 +263,7 @@ class CollectorService(
     partitionKey: String
   ): Unit = {
     // Split events into Good and Bad
-    val eventSplit = splitBatch.splitAndSerializePayload(event, sinks.good.MaxBytes)
+    val eventSplit = splitBatch.splitAndSerializePayload(event, sinks.good.maxBytes)
     // Send events to respective sinks
     sinks.good.storeRawEvents(eventSplit.good, partitionKey)
     sinks.bad.storeRawEvents(eventSplit.bad, partitionKey)

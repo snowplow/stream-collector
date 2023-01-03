@@ -105,10 +105,11 @@ abstract class ConfigSpec extends Specification {
   )
 
   def sinkConfigRefFactory(app: String): SinkConfig = app match {
-    case "nsq"   => Nsq("nsqHost", 4150)
-    case "kafka" => Kafka("localhost:9092,another.host:9092", 10, None)
+    case "nsq"   => Nsq(maxBytes   = 1000000, "nsqHost", 4150)
+    case "kafka" => Kafka(maxBytes = 1000000, "localhost:9092,another.host:9092", 10, None)
     case "pubsub" =>
       GooglePubSub(
+        maxBytes        = 10000000,
         googleProjectId = "googleProjectId",
         backoffPolicy = GooglePubSubBackoffPolicyConfig(
           minBackoff           = 1000,
@@ -122,6 +123,7 @@ abstract class ConfigSpec extends Specification {
       )
     case "sqs" =>
       Sqs(
+        maxBytes       = 192000,
         region         = "eu-central-1",
         threadPoolSize = 10,
         aws = AWSConfig(
@@ -133,9 +135,10 @@ abstract class ConfigSpec extends Specification {
           maxBackoff = 600000
         )
       )
-    case "stdout" => Stdout
+    case "stdout" => Stdout(maxBytes = 1000000000)
     case "kinesis" =>
       Kinesis(
+        maxBytes       = 1000000,
         region         = "eu-central-1",
         threadPoolSize = 10,
         aws = AWSConfig(
@@ -148,6 +151,7 @@ abstract class ConfigSpec extends Specification {
         ),
         sqsBadBuffer   = None,
         sqsGoodBuffer  = None,
+        sqsMaxBytes    = 192000,
         customEndpoint = None
       )
   }

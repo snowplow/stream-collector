@@ -23,13 +23,11 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.model._
   * Kafka Sink for the Scala Stream Collector
   */
 class KafkaSink(
+  val maxBytes: Int,
   kafkaConfig: Kafka,
   bufferConfig: BufferConfig,
   topicName: String
 ) extends Sink {
-
-  // Records must not exceed MaxBytes - 1MB
-  override val MaxBytes = 1000000
 
   private val kafkaProducer = createProducer
 
