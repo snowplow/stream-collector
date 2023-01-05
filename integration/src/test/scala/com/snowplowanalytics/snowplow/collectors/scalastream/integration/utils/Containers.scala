@@ -16,16 +16,17 @@ package com.snowplowanalytics.snowplow.collectors.scalastream.integration.utils
 
 import cats.effect.{Resource, Sync}
 import com.dimafeng.testcontainers.GenericContainer
+import com.snowplowanalytics.snowplow.collectors.scalastream.generated.ProjectMetadata
 import com.snowplowanalytics.snowplow.collectors.scalastream.integration.CollectorConfig
 import org.slf4j.LoggerFactory
 import org.testcontainers.containers.output.Slf4jLogConsumer
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.containers.{BindMode, Network, GenericContainer => JGenericContainer}
-import org.testcontainers.images.builder.ImageFromDockerfile
 
 object Containers {
   val LocalstackExposedPort = 4566
   val CollectorExposedPort  = 12345
+  val CollectorInterface    = "0.0.0.0"
 
   private val network = Network.newNetwork()
 
@@ -36,6 +37,9 @@ object Containers {
       env          = Map("USE_SSL" -> "1"),
       waitStrategy = Wait.forLogMessage(".*AWS kinesis.CreateStream.*", 2),
       fileSystemBind = Seq(
+        // This exposes any data in the mocked Kinesis streams via the local filesystem.
+        // Could be useful to read data directly, rather than needing a Kinesis clients.
+        // Delete if not in use.
         GenericContainer.FileSystemBind(
           "./.localstack",
           "/var/lib/localstack",
@@ -55,13 +59,12 @@ object Containers {
 
   def collector(
     flavour: String,
-    testConfig: CollectorConfig,
-    dependsOn: Option[JGenericContainer[_]] = None
+    testConfig: CollectorConfig
   ): JGenericContainer[_] = {
-    val imageFromDockerfile = new ImageFromDockerfile()
-      .withDockerfile(java.nio.file.Path.of(flavour, "target", "docker", "stage", "Dockerfile"))
+    val version = ProjectMetadata.version
+    val image   = s"snowplow/scala-stream-collector-$flavour:$version"
     val container = GenericContainer(
-      dockerImage  = imageFromDockerfile,
+      dockerImage  = image,
       exposedPorts = Seq(CollectorExposedPort),
       env          = Map("AWS_ACCESS_KEY_ID" -> "test", "AWS_SECRET_KEY" -> "test") ++ testConfig,
       command      = Seq("--config", s"/snowplow/config/collector.hocon"),
@@ -76,7 +79,6 @@ object Containers {
     )
     container.underlyingUnsafeContainer.withNetwork(network)
     container.underlyingUnsafeContainer.withNetworkAliases("collector")
-    dependsOn.foreach(container.underlyingUnsafeContainer.dependsOn(_))
     container.container
   }
 

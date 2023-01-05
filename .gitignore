@@ -6,4 +6,5 @@ src/main/resources/application.conf
 
 .bsp
 
+# Remove if we remove the binding in com.snowplowanalytics.snowplow.collectors.scalastream.integration.utils.Containers.scala
 .localstack/

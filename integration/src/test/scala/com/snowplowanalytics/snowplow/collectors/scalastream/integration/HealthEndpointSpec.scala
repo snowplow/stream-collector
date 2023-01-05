@@ -25,7 +25,7 @@ import java.net.URI
 import java.net.http.HttpRequest.BodyPublishers
 import java.net.http.{HttpClient, HttpRequest}
 
-class StdoutSpec extends Specification with CatsIO {
+class HealthEndpointSpec extends Specification with CatsIO {
   "The collector" should {
     def resources(collector: JGenericContainer[_]): Resource[IO, (JGenericContainer[_], HttpClient)] =
       for {
@@ -35,16 +35,11 @@ class StdoutSpec extends Specification with CatsIO {
 
     "respond with 200 OK to requests made to its health endpoint" in {
       val CollectorEndpointScheme     = "http"
-      val CollectorEndpointHost       = "0.0.0.0"
       val CollectorHealthEndpointPath = "/health"
 
       val testConfig = Map(
-        "COLLECTOR_COOKIE_ENABLED"    -> "true",
-        "COLLECTOR_COOKIE_EXPIRATION" -> "365 days",
-        "COLLECTOR_COOKIE_NAME"       -> "sp",
-        "COLLECTOR_COOKIE_SECURE"     -> "true",
-        "COLLECTOR_COOKIE_HTTP_ONLY"  -> "true",
-        "COLLECTOR_COOKIE_SAME_SITE"  -> "Strict"
+        "COLLECTOR_INTERFACE" -> Containers.CollectorInterface,
+        "COLLECTOR_PORT"      -> Containers.CollectorExposedPort.toString
       )
 
       val collector = Containers.collector("stdout", testConfig)
@@ -55,7 +50,7 @@ class StdoutSpec extends Specification with CatsIO {
           val uri = new URI(
             CollectorEndpointScheme,
             "",
-            CollectorEndpointHost,
+            Containers.CollectorInterface,
             collectorPort,
             CollectorHealthEndpointPath,
             "",

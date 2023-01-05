@@ -14,7 +14,7 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream.integration
 
-import cats.effect.{IO, Resource, Sync}
+import cats.effect.{IO, Resource}
 import cats.effect.testing.specs2.CatsIO
 import cats.implicits.toTraverseOps
 import com.snowplowanalytics.snowplow.collectors.scalastream.integration.SetCookieSpec.Cookie
@@ -57,10 +57,10 @@ class SetCookieSpec extends Specification with CatsIO {
 
             for {
               responses <- good.traverse(sendOne[IO](_, httpClient))
-              results <- Sync[IO].delay(responses.zip(good).map {
+              results = responses.zip(good).map {
                 case (resp, req) =>
                   (resp.headers.firstValue("Set-Cookie").asScala, req.headers.firstValue("SP-Anonymous").asScala)
-              })
+              }
             } yield results.map {
               case (cookieHeader, anonymousHeader) =>
                 if (anonymousHeader.isDefined) cookieHeader must beNone
@@ -73,6 +73,8 @@ class SetCookieSpec extends Specification with CatsIO {
 
       "(1) Secure: true, HttpOnly: true, SameSite: Strict, no cookie domains, no fallback domain" in {
         val testConfig = Map(
+          "COLLECTOR_INTERFACE"         -> Containers.CollectorInterface,
+          "COLLECTOR_PORT"              -> Containers.CollectorExposedPort.toString,
           "COLLECTOR_COOKIE_ENABLED"    -> "true",
           "COLLECTOR_COOKIE_EXPIRATION" -> "365 days",
           "COLLECTOR_COOKIE_NAME"       -> "sp",
@@ -88,6 +90,8 @@ class SetCookieSpec extends Specification with CatsIO {
 
       "(2) Secure: false, HttpOnly: false, SameSite: not configured, no cookie domains, no fallback domain" in {
         val testConfig = Map(
+          "COLLECTOR_INTERFACE"         -> Containers.CollectorInterface,
+          "COLLECTOR_PORT"              -> Containers.CollectorExposedPort.toString,
           "COLLECTOR_COOKIE_ENABLED"    -> "true",
           "COLLECTOR_COOKIE_EXPIRATION" -> "7 days",
           "COLLECTOR_COOKIE_NAME"       -> "alt",
@@ -102,6 +106,8 @@ class SetCookieSpec extends Specification with CatsIO {
 
       "(3) Secure: false, HttpOnly: false, SameSite: Lax, no cookie domains, fallback domain configured" in {
         val testConfig = Map(
+          "COLLECTOR_INTERFACE"              -> Containers.CollectorInterface,
+          "COLLECTOR_PORT"                   -> Containers.CollectorExposedPort.toString,
           "COLLECTOR_COOKIE_ENABLED"         -> "true",
           "COLLECTOR_COOKIE_EXPIRATION"      -> "365 days",
           "COLLECTOR_COOKIE_NAME"            -> "sp",
@@ -118,6 +124,8 @@ class SetCookieSpec extends Specification with CatsIO {
 
       "(4) Secure: false, HttpOnly: false, SameSite: not configured, cookie domains configured, no fallback domain configured" in {
         val testConfig = Map(
+          "COLLECTOR_INTERFACE"         -> Containers.CollectorInterface,
+          "COLLECTOR_PORT"              -> Containers.CollectorExposedPort.toString,
           "COLLECTOR_COOKIE_ENABLED"    -> "true",
           "COLLECTOR_COOKIE_EXPIRATION" -> "365 days",
           "COLLECTOR_COOKIE_NAME"       -> "sp",
@@ -129,9 +137,10 @@ class SetCookieSpec extends Specification with CatsIO {
         )
 
         "(a) if an Origin domain matches one of the configured cookie domains" in {
-          val expectedCookie = Cookie("sp", 365.days, secure = false, httpOnly = false, "None", "test.net")
+          val OriginDomain: String = "http://test.net"
+          val expectedCookie       = Cookie("sp", 365.days, secure = false, httpOnly = false, "None", "test.net")
 
-          run(testConfig, Http.Request.addOrigin(_, "http://test.net"), expectedCookie)
+          run(testConfig, Http.Request.addOrigin(_, OriginDomain), expectedCookie)
         }
 
         "(b) if no Origin domain matches one of the configured cookie domains" in {
@@ -143,6 +152,8 @@ class SetCookieSpec extends Specification with CatsIO {
 
       "(5) Secure: false, HttpOnly: false, SameSite: not configured, cookie domains configured, fallback domain configured" in {
         val testConfig = Map(
+          "COLLECTOR_INTERFACE"              -> Containers.CollectorInterface,
+          "COLLECTOR_PORT"                   -> Containers.CollectorExposedPort.toString,
           "COLLECTOR_COOKIE_ENABLED"         -> "true",
           "COLLECTOR_COOKIE_EXPIRATION"      -> "365 days",
           "COLLECTOR_COOKIE_NAME"            -> "sp",
@@ -155,9 +166,10 @@ class SetCookieSpec extends Specification with CatsIO {
         )
 
         "(a) if an Origin domain matches one of the configured cookie domains" in {
-          val expectedCookie = Cookie("sp", 365.days, secure = false, httpOnly = false, "None", "test.info")
+          val OriginDomain: String = "http://test.info"
+          val expectedCookie       = Cookie("sp", 365.days, secure = false, httpOnly = false, "None", "test.info")
 
-          run(testConfig, Http.Request.addOrigin(_, "http://test.info"), expectedCookie)
+          run(testConfig, Http.Request.addOrigin(_, OriginDomain), expectedCookie)
         }
 
         "(b) if no Origin domain matches one of the configured cookie domains" in {
@@ -169,8 +181,13 @@ class SetCookieSpec extends Specification with CatsIO {
     }
 
     "not send back a `Set-Cookie` header if cookies are disabled in the config" in {
-      val testConfig = Map("COLLECTOR_COOKIE_ENABLED" -> "false")
-      val collector  = Containers.collector("stdout", testConfig)
+      val testConfig =
+        Map(
+          "COLLECTOR_INTERFACE"      -> Containers.CollectorInterface,
+          "COLLECTOR_PORT"           -> Containers.CollectorExposedPort.toString,
+          "COLLECTOR_COOKIE_ENABLED" -> "false"
+        )
+      val collector = Containers.collector("stdout", testConfig)
 
       resources(collector).use {
         case (collector, httpClient) =>
@@ -179,13 +196,15 @@ class SetCookieSpec extends Specification with CatsIO {
 
           for {
             responses <- good.traverse(sendOne[IO](_, httpClient))
-            results   <- Sync[IO].delay(responses.flatMap(_.headers().firstValue("Set-Cookie").asScala))
+            results = responses.flatMap(_.headers().firstValue("Set-Cookie").asScala)
           } yield results mustEqual List.empty
       }
     }
 
     "send back a `Set-Cookie` header even when doNotTrackCookie is enabled, if the dnt cookie is not part of the request" in {
       val testConfig = Map(
+        "COLLECTOR_INTERFACE"                   -> Containers.CollectorInterface,
+        "COLLECTOR_PORT"                        -> Containers.CollectorExposedPort.toString,
         "COLLECTOR_COOKIE_ENABLED"              -> "true",
         "COLLECTOR_COOKIE_EXPIRATION"           -> "365 days",
         "COLLECTOR_COOKIE_NAME"                 -> "sp",
@@ -207,13 +226,15 @@ class SetCookieSpec extends Specification with CatsIO {
 
           for {
             responses <- good.traverse(sendOne[IO](_, httpClient))
-            results   <- Sync[IO].delay(responses.flatMap(_.headers().firstValue("Set-Cookie").asScala))
+            results = responses.flatMap(_.headers().firstValue("Set-Cookie").asScala)
           } yield results.size mustEqual nonAnonymous.size
       }
     }
 
     "not send back a `Set-Cookie` header if doNotTrackCookie is enabled and the request contains a dnt cookie" in {
       val testConfig = Map(
+        "COLLECTOR_INTERFACE"                   -> Containers.CollectorInterface,
+        "COLLECTOR_PORT"                        -> Containers.CollectorExposedPort.toString,
         "COLLECTOR_COOKIE_ENABLED"              -> "true",
         "COLLECTOR_COOKIE_EXPIRATION"           -> "365 days",
         "COLLECTOR_COOKIE_NAME"                 -> "sp",
@@ -233,7 +254,7 @@ class SetCookieSpec extends Specification with CatsIO {
 
           for {
             responses <- good.traverse(sendOne[IO](_, httpClient))
-            results   <- Sync[IO].delay(responses.flatMap(_.headers().firstValue("Set-Cookie").asScala))
+            results = responses.flatMap(_.headers().firstValue("Set-Cookie").asScala)
           } yield results mustEqual List.empty
       }
     }

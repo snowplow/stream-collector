@@ -34,19 +34,19 @@ object Http {
   object Request {
     trait RequestType {
       def querystring: RequestStub => String
-      def payload: RequestStub => HttpRequest.BodyPublisher
+      def payload: RequestStub     => HttpRequest.BodyPublisher
     }
 
     object RequestType {
       final case object Good extends RequestType {
         override def querystring: RequestStub => String = _.qs.map(_.toString()).getOrElse("")
-        override def payload: RequestStub => HttpRequest.BodyPublisher =
+        override def payload: RequestStub     => HttpRequest.BodyPublisher =
           _.body.map(b => BodyPublishers.ofString(b.toString)).getOrElse(BodyPublishers.noBody())
       }
 
       final case object Bad extends RequestType {
         override def querystring: RequestStub => String = _ => ""
-        override def payload: RequestStub => HttpRequest.BodyPublisher = _.body match {
+        override def payload: RequestStub     => HttpRequest.BodyPublisher = _.body match {
           case None => BodyPublishers.noBody()
           case Some(_) =>
             val newBody = "s" * 192001

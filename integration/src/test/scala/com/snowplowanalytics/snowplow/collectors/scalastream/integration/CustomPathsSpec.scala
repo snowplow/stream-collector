@@ -36,8 +36,10 @@ class CustomPathsSpec extends Specification with CatsIO {
         "-Dcollector.paths./test/track=/com.snowplowanalytics.snowplow/tp2 -Dcollector.paths./test/redirect=/r/tp2 -Dcollector.paths./test/iglu=/com.snowplowanalytics.iglu/v1"
 
       val testConfig = Map(
+        "COLLECTOR_INTERFACE"      -> Containers.CollectorInterface,
+        "COLLECTOR_PORT"           -> Containers.CollectorExposedPort.toString,
         "COLLECTOR_COOKIE_ENABLED" -> "false",
-        "JAVA_OPTS"                -> JavaOpts
+        "JDK_JAVA_OPTIONS"         -> JavaOpts
       )
       val collector    = Containers.collector("stdout", testConfig)
       val requestStubs = EventGenerator.makeStubs(3, 3)

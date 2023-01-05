@@ -25,6 +25,8 @@ class KinesisSpec extends Specification with CatsIO {
   "The Kinesis collector" should {
     "ensure all good and bad events are written to the sink" in {
       val testConfig = Map(
+        "COLLECTOR_INTERFACE"                    -> Containers.CollectorInterface,
+        "COLLECTOR_PORT"                         -> Containers.CollectorExposedPort.toString,
         "COLLECTOR_COOKIE_ENABLED"               -> "true",
         "COLLECTOR_COOKIE_EXPIRATION"            -> "365 days",
         "COLLECTOR_COOKIE_NAME"                  -> "sp",
@@ -39,7 +41,7 @@ class KinesisSpec extends Specification with CatsIO {
       )
 
       val localstack = Containers.localstack
-      val collector  = Containers.collector("kinesis", testConfig, Some(localstack))
+      val collector  = Containers.collector("kinesis", testConfig)
 
       lazy val localstackPort = Containers.getExposedPort(localstack, Containers.LocalstackExposedPort)
       lazy val collectorPort  = Containers.getExposedPort(collector, Containers.CollectorExposedPort)

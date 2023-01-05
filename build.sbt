@@ -54,6 +54,31 @@ lazy val buildInfoSettings = Seq(
   buildInfoKeys := Seq[BuildInfoKey](organization, moduleName, name, version, "shortName" -> "ssc", scalaVersion)
 )
 
+// Make package (build) metadata available within source code.
+lazy val scalifiedSettings = Seq(
+  Compile / sourceGenerators += Def.task {
+    val file = (Compile / sourceManaged).value / "settings.scala"
+    IO.write(
+      file,
+      """package %s
+        |object ProjectMetadata {
+        |  val organization = "%s"
+        |  val name = "%s"
+        |  val version = "%s"
+        |}
+        |"""
+        .stripMargin
+        .format(
+          buildInfoPackage.value,
+          organization.value,
+          name.value,
+          version.value
+        )
+    )
+    Seq(file)
+  }.taskValue
+)
+
 lazy val buildSettings = Seq(
   organization := "com.snowplowanalytics",
   name := "snowplow-stream-collector",
@@ -275,4 +300,9 @@ lazy val integrationTestsSettings = BuildSettings.formatting ++ Seq(
 lazy val integrationTests = project
   .in(file("integration"))
   .settings(integrationTestsSettings)
-  .settings((Test / test) := (Test / test).dependsOn(kinesis / Docker / stage, stdout / Docker / stage).value)
+  .settings(buildInfoSettings ++ scalifiedSettings)
+  .settings(
+    (Test / test) := (Test / test)
+      .dependsOn(kinesisDistroless / Docker / publishLocal, stdoutDistroless / Docker / publishLocal)
+      .value
+  )
