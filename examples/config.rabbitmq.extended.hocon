@@ -206,13 +206,13 @@ collector {
       # The thread pool is shared by the writing of good and bad events.
       # If this parameter is omitted, a cached thread pool is used.
       # threadPoolSize = 30
+
+      # Optional. Maximum number of bytes that a single record can contain.
+      # If a record is bigger, a size violation bad row is emitted instead
+      # Default: 128 MB
+      maxBytes = 128000000
     }
   }
-
-  # Optional. Maximum number of bytes that a single record can contain.
-  # If a record is bigger, a size violation bad row is emitted instead
-  # Default: 128 MB
-  maxBytes = 128000000
 
   # Telemetry sends heartbeat events to external pipeline.
   # Unless disable parameter set to true, this feature will be enabled. Deleting whole section will not disable it.

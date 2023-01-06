@@ -188,13 +188,13 @@ collector {
       host = "nsqHost"
       ## TCP port for nsqd, 4150 by default
       port = 4150
+
+      # Optional. Maximum number of bytes that a single record can contain.
+      # If a record is bigger, a size violation bad row is emitted instead
+      # Default: 1 MB
+      maxBytes = 1000000
     }
   }
-
-  # Optional. Maximum number of bytes that a single record can contain.
-  # If a record is bigger, a size violation bad row is emitted instead
-  # Default: 1 MB
-  maxBytes = 1000000
 
   # Telemetry sends heartbeat events to external pipeline.
   # Unless disable parameter set to true, this feature will be enabled. Deleting whole section will not disable it.

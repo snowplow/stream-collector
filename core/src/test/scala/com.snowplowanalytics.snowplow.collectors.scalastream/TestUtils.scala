@@ -48,6 +48,7 @@ object TestUtils {
         bad                        = "bad",
         useIpAddressAsPartitionKey = false,
         sink = Kinesis(
+          maxBytes       = 1000000,
           region         = "us-east-1",
           threadPoolSize = 12,
           aws            = AWSConfig("cpf", "cpf"),
@@ -59,7 +60,6 @@ object TestUtils {
         ),
         buffer = BufferConfig(4000000L, 500L, 60000L)
       ),
-      maxBytes                = 1000000,
       monitoring              = MonitoringConfig(MetricsConfig(StatsdConfig(false, "localhost", 8125, 10.seconds))),
       telemetry               = None,
       enableStartupChecks     = true,

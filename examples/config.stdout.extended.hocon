@@ -183,7 +183,12 @@ collector {
       # "enabled" which should be set to "stdout".
       enabled = stdout
       enabled = ${?COLLECTOR_STREAMS_SINK_ENABLED}
-      }
+
+      # Optional. Maximum number of bytes that a single record can contain.
+      # If a record is bigger, a size violation bad row is emitted instead
+      # Default: 1 GB
+      maxBytes = 1000000000
+    }
 
     # Incoming events are stored in a buffer before being sent to Kinesis/Kafka.
     # Note: Buffering is not supported by NSQ.
@@ -197,11 +202,6 @@ collector {
       timeLimit = 5000
     }
   }
-
-  # Optional. Maximum number of bytes that a single record can contain.
-  # If a record is bigger, a size violation bad row is emitted instead
-  # Default: 1 GB
-  maxBytes = 1000000000
 
   # Telemetry sends heartbeat events to external pipeline.
   # Unless disable parameter set to true, this feature will be enabled. Deleting whole section will not disable it.

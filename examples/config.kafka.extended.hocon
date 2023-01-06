@@ -199,6 +199,10 @@ collector {
       #  "value.serializer"   = "org.apache.kafka.common.serialization.StringSerializer"
       #}
 
+      # Optional. Maximum number of bytes that a single record can contain.
+      # If a record is bigger, a size violation bad row is emitted instead
+      # Default: 1 MB
+      maxBytes = 1000000
     }
 
     # Incoming events are stored in a buffer before being sent to Kinesis/Kafka.
@@ -213,11 +217,6 @@ collector {
       timeLimit = 5000
     }
   }
-
-  # Optional. Maximum number of bytes that a single record can contain.
-  # If a record is bigger, a size violation bad row is emitted instead
-  # Default: 1 MB
-  maxBytes = 1000000
 
   # Telemetry sends heartbeat events to external pipeline.
   # Unless disable parameter set to true, this feature will be enabled. Deleting whole section will not disable it.

@@ -42,14 +42,14 @@ class CollectorServiceSpec extends Specification {
 
   val service = new CollectorService(
     TestUtils.testConf,
-    CollectorSinks(TestSink.mk, TestSink.mk),
+    CollectorSinks(new TestSink, new TestSink),
     "app",
     "version"
   )
 
   def probeService(): ProbeService = {
-    val good = TestSink.mk
-    val bad  = TestSink.mk
+    val good = new TestSink
+    val bad  = new TestSink
     val s = new CollectorService(
       TestUtils.testConf,
       CollectorSinks(good, bad),
@@ -59,8 +59,8 @@ class CollectorServiceSpec extends Specification {
     ProbeService(s, good, bad)
   }
   def bouncingService(): ProbeService = {
-    val good = TestSink.mk
-    val bad  = TestSink.mk
+    val good = new TestSink
+    val bad  = new TestSink
     val s = new CollectorService(
       TestUtils.testConf.copy(cookieBounce = TestUtils.testConf.cookieBounce.copy(enabled = true)),
       CollectorSinks(good, bad),
@@ -585,7 +585,7 @@ class CollectorServiceSpec extends Specification {
         def conf = TestUtils.testConf.copy(redirectDomains = Set.empty)
         val permissiveService = new CollectorService(
           conf,
-          CollectorSinks(TestSink.mk, TestSink.mk),
+          CollectorSinks(new TestSink, new TestSink),
           "app",
           "version"
         )
@@ -935,7 +935,7 @@ class CollectorServiceSpec extends Specification {
       "should pass on the original path if no mapping for it can be found" in {
         val service = new CollectorService(
           TestUtils.testConf.copy(paths = Map.empty[String, String]),
-          CollectorSinks(TestSink.mk, TestSink.mk),
+          CollectorSinks(new TestSink, new TestSink),
           "",
           ""
         )

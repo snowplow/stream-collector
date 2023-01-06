@@ -24,7 +24,9 @@ import scala.collection.mutable.ListBuffer
 
 // Allow the testing framework to test collection events using the
 // same methods from AbstractSink as the other sinks.
-class TestSink(val maxBytes: Int) extends Sink {
+class TestSink extends Sink {
+
+  override val maxBytes = Int.MaxValue
 
   private val buf: ListBuffer[Array[Byte]] = ListBuffer()
   def storedRawEvents: List[Array[Byte]]   = buf.toList
@@ -33,8 +35,4 @@ class TestSink(val maxBytes: Int) extends Sink {
     buf ++= events
 
   override def shutdown(): Unit = ()
-}
-
-object TestSink {
-  def mk = new TestSink(Int.MaxValue)
 }

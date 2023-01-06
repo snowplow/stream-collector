@@ -45,9 +45,20 @@ object RabbitMQCollector extends Collector {
         (connection, channel) = rabbitMQ
         _                     = Runtime.getRuntime().addShutdownHook(shutdownHook(connection, channel))
         threadPool            = initThreadPool(config.threadPoolSize)
-        maxBytes              = collectorConf.maxBytes
-        goodSink <- RabbitMQSink.init(maxBytes, channel, collectorConf.streams.good, config.backoffPolicy, threadPool)
-        badSink  <- RabbitMQSink.init(maxBytes, channel, collectorConf.streams.bad, config.backoffPolicy, threadPool)
+        goodSink <- RabbitMQSink.init(
+          config.maxBytes,
+          channel,
+          collectorConf.streams.good,
+          config.backoffPolicy,
+          threadPool
+        )
+        badSink <- RabbitMQSink.init(
+          config.maxBytes,
+          channel,
+          collectorConf.streams.bad,
+          config.backoffPolicy,
+          threadPool
+        )
       } yield CollectorSinks(goodSink, badSink)
 
     sinks match {

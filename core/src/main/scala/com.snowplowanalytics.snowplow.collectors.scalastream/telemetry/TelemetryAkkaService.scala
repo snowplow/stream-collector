@@ -117,10 +117,10 @@ object TelemetryAkkaService {
   ): TelemetryAkkaService = {
 
     val (cloud, region) = collectorConfig.streams.sink match {
-      case Kinesis(region, _, _, _, _, _, _, _) => (Some(CloudVendor.Aws), Some(region))
-      case Sqs(region, _, _, _)                 => (Some(CloudVendor.Aws), Some(region))
-      case GooglePubSub(_, _)                   => (Some(CloudVendor.Gcp), None)
-      case _                                    => (None, None)
+      case k: Kinesis      => (Some(CloudVendor.Aws), Some(k.region))
+      case s: Sqs          => (Some(CloudVendor.Aws), Some(s.region))
+      case _: GooglePubSub => (Some(CloudVendor.Gcp), None)
+      case _               => (None, None)
     }
 
     TelemetryAkkaService(
