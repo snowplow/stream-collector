@@ -77,7 +77,6 @@ abstract class ConfigSpec extends Specification {
     telemetry               = Some(TelemetryConfig()),
     ssl                     = SSLConfig(enable = false, redirect = false, port = 443),
     enableDefaultRedirect   = false,
-    enableStartupChecks     = true,
     redirectDomains         = Set.empty,
     terminationDeadline     = 10.seconds,
     preTerminationPeriod    = 10.seconds,
@@ -119,7 +118,8 @@ abstract class ConfigSpec extends Specification {
           initialRpcTimeout    = 10000,
           maxRpcTimeout        = 10000,
           rpcTimeoutMultiplier = 2
-        )
+        ),
+        startupCheckInterval = 1.second
       )
     case "sqs" =>
       Sqs(
@@ -133,7 +133,8 @@ abstract class ConfigSpec extends Specification {
         backoffPolicy = SqsBackoffPolicyConfig(
           minBackoff = 3000,
           maxBackoff = 600000
-        )
+        ),
+        startupCheckInterval = 1.second
       )
     case "stdout" => Stdout(maxBytes = 1000000000)
     case "kinesis" =>
@@ -149,10 +150,11 @@ abstract class ConfigSpec extends Specification {
           minBackoff = 3000,
           maxBackoff = 600000
         ),
-        sqsBadBuffer   = None,
-        sqsGoodBuffer  = None,
-        sqsMaxBytes    = 192000,
-        customEndpoint = None
+        sqsBadBuffer         = None,
+        sqsGoodBuffer        = None,
+        sqsMaxBytes          = 192000,
+        customEndpoint       = None,
+        startupCheckInterval = 1.second
       )
   }
 

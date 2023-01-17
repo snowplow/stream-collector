@@ -46,7 +46,6 @@ object KinesisCollector extends Collector {
         bufferConf,
         goodStream,
         sqsGood,
-        collectorConf.enableStartupChecks,
         es
       )
       bad <- KinesisSink.createAndInitialize(
@@ -55,7 +54,6 @@ object KinesisCollector extends Collector {
         bufferConf,
         badStream,
         sqsBad,
-        collectorConf.enableStartupChecks,
         es
       )
     } yield CollectorSinks(good, bad)

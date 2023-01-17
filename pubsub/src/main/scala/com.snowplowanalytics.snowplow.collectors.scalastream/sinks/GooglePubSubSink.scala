@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2022 Snowplow Analytics Ltd. All rights reserved.
+ * Copyright (c) 2013-2023 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0,
  * and you may not use this file except in compliance with the Apache License Version 2.0.
@@ -17,6 +17,7 @@ import java.util.concurrent.Executors
 
 import scala.collection.JavaConverters._
 import scala.util._
+import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 
 import org.threeten.bp.Duration
 
@@ -41,54 +42,53 @@ import cats.syntax.either._
 
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 
-/**
-  * Google PubSub Sink for the Scala Stream Collector
-  */
-class GooglePubSubSink private (val maxBytes: Int, publisher: Publisher, topicName: String) extends Sink {
-  private val logExecutor = Executors.newSingleThreadExecutor()
+class GooglePubSubSink private (val maxBytes: Int, publisher: Publisher, projectId: String, topicName: String)
+    extends Sink {
+  private val logExecutor   = Executors.newSingleThreadExecutor()
+  private val checkExecutor = Executors.newSingleThreadExecutor()
 
-  // Is the collector detecting an outage downstream
-  @volatile private var outage: Boolean = false
-  override def isHealthy: Boolean       = !outage
+  @volatile private var pubsubHealthy: Boolean = false
+  override def isHealthy: Boolean              = pubsubHealthy
 
-  /**
-    * Store raw events in the PubSub topic
-    * @param events The list of events to send
-    * @param key Not used.
-    */
-  override def storeRawEvents(events: List[Array[Byte]], key: String): Unit = {
-    if (events.nonEmpty)
-      log.debug(s"Writing ${events.size} Thrift records to Google PubSub topic $topicName.")
-    events.foreach { event =>
-      publisher.asRight.map { p =>
-        val future = p.publish(eventToPubsubMessage(event))
-        ApiFutures.addCallback(
-          future,
-          new ApiFutureCallback[String]() {
-            override def onSuccess(messageId: String): Unit = {
-              outage = false
-              log.debug(s"Successfully published event with id $messageId to $topicName.")
-            }
+  override def storeRawEvents(events: List[Array[Byte]], key: String): Unit =
+    if (events.nonEmpty) {
+      log.info(s"Writing ${events.size} records to PubSub topic $topicName")
 
-            override def onFailure(throwable: Throwable): Unit = {
-              outage = true
-              throwable match {
-                case apiEx: ApiException =>
-                  log.error(
-                    s"Publishing message to $topicName failed with code ${apiEx.getStatusCode}: ${apiEx.getMessage} This error is retryable: ${apiEx.isRetryable}."
-                  )
-                case t => log.error(s"Publishing message to $topicName failed with ${t.getMessage}.")
+      events.foreach { event =>
+        publisher.asRight.map { p =>
+          val future = p.publish(eventToPubsubMessage(event))
+          ApiFutures.addCallback(
+            future,
+            new ApiFutureCallback[String]() {
+              override def onSuccess(messageId: String): Unit = {
+                pubsubHealthy = true
+                log.debug(s"Successfully published event with id $messageId to $topicName")
               }
-            }
-          },
-          logExecutor
-        )
+
+              override def onFailure(throwable: Throwable): Unit = {
+                pubsubHealthy = false
+                throwable match {
+                  case apiEx: ApiException =>
+                    val retryable = if (apiEx.isRetryable()) "retryable" else "non-retryable"
+                    log.error(
+                      s"Publishing message to $topicName failed with code ${apiEx.getStatusCode} and $retryable error: ${apiEx.getMessage}"
+                    )
+                  case t => log.error(s"Publishing message to $topicName failed with error: ${t.getMessage}")
+                }
+              }
+            },
+            logExecutor
+          )
+        }
       }
     }
-  }
 
-  override def shutdown(): Unit =
+  override def shutdown(): Unit = {
     publisher.shutdown()
+    checkExecutor.shutdown()
+    checkExecutor.awaitTermination(10000, MILLISECONDS)
+    ()
+  }
 
   /**
     * Convert event bytes to a PubsubMessage to be published
@@ -97,6 +97,38 @@ class GooglePubSubSink private (val maxBytes: Int, publisher: Publisher, topicNa
     */
   private def eventToPubsubMessage(event: Array[Byte]): PubsubMessage =
     PubsubMessage.newBuilder.setData(ByteString.copyFrom(event)).build()
+
+  private def checkPubsubHealth(
+    customProviders: Option[(TransportChannelProvider, CredentialsProvider)],
+    startupCheckInterval: FiniteDuration
+  ): Unit = {
+    val healthThread = new Runnable {
+      override def run() {
+        val topicAdmin = GooglePubSubSink.createTopicAdmin(customProviders)
+
+        while (!pubsubHealthy) {
+          GooglePubSubSink.topicExists(topicAdmin, projectId, topicName) match {
+            case Right(true) =>
+              log.info(s"Topic $topicName exists")
+              pubsubHealthy = true
+            case Right(false) =>
+              log.error(s"Topic $topicName doesn't exist")
+              Thread.sleep(startupCheckInterval.toMillis)
+            case Left(err) =>
+              log.error(s"Error while checking if topic $topicName exists: ${err.getCause()}")
+              Thread.sleep(startupCheckInterval.toMillis)
+          }
+        }
+
+        Either.catchNonFatal(topicAdmin.close()) match {
+          case Right(_) =>
+          case Left(err) =>
+            log.error(s"Error when closing topicAdmin: ${err.getMessage()}")
+        }
+      }
+    }
+    checkExecutor.execute(healthThread)
+  }
 }
 
 /** GooglePubSubSink companion object with factory method */
@@ -105,8 +137,7 @@ object GooglePubSubSink {
     maxBytes: Int,
     googlePubSubConfig: GooglePubSub,
     bufferConfig: BufferConfig,
-    topicName: String,
-    enableStartupChecks: Boolean
+    topicName: String
   ): Either[Throwable, GooglePubSubSink] =
     for {
       batching <- batchingSettings(bufferConfig).asRight
@@ -117,17 +148,10 @@ object GooglePubSubSink {
         val credentialsProvider = NoCredentialsProvider.create()
         (channelProvider, credentialsProvider)
       }
-      _ <- if (enableStartupChecks) {
-        val topicAdmin = createTopicAdmin(customProviders)
-        try {
-          topicExists(topicAdmin, googlePubSubConfig.googleProjectId, topicName)
-        } finally {
-          Either.catchNonFatal(topicAdmin.close())
-          ()
-        }
-      } else ().asRight
       publisher <- createPublisher(googlePubSubConfig.googleProjectId, topicName, batching, retry, customProviders)
-    } yield new GooglePubSubSink(maxBytes, publisher, topicName)
+      sink = new GooglePubSubSink(maxBytes, publisher, googlePubSubConfig.googleProjectId, topicName)
+      _    = sink.checkPubsubHealth(customProviders, googlePubSubConfig.startupCheckInterval)
+    } yield sink
 
   private val UserAgent = s"snowplow/stream-collector-${generated.BuildInfo.version}"
 
@@ -192,16 +216,16 @@ object GooglePubSubSink {
         TopicAdminClient.create()
     }
 
-  /** Checks that a PubSub topic exists **/
-  private def topicExists(topicAdmin: TopicAdminClient, projectId: String, topicName: String): Either[Throwable, Unit] =
+  private def topicExists(
+    topicAdmin: TopicAdminClient,
+    projectId: String,
+    topicName: String
+  ): Either[Throwable, Boolean] =
     Either
       .catchNonFatal(topicAdmin.listTopics(ProjectName.of(projectId)))
       .leftMap(new RuntimeException(s"Can't list topics", _))
       .map(_.iterateAll.asScala.toList.map(_.getName()))
       .flatMap { topics =>
-        if (topics.contains(TopicName.of(projectId, topicName).toString()))
-          ().asRight
-        else
-          new IllegalStateException(s"PubSub topic $topicName doesn't exist").asLeft
+        topics.contains(TopicName.of(projectId, topicName).toString()).asRight
       }
 }

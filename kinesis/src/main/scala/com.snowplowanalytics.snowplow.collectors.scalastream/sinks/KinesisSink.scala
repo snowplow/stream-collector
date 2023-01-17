@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2022 Snowplow Analytics Ltd. All rights reserved.
+ * Copyright (c) 2013-2023 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0,
  * and you may not use this file except in compliance with the Apache License Version 2.0.
@@ -16,31 +16,25 @@ package sinks
 import java.nio.ByteBuffer
 import java.util.concurrent.ScheduledExecutorService
 import java.util.UUID
-import com.amazonaws.auth._
-import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
-import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClientBuilder}
-import com.amazonaws.services.kinesis.model._
-import com.amazonaws.services.sqs.{AmazonSQS, AmazonSQSClientBuilder}
-import com.amazonaws.services.sqs.model.{
-  MessageAttributeValue,
-  QueueDoesNotExistException,
-  SendMessageBatchRequest,
-  SendMessageBatchRequestEntry
-}
-import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.{ExecutionContextExecutorService, Future}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
+
 import cats.syntax.either._
+
+import com.amazonaws.auth._
+import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
+import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClientBuilder}
+import com.amazonaws.services.kinesis.model._
+import com.amazonaws.services.sqs.{AmazonSQS, AmazonSQSClientBuilder}
+import com.amazonaws.services.sqs.model.{MessageAttributeValue, SendMessageBatchRequest, SendMessageBatchRequestEntry}
+
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink.SqsClientAndName
 
-/**
-  * Kinesis Sink for the Scala Stream Collector.
-  */
 class KinesisSink private (
   val maxBytes: Int,
   client: AmazonKinesis,
@@ -54,12 +48,10 @@ class KinesisSink private (
 
   maybeSqs match {
     case Some(sqs) =>
-      log.info(
-        s"SQS buffer for '$streamName' Kinesis sink is set up as: ${sqs.sqsBufferName}."
-      )
+      log.info(s"SQS buffer for Kinesis stream $streamName is defined with name ${sqs.sqsBufferName}")
     case None =>
       log.warn(
-        s"No SQS buffer for surge protection set up (consider setting a SQS Buffer in config.hocon)."
+        s"No SQS buffer for surge protection set up for stream $streamName (consider setting it via the config file)"
       )
   }
 
@@ -77,9 +69,9 @@ class KinesisSink private (
   implicit lazy val ec: ExecutionContextExecutorService =
     concurrent.ExecutionContext.fromExecutorService(executorService)
 
-  // Is the collector detecting an outage downstream
-  @volatile private var outage: Boolean = false
-  override def isHealthy: Boolean       = !outage
+  @volatile private var kinesisHealthy: Boolean = false
+  @volatile private var sqsHealthy: Boolean     = false
+  override def isHealthy: Boolean               = kinesisHealthy || sqsHealthy
 
   override def storeRawEvents(events: List[Array[Byte]], key: String): Unit =
     events.foreach(e => EventStorage.store(e, key))
@@ -110,7 +102,7 @@ class KinesisSink private (
         evts
       }
       lastFlushedTime = System.currentTimeMillis()
-      sinkBatch(eventsToSend, KinesisStream(maybeSqs), minBackoff)(MaxRetries)
+      sinkBatch(eventsToSend)
     }
 
     def getLastFlushTime: Long = lastFlushedTime
@@ -142,110 +134,111 @@ class KinesisSink private (
     }
   }
 
-  /**
-    * The number of retries is unlimited, but targets switch every 10 attempts if an SQS buffer is configured.
-    * @param batch A batch of events to be written
-    * @param target A Kinesis stream or SQS queue to write events to
-    * @param nextBackoff Period of time to wait before next attempt if retrying
-    * @param retriesLeft How many retries are left to the current target. Once exhausted, the target will be switched.
-    */
-  def sinkBatch(batch: List[Events], target: Target, nextBackoff: Long)(
+  def sinkBatch(batch: List[Events]): Unit =
+    if (batch.nonEmpty) maybeSqs match {
+      // Kinesis healthy
+      case _ if kinesisHealthy =>
+        writeBatchToKinesisWithRetries(batch, minBackoff, MaxRetries)
+      // No SQS buffer
+      case None =>
+        writeBatchToKinesisWithRetries(batch, minBackoff, MaxRetries)
+      // Kinesis not healthy and SQS buffer defined
+      case Some(sqs) =>
+        writeBatchToSqsWithRetries(batch, sqs, minBackoff, MaxRetries)
+    }
+
+  def writeBatchToKinesisWithRetries(batch: List[Events], nextBackoff: Long, retriesLeft: Int): Unit = {
+    log.info(s"Writing ${batch.size} records to Kinesis stream $streamName")
+    writeBatchToKinesis(batch).onComplete {
+      case Success(s) =>
+        kinesisHealthy = true
+        val results      = s.getRecords.asScala.toList
+        val failurePairs = batch.zip(results).filter(_._2.getErrorMessage != null)
+        log.info(
+          s"Successfully wrote ${batch.size - failurePairs.size} out of ${batch.size} records to Kinesis stream $streamName"
+        )
+        if (failurePairs.nonEmpty) {
+          failurePairs.groupBy(_._2.getErrorCode).foreach {
+            case (errorCode, items) =>
+              val exampleMsg = items.map(_._2.getErrorMessage).find(_.nonEmpty).getOrElse("")
+              log.error(
+                s"Writing ${items.size} records to Kinesis stream $streamName failed with error code [$errorCode] and example message: $exampleMsg"
+              )
+          }
+          val failedRecords = failurePairs.map(_._1)
+          handleKinesisError(failedRecords, nextBackoff, retriesLeft)
+        }
+      case Failure(f) =>
+        log.error(s"Writing ${batch.size} records to Kinesis stream $streamName failed with error: ${f.getMessage()}")
+        handleKinesisError(batch, nextBackoff, retriesLeft)
+    }
+  }
+
+  def writeBatchToSqsWithRetries(
+    batch: List[Events],
+    sqs: SqsClientAndName,
+    nextBackoff: Long,
     retriesLeft: Int
-  ): Unit =
-    if (batch.nonEmpty) target match {
-      case KinesisStream(buffer) =>
-        log.info(s"Writing ${batch.size} Thrift records to Kinesis stream $streamName.")
-        writeBatchToKinesis(batch).onComplete {
-          case Success(s) =>
-            // We only need to keep track of Kinesis health if no SQS buffer is configured.
-            // We also need a way to recover from an SQS outage without writing to SQS,
-            // as there's no guarantee the latter will happen.
-            if (outage) {
-              outage = buffer match {
-                case None => false
-                case Some(SqsClientAndName(sqsClient, bufferName)) =>
-                  sqsQueueExists(sqsClient, bufferName) match {
-                    case Success(true)  => false
-                    case Success(false) => true
-                    case Failure(_)     => true
-                  }
-              }
-            }
-            val results      = s.getRecords.asScala.toList
-            val failurePairs = batch.zip(results).filter(_._2.getErrorMessage != null)
-            log.info(
-              s"Successfully wrote ${batch.size - failurePairs.size} out of ${batch.size} records to Kinesis stream $streamName."
-            )
-            if (failurePairs.nonEmpty) {
-              failurePairs.groupBy(_._2.getErrorCode).foreach {
-                case (errorCode, items) =>
-                  val exampleMsg = items.map(_._2.getErrorMessage).find(_.nonEmpty).getOrElse("")
-                  log.error(
-                    s"Failed writing ${items.size} records to Kinesis stream $streamName, with error code [$errorCode] and example message [$exampleMsg]."
-                  )
-              }
-              val failures = failurePairs.map(_._1)
-              val errorMessage = {
-                if (buffer.isEmpty || retriesLeft > 1)
-                  s"Retrying all records that could not be written to Kinesis stream $streamName in $nextBackoff milliseconds..."
-                else
-                  s"Sending ${failures.size} records that could not be written to Kinesis stream $streamName to SQS queue ${buffer.get.sqsBufferName} in $nextBackoff milliseconds..."
-              }
-              log.error(errorMessage)
-              scheduleWrite(failures, target, nextBackoff)(retriesLeft - 1)
-            }
-          case Failure(f) =>
-            log.error("Writing failed with error:", f)
-
-            buffer match {
-              case _ if retriesLeft > 1 =>
-                log.error(s"Retrying writing batch to Kinesis stream $streamName in $nextBackoff milliseconds...")
-              case None =>
-                outage = true // No SQS buffer and we can't write to Kinesis => suspected outage
-              case Some(_) =>
-                log.error(s"Sending batch to SQS queue ${buffer.get.sqsBufferName} in $nextBackoff milliseconds...")
-            }
-
-            scheduleWrite(batch, target, nextBackoff)(retriesLeft - 1)
+  ): Unit = {
+    log.info(s"Writing ${batch.size} records to SQS buffer ${sqs.sqsBufferName}")
+    writeBatchToSqs(batch, sqs).onComplete {
+      case Success(s) =>
+        sqsHealthy = true
+        log.info(
+          s"Successfully wrote ${batch.size - s.size} out of ${batch.size} records to SQS buffer ${sqs.sqsBufferName}"
+        )
+        if (s.nonEmpty) {
+          s.groupBy(_._2.code).foreach {
+            case (errorCode, items) =>
+              val exampleMsg = items.map(_._2.message).find(_.nonEmpty).getOrElse("")
+              log.error(
+                s"Writing ${items.size} records to SQS buffer ${sqs.sqsBufferName} failed with error code [$errorCode] and example message: $exampleMsg"
+              )
+          }
+          val failedRecords = s.map(_._1)
+          handleSqsError(failedRecords, sqs, nextBackoff, retriesLeft)
         }
+      case Failure(f) =>
+        log.error(
+          s"Writing ${batch.size} records to SQS buffer ${sqs.sqsBufferName} failed with error: ${f.getMessage()}"
+        )
+        handleSqsError(batch, sqs, nextBackoff, retriesLeft)
+    }
+  }
 
-      case SqsQueue(sqs) =>
-        log.info(s"Writing ${batch.size} Thrift records to SQS queue ${sqs.sqsBufferName}.")
-        writeBatchToSqs(batch, sqs).onComplete {
-          case Success(s) =>
-            outage = false
-            log.info(
-              s"Successfully wrote ${batch.size - s.size} out of ${batch.size} messages to SQS queue ${sqs.sqsBufferName}."
-            )
-            if (s.nonEmpty) {
-              s.groupBy(_._2.code).foreach {
-                case (errorCode, items) =>
-                  val exampleMsg = items.map(_._2.message).find(_.nonEmpty).getOrElse("")
-                  log.error(
-                    s"Failed writing ${items.size} records to SQS queue ${sqs.sqsBufferName}, with error code [$errorCode] and example message [$exampleMsg]."
-                  )
-              }
-              val errorMessage = {
-                if (retriesLeft > 1)
-                  s"Retrying all messages that could not be written to SQS queue ${sqs.sqsBufferName} in $nextBackoff milliseconds..."
-                else
-                  s"Sending ${s.size} messages that could not be written to SQS queue ${sqs.sqsBufferName} to Kinesis stream $streamName in $nextBackoff milliseconds..."
-              }
-              log.error(errorMessage)
-              scheduleWrite(s.map(_._1), target, nextBackoff)(retriesLeft - 1)
-            }
-          case Failure(f) =>
-            log.error("Writing failed with error:", f)
+  def handleKinesisError(failedRecords: List[Events], nextBackoff: Long, retriesLeft: Int): Unit =
+    if (retriesLeft > 0) {
+      log.error(
+        s"$retriesLeft retries left. Retrying to write ${failedRecords.size} records to Kinesis stream $streamName in $nextBackoff milliseconds"
+      )
+      scheduleRetryToKinesis(failedRecords, nextBackoff, retriesLeft - 1)
+    } else {
+      kinesisHealthy = false
+      log.error(s"Maximum number of retries reached for Kinesis stream $streamName for ${failedRecords.size} records")
+      maybeSqs match {
+        case Some(sqs) =>
+          log.error(
+            s"SQS buffer ${sqs.sqsBufferName} defined for stream $streamName. Retrying to send the events to SQS"
+          )
+          writeBatchToSqsWithRetries(failedRecords, sqs, minBackoff, MaxRetries)
+        case None =>
+          log.error(s"No SQS buffer defined for stream $streamName. Retrying to send the events to Kinesis")
+          writeBatchToKinesisWithRetries(failedRecords, maxBackoff, MaxRetries)
+      }
+    }
 
-            if (retriesLeft > 1) {
-              log.error(s"Retrying writing batch to SQS queue ${sqs.sqsBufferName} in $nextBackoff milliseconds...")
-            } else {
-              outage = true
-              log.error(s"Sending batch to Kinesis stream $streamName in $nextBackoff milliseconds...")
-            }
-
-            scheduleWrite(batch, target, nextBackoff)(retriesLeft - 1)
-        }
+  def handleSqsError(failedRecords: List[Events], sqs: SqsClientAndName, nextBackoff: Long, retriesLeft: Int): Unit =
+    if (retriesLeft > 0) {
+      log.error(
+        s"$retriesLeft retries left. Retrying to write ${failedRecords.size} records to SQS buffer ${sqs.sqsBufferName} in $nextBackoff milliseconds"
+      )
+      scheduleRetryToSqs(failedRecords, sqs, nextBackoff, retriesLeft - 1)
+    } else {
+      sqsHealthy = false
+      log.error(
+        s"Maximum number of retries reached for SQS buffer ${sqs.sqsBufferName} for ${failedRecords.size} records. Retrying in Kinesis"
+      )
+      writeBatchToKinesisWithRetries(failedRecords, minBackoff, MaxRetries)
     }
 
   def writeBatchToKinesis(batch: List[Events]): Future[PutRecordsResult] =
@@ -311,29 +304,33 @@ class KinesisSink private (
     new String(buffer)
   }
 
-  def scheduleWrite(batch: List[Events], target: Target, lastBackoff: Long = minBackoff)(
-    retriesLeft: Int
-  ): Unit = {
-    val nextBackoff = getNextBackoff(lastBackoff)
+  def scheduleRetryToKinesis(failedRecords: List[Events], currentBackoff: Long, retriesLeft: Int): Unit = {
+    val nextBackoff = getNextBackoff(currentBackoff)
     executorService.schedule(
       new Runnable {
-        override def run(): Unit =
-          // If an SQS buffer is configured, keep switching targets every 10 retries.
-          // If no SQS buffer is configured, continue retrying to Kinesis forever.
-          if (retriesLeft > 0) sinkBatch(batch, target, nextBackoff)(retriesLeft)
-          else sinkBatch(batch, switchTarget(target), nextBackoff)(MaxRetries)
+        override def run(): Unit = writeBatchToKinesisWithRetries(failedRecords, nextBackoff, retriesLeft)
       },
-      lastBackoff,
+      currentBackoff,
       MILLISECONDS
     )
     ()
   }
 
-  // No-op if no SQS buffer is configured
-  def switchTarget(target: Target): Target = target match {
-    case KinesisStream(Some(sqs)) => SqsQueue(sqs)
-    case KinesisStream(None)      => KinesisStream(None)
-    case SqsQueue(sqs)            => KinesisStream(Some(sqs))
+  def scheduleRetryToSqs(
+    failedRecords: List[Events],
+    sqs: SqsClientAndName,
+    currentBackoff: Long,
+    retriesLeft: Int
+  ): Unit = {
+    val nextBackoff = getNextBackoff(currentBackoff)
+    executorService.schedule(
+      new Runnable {
+        override def run(): Unit = writeBatchToSqsWithRetries(failedRecords, sqs, nextBackoff, retriesLeft)
+      },
+      currentBackoff,
+      MILLISECONDS
+    )
+    ()
   }
 
   /**
@@ -352,14 +349,60 @@ class KinesisSink private (
     executorService.awaitTermination(10000, MILLISECONDS)
     ()
   }
+
+  private def checkKinesisHealth(): Unit = {
+    val healthThread = new Runnable {
+      override def run() {
+        while (!kinesisHealthy) {
+          Try {
+            val describeRequest = new DescribeStreamSummaryRequest()
+            describeRequest.setStreamName(streamName)
+            val describeResult = client.describeStreamSummary(describeRequest)
+            describeResult.getStreamDescriptionSummary().getStreamStatus()
+          } match {
+            case Success("ACTIVE") =>
+              log.info(s"Stream $streamName ACTIVE")
+              kinesisHealthy = true
+            case Success(other) =>
+              log.warn(s"Stream $streamName not ACTIVE but $other")
+              Thread.sleep(kinesisConfig.startupCheckInterval.toMillis)
+            case Failure(err) =>
+              log.error(s"Error while checking status of stream $streamName: ${err.getMessage()}")
+              Thread.sleep(kinesisConfig.startupCheckInterval.toMillis)
+          }
+        }
+      }
+    }
+    executorService.execute(healthThread)
+  }
+
+  private def checkSqsHealth(): Unit = maybeSqs.foreach { sqs =>
+    val healthThread = new Runnable {
+      override def run() {
+        while (!sqsHealthy) {
+          Try {
+            sqs.sqsClient.getQueueUrl(sqs.sqsBufferName)
+          } match {
+            case Success(_) =>
+              log.info(s"SQS buffer ${sqs.sqsBufferName} exists")
+              sqsHealthy = true
+            case Failure(err) =>
+              log.error(s"SQS buffer ${sqs.sqsBufferName} doesn't exist. Error: ${err.getMessage()}")
+          }
+          Thread.sleep(kinesisConfig.startupCheckInterval.toMillis)
+        }
+      }
+    }
+    executorService.execute(healthThread)
+  }
 }
 
 /** KinesisSink companion object with factory method */
 object KinesisSink {
 
   sealed trait Target
-  final case class KinesisStream(buffer: Option[SqsClientAndName]) extends Target
-  final case class SqsQueue(sqs: SqsClientAndName) extends Target
+  final case object Kinesis extends Target
+  final case class Sqs(sqs: SqsClientAndName) extends Target
 
   /**
     * Events to be written to Kinesis or SQS.
@@ -386,14 +429,12 @@ object KinesisSink {
     bufferConfig: BufferConfig,
     streamName: String,
     sqsBufferName: Option[String],
-    enableStartupChecks: Boolean,
     executorService: ScheduledExecutorService
   ): Either[Throwable, KinesisSink] = {
     val clients = for {
       provider         <- getProvider(kinesisConfig.aws)
       kinesisClient    <- createKinesisClient(provider, kinesisConfig.endpoint, kinesisConfig.region)
       sqsClientAndName <- sqsBuffer(sqsBufferName, provider, kinesisConfig.region)
-      _ = if (enableStartupChecks) runChecks(kinesisClient, streamName, sqsClientAndName)
     } yield (kinesisClient, sqsClientAndName)
 
     clients.map {
@@ -410,6 +451,8 @@ object KinesisSink {
             executorService,
             sqsClientAndName
           )
+        ks.checkKinesisHealth()
+        ks.checkSqsHealth()
         ks.EventStorage.scheduleFlush()
         ks
     }
@@ -476,74 +519,6 @@ object KinesisSink {
     Either.catchNonFatal(
       AmazonSQSClientBuilder.standard().withRegion(region).withCredentials(provider).build
     )
-
-  private def runChecks(
-    kinesisClient: AmazonKinesis,
-    streamName: String,
-    sqs: Option[SqsClientAndName]
-  ): Unit = {
-    lazy val log = LoggerFactory.getLogger(getClass)
-    val kExists  = streamExists(kinesisClient, streamName)
-
-    kExists match {
-      case Success(true) =>
-        ()
-      case Success(false) =>
-        log.error(s"Kinesis stream $streamName doesn't exist or isn't available.")
-      case Failure(t) =>
-        log.error(s"Error checking if stream $streamName exists", t)
-    }
-
-    sqs match {
-      case Some(SqsClientAndName(sqsClient, bufferName)) =>
-        sqsQueueExists(sqsClient, bufferName) match {
-          case Success(true) =>
-            ()
-          case Success(false) =>
-            log.error(s"SQS queue $bufferName is defined in config file, but does not exist or isn't available.")
-          case Failure(t) =>
-            log.error(s"Error checking if SQS queue $bufferName exists", t)
-        }
-      case None =>
-        kExists match {
-          case Success(true) => ()
-          case _             => log.error(s"SQS buffer is not configured.")
-        }
-    }
-  }
-
-  /**
-    * Check whether a Kinesis stream exists
-    *
-    * An error is expected if Kinesis is unavailable or if api usage quota is exceeded.
-    *
-    * @param name Name of the stream
-    * @return Whether the stream exists
-    */
-  private def streamExists(client: AmazonKinesis, name: String): Try[Boolean] =
-    Try {
-      val describeStreamResult = client.describeStream(name)
-      val status               = describeStreamResult.getStreamDescription.getStreamStatus
-      status == "ACTIVE" || status == "UPDATING"
-    }.recover {
-      case _: ResourceNotFoundException => false
-    }
-
-  /**
-    * Check whether an SQS queue (buffer) exists
-    *
-    * An error is expected if SQS is unavailable or if api usage quota is exceeded.
-    *
-    * @param name Name of the queue
-    * @return Whether the queue exists
-    */
-  private def sqsQueueExists(client: AmazonSQS, name: String): Try[Boolean] =
-    Try {
-      client.getQueueUrl(name)
-      true
-    }.recover {
-      case _: QueueDoesNotExistException => false
-    }
 
   /**
     * Splits a Kinesis-sized batch of `Events` into smaller batches that meet the SQS limit.
