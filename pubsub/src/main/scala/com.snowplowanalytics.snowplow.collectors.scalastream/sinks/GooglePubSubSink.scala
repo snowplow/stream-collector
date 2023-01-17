@@ -48,7 +48,7 @@ class GooglePubSubSink private (val maxBytes: Int, publisher: Publisher, topicNa
   private val logExecutor = Executors.newSingleThreadExecutor()
 
   // Is the collector detecting an outage downstream
-  @volatile private var outage: Boolean = false
+  @volatile private var outage: Boolean = true
   override def isHealthy: Boolean       = !outage
 
   /**

@@ -85,7 +85,7 @@ class CollectorService(
   override val cookieName            = config.cookieName
   override val doNotTrackCookie      = config.doNotTrackHttpCookie
   override val enableDefaultRedirect = config.enableDefaultRedirect
-  override def sinksHealthy          = sinks.good.isHealthy && sinks.bad.isHealthy
+  override def sinksHealthy          = sinks.good.isHealthy
 
   private val spAnonymousNuid = "00000000-0000-0000-0000-000000000000"
 
