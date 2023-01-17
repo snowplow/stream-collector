@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2022 Snowplow Analytics Ltd. All rights reserved.
+ * Copyright (c) 2013-2023 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0,
  * and you may not use this file except in compliance with the Apache License Version 2.0.
@@ -15,6 +15,15 @@ package com.snowplowanalytics.snowplow.collectors.scalastream.sinks
 import java.nio.ByteBuffer
 import java.util.UUID
 import java.util.concurrent.ScheduledExecutorService
+
+import scala.collection.mutable.ListBuffer
+import scala.util.{Failure, Random, Success, Try}
+import scala.concurrent.{ExecutionContextExecutorService, Future}
+import scala.concurrent.duration.MILLISECONDS
+import scala.collection.JavaConverters._
+
+import cats.syntax.either._
+
 import com.amazonaws.auth.{
   AWSCredentialsProvider,
   AWSStaticCredentialsProvider,
@@ -24,26 +33,10 @@ import com.amazonaws.auth.{
   InstanceProfileCredentialsProvider
 }
 import com.amazonaws.services.sqs.{AmazonSQS, AmazonSQSClientBuilder}
-import com.amazonaws.services.sqs.model.{
-  MessageAttributeValue,
-  QueueDoesNotExistException,
-  SendMessageBatchRequest,
-  SendMessageBatchRequestEntry
-}
-import org.slf4j.LoggerFactory
+import com.amazonaws.services.sqs.model.{MessageAttributeValue, SendMessageBatchRequest, SendMessageBatchRequestEntry}
 
-import scala.concurrent.{ExecutionContextExecutorService, Future}
-import scala.collection.JavaConverters._
-import scala.concurrent.duration.MILLISECONDS
-import scala.util.{Failure, Random, Success}
-import cats.syntax.either._
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 
-import scala.collection.mutable.ListBuffer
-
-/**
-  *  SQS sink for the Scala Stream Collector
-  */
 class SqsSink private (
   val maxBytes: Int,
   client: AmazonSQS,
@@ -68,9 +61,8 @@ class SqsSink private (
   implicit lazy val ec: ExecutionContextExecutorService =
     concurrent.ExecutionContext.fromExecutorService(executorService)
 
-  // Is the collector detecting an outage downstream
-  @volatile private var outage: Boolean = false
-  override def isHealthy: Boolean       = !outage
+  @volatile private var sqsHealthy: Boolean = false
+  override def isHealthy: Boolean           = sqsHealthy
 
   override def storeRawEvents(events: List[Array[Byte]], key: String): Unit =
     events.foreach(e => EventStorage.store(e, key))
@@ -101,7 +93,7 @@ class SqsSink private (
         evts
       }
       lastFlushedTime = System.currentTimeMillis()
-      sinkBatch(eventsToSend)(MaxRetries)
+      sinkBatch(eventsToSend, minBackoff, MaxRetries)
     }
 
     def getLastFlushTime: Long = lastFlushedTime
@@ -133,33 +125,47 @@ class SqsSink private (
     }
   }
 
-  def sinkBatch(batch: List[Events], nextBackoff: Long = minBackoff)(maxRetries: Int = MaxRetries): Unit =
+  def sinkBatch(batch: List[Events], nextBackoff: Long, retriesLeft: Int): Unit =
     if (batch.nonEmpty) {
-      log.info(s"Writing ${batch.size} Thrift records to SQS queue $queueName.")
+      log.info(s"Writing ${batch.size} records to SQS queue $queueName")
 
       writeBatchToSqs(batch).onComplete {
         case Success(s) =>
-          outage = false
-          log.info(s"Successfully wrote ${batch.size - s.size} out of ${batch.size} messages to SQS queue $queueName.")
+          sqsHealthy = true
+          log.info(s"Successfully wrote ${batch.size - s.size} out of ${batch.size} records to SQS queue $queueName")
+
           if (s.nonEmpty) {
-            s.foreach { f =>
-              log.error(
-                s"Failed writing message to SQS queue $queueName, with error code [${f._2.code}] and message [${f._2.message}]."
-              )
+            s.groupBy(_._2.code).foreach {
+              case (errorCode, items) =>
+                val exampleMsg = items.map(_._2.message).find(_.nonEmpty).getOrElse("")
+                log.error(
+                  s"Writing ${items.size} records to SQS queue $queueName failed with error code [$errorCode] and example message: $exampleMsg"
+                )
             }
-            log.error(
-              s"Retrying all messages that could not be written to SQS queue $queueName in $nextBackoff milliseconds..."
-            )
-            scheduleWrite(s.map(_._1), nextBackoff)(MaxRetries)
+            val failedRecords = s.map(_._1)
+            handleError(failedRecords, nextBackoff, retriesLeft)
           }
         case Failure(f) =>
-          log.error("Writing failed with error:", f)
-
-          if (maxRetries <= 1) outage = true
-          log.error(s"Retrying writing batch to SQS queue $queueName in $nextBackoff milliseconds...")
-
-          scheduleWrite(batch, nextBackoff)(maxRetries - 1)
+          log.error(
+            s"Writing ${batch.size} records to SQS queue $queueName failed with error: ${f.getMessage()}"
+          )
+          handleError(batch, nextBackoff, retriesLeft)
       }
+    }
+
+  def handleError(failedRecords: List[Events], nextBackoff: Long, retriesLeft: Int): Unit =
+    if (retriesLeft > 0) {
+      log.error(
+        s"$retriesLeft retries left. Retrying to write ${failedRecords.size} records to SQS queue $queueName in $nextBackoff milliseconds"
+      )
+      scheduleWrite(failedRecords, nextBackoff, retriesLeft - 1)
+    } else {
+      sqsHealthy = false
+      checkSqsHealth()
+      log.error(
+        s"Maximum number of retries reached for SQS queue $queueName for ${failedRecords.size} records"
+      )
+      scheduleWrite(failedRecords, maxBackoff, MaxRetries)
     }
 
   /**
@@ -210,13 +216,11 @@ class SqsSink private (
     new String(buffer)
   }
 
-  def scheduleWrite(batch: List[Events], lastBackoff: Long = minBackoff)(maxRetries: Int): Unit = {
+  def scheduleWrite(batch: List[Events], lastBackoff: Long, retriesLeft: Int): Unit = {
     val nextBackoff = getNextBackoff(lastBackoff)
     executorService.schedule(
       new Runnable {
-        override def run(): Unit =
-          if (maxRetries > 0) sinkBatch(batch, nextBackoff)(maxRetries)
-          else sinkBatch(batch, nextBackoff)(MaxRetries)
+        override def run(): Unit = sinkBatch(batch, nextBackoff, retriesLeft)
       },
       lastBackoff,
       MILLISECONDS
@@ -239,6 +243,26 @@ class SqsSink private (
     executorService.shutdown()
     executorService.awaitTermination(10000, MILLISECONDS)
     ()
+  }
+
+  private def checkSqsHealth(): Unit = {
+    val healthThread = new Thread() {
+      override def run() {
+        while (!sqsHealthy) {
+          Try {
+            client.getQueueUrl(queueName)
+          } match {
+            case Success(_) =>
+              log.info(s"SQS queue $queueName exists")
+              sqsHealthy = true
+            case Failure(err) =>
+              log.error(s"SQS queue $queueName doesn't exist. Error: ${err.getMessage()}")
+              Thread.sleep(1000L)
+          }
+        }
+      }
+    }
+    healthThread.start()
   }
 }
 
@@ -267,18 +291,17 @@ object SqsSink {
     sqsConfig: Sqs,
     bufferConfig: BufferConfig,
     queueName: String,
-    enableStartupChecks: Boolean,
     executorService: ScheduledExecutorService
   ): Either[Throwable, SqsSink] = {
     val client = for {
       provider <- getProvider(sqsConfig.aws)
       client   <- createSqsClient(provider, sqsConfig.region)
-      _ = if (enableStartupChecks) sqsQueueExists(client, queueName)
     } yield client
 
     client.map { c =>
       val sqsSink = new SqsSink(maxBytes, c, sqsConfig, bufferConfig, queueName, executorService)
       sqsSink.EventStorage.scheduleFlush()
+      sqsSink.checkSqsHealth()
       sqsSink
     }
   }
@@ -313,20 +336,4 @@ object SqsSink {
     Either.catchNonFatal(
       AmazonSQSClientBuilder.standard().withRegion(region).withCredentials(provider).build
     )
-
-  /**
-    * Check whether an SQS queue exists
-    * @param name Name of the queue
-    * @return Whether the queue exists
-    */
-  private def sqsQueueExists(client: AmazonSQS, name: String): Unit = {
-    lazy val log = LoggerFactory.getLogger(getClass)
-    try {
-      client.getQueueUrl(name)
-      ()
-    } catch {
-      case _: QueueDoesNotExistException => log.error(s"SQS queue $name does not exist.")
-      case t: Throwable                  => log.error(t.getMessage)
-    }
-  }
 }

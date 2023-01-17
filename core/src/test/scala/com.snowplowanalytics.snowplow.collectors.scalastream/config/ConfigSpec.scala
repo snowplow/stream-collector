@@ -77,7 +77,6 @@ abstract class ConfigSpec extends Specification {
     telemetry               = Some(TelemetryConfig()),
     ssl                     = SSLConfig(enable = false, redirect = false, port = 443),
     enableDefaultRedirect   = false,
-    enableStartupChecks     = true,
     redirectDomains         = Set.empty,
     terminationDeadline     = 10.seconds,
     preTerminationPeriod    = 10.seconds,

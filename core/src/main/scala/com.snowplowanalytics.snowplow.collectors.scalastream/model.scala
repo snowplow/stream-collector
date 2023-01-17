@@ -228,7 +228,6 @@ package model {
     ssl: SSLConfig = SSLConfig(),
     enableDefaultRedirect: Boolean,
     redirectDomains: Set[String],
-    enableStartupChecks: Boolean,
     terminationDeadline: FiniteDuration,
     preTerminationPeriod: FiniteDuration,
     preTerminationUnhealthy: Boolean,

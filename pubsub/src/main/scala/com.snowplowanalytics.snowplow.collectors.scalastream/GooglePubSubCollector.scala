@@ -40,15 +40,13 @@ object GooglePubSubCollector extends Collector {
         pc.maxBytes,
         pc,
         bufferConf,
-        goodStream,
-        collectorConf.enableStartupChecks
+        goodStream
       )
       bad <- GooglePubSubSink.createAndInitialize(
         pc.maxBytes,
         pc,
         bufferConf,
-        badStream,
-        collectorConf.enableStartupChecks
+        badStream
       )
     } yield CollectorSinks(good, bad)
 

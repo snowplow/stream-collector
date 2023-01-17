@@ -62,7 +62,6 @@ object TestUtils {
       ),
       monitoring              = MonitoringConfig(MetricsConfig(StatsdConfig(false, "localhost", 8125, 10.seconds))),
       telemetry               = None,
-      enableStartupChecks     = true,
       enableDefaultRedirect   = false,
       redirectDomains         = Set("localhost"),
       terminationDeadline     = 10.seconds,

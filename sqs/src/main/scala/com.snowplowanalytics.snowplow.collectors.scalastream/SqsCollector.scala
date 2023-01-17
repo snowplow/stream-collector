@@ -43,7 +43,6 @@ object SqsCollector extends Collector {
         sqs,
         bufferConf,
         goodQueue,
-        collectorConf.enableStartupChecks,
         es
       )
       bad <- SqsSink.createAndInitialize(
@@ -51,7 +50,6 @@ object SqsCollector extends Collector {
         sqs,
         bufferConf,
         badQueue,
-        collectorConf.enableStartupChecks,
         es
       )
     } yield CollectorSinks(good, bad)
