@@ -15,6 +15,7 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.DurationInt
 
 import akka.http.scaladsl.model.headers.HttpCookiePair
 
@@ -22,9 +23,13 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.Sink
 
 import io.circe.Json
 
-package model {
+import pureconfig.{CamelCase, ConfigFieldMapping, ConfigReader}
+import pureconfig.error.UserValidationFailed
+import pureconfig.generic.auto._
+import pureconfig.generic.semiauto._
+import pureconfig.generic.{FieldCoproductHint, ProductHint}
 
-  import scala.concurrent.duration.DurationInt
+package model {
 
   /**
     * Case class for holding both good and
@@ -240,6 +245,26 @@ package model {
     def cookieDomain     = cookieConfig.flatMap(_.domains)
     def fallbackDomain   = cookieConfig.flatMap(_.fallbackDomain)
     def cookieExpiration = cookieConfig.map(_.expiration)
+  }
+
+  object CollectorConfig {
+
+    implicit private val _ = new FieldCoproductHint[SinkConfig]("enabled")
+    implicit def hint[T]   = ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
+
+    private val invalidDomainMatcher = ".*([^A-Za-z0-9-.]).*".r
+
+    implicit def cookieConfigReader: ConfigReader[CookieConfig] =
+      deriveReader[CookieConfig].emap { cc =>
+        cc.fallbackDomain match {
+          case Some(invalidDomainMatcher(char)) =>
+            Left(UserValidationFailed(s"fallbackDomain contains invalid character for a domain: [$char]"))
+          case _ => Right(cc)
+        }
+      }
+
+    implicit def collectorConfigReader: ConfigReader[CollectorConfig] =
+      deriveReader[CollectorConfig]
   }
 
 }
