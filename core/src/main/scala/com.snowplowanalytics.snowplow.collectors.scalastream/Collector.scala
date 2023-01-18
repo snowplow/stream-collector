@@ -23,9 +23,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.Directives._
 import com.typesafe.config.{Config, ConfigFactory}
-import pureconfig._
-import pureconfig.generic.auto._
-import pureconfig.generic.{FieldCoproductHint, ProductHint}
+import pureconfig.ConfigSource
 import com.timgroup.statsd.NonBlockingStatsDClientBuilder
 import fr.davit.akka.http.metrics.core.HttpMetricsRegistry
 import fr.davit.akka.http.metrics.core.HttpMetrics._
@@ -48,9 +46,6 @@ trait Collector {
   def appVersion: String
 
   lazy val log = LoggerFactory.getLogger(getClass())
-
-  implicit def hint[T] = ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
-  implicit val _       = new FieldCoproductHint[SinkConfig]("enabled")
 
   // Used as an option prefix when reading system properties.
   val Namespace = "collector"
