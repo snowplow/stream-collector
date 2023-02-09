@@ -35,11 +35,15 @@ lazy val commonDependencies = Seq(
   Dependencies.Libraries.pureconfig,
   Dependencies.Libraries.trackerCore,
   Dependencies.Libraries.trackerEmitterId,
-  // Scala (test)
+  // Unit tests
   Dependencies.Libraries.akkaTestkit,
   Dependencies.Libraries.akkaHttpTestkit,
   Dependencies.Libraries.akkaStreamTestkit,
-  Dependencies.Libraries.specs2
+  Dependencies.Libraries.specs2,
+  // Integration tests
+  Dependencies.Libraries.testcontainersIt,
+  Dependencies.Libraries.http4sClientIt,
+  Dependencies.Libraries.catsRetryIt
 )
 
 lazy val commonExclusions = Seq(
@@ -121,7 +125,6 @@ lazy val dynVerSettings = Seq(
 lazy val allSettings = buildSettings ++
   BuildSettings.sbtAssemblySettings ++
   BuildSettings.formatting ++
-  Seq(libraryDependencies ++= commonDependencies) ++
   Seq(excludeDependencies ++= commonExclusions) ++
   dynVerSettings ++
   BuildSettings.addExampleConfToTestCp
@@ -136,6 +139,8 @@ lazy val core = project
   .settings(buildSettings ++ BuildSettings.sbtAssemblySettings)
   .settings(libraryDependencies ++= commonDependencies)
   .settings(excludeDependencies ++= commonExclusions)
+  .settings(Defaults.itSettings)
+  .configs(IntegrationTest)
 
 lazy val kinesisSettings =
   allSettings ++ buildInfoSettings ++ Seq(
@@ -156,9 +161,18 @@ lazy val kinesis = project
 lazy val kinesisDistroless = project
   .in(file("distroless/kinesis"))
   .settings(sourceDirectory := (kinesis / sourceDirectory).value)
-  .settings(kinesisSettings ++ dockerSettingsDistroless)
+  .settings(kinesisSettings ++ dockerSettingsDistroless ++ scalifiedSettings)
   .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
-  .dependsOn(kinesis % "test->test;compile->compile")
+  .dependsOn(core % "test->test;compile->compile;it->it")
+  .settings(libraryDependencies ++= Seq(
+    // integration tests dependencies
+    Dependencies.Libraries.specs2It,
+    Dependencies.Libraries.specs2CEIt
+  ))
+  .settings(Defaults.itSettings)
+  .configs(IntegrationTest)
+  .settings((IntegrationTest / test) := (IntegrationTest / test).dependsOn(Docker / publishLocal).value)
+  .settings((IntegrationTest / testOnly) := (IntegrationTest / testOnly).dependsOn(Docker / publishLocal).evaluated)
 
 lazy val sqsSettings =
   allSettings ++ buildInfoSettings ++ Seq(
@@ -180,7 +194,7 @@ lazy val sqsDistroless = project
   .settings(sourceDirectory := (sqs / sourceDirectory).value)
   .settings(sqsSettings ++ dockerSettingsDistroless)
   .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
-  .dependsOn(sqs % "test->test;compile->compile")
+  .dependsOn(core % "test->test;compile->compile")
 
 lazy val pubsubSettings =
   allSettings ++ buildInfoSettings ++ Seq(
@@ -199,14 +213,11 @@ lazy val pubsubDistroless = project
   .settings(sourceDirectory := (pubsub / sourceDirectory).value)
   .settings(pubsubSettings ++ dockerSettingsDistroless ++ scalifiedSettings)
   .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
-  .dependsOn(pubsub % "test->test;compile->compile")
+  .dependsOn(core % "test->test;compile->compile;it->it")
   .settings(libraryDependencies ++= Seq(
     // integration tests dependencies
     Dependencies.Libraries.specs2It,
-    Dependencies.Libraries.specs2CEIt,
-    Dependencies.Libraries.testcontainersIt,
-    Dependencies.Libraries.catsRetryIt,
-    Dependencies.Libraries.http4sClientIt
+    Dependencies.Libraries.specs2CEIt
   ))
   .settings(Defaults.itSettings)
   .configs(IntegrationTest)
@@ -230,7 +241,7 @@ lazy val kafkaDistroless = project
   .settings(sourceDirectory := (kafka / sourceDirectory).value)
   .settings(kafkaSettings ++ dockerSettingsDistroless)
   .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
-  .dependsOn(kafka % "test->test;compile->compile")
+  .dependsOn(core % "test->test;compile->compile")
 
 lazy val nsqSettings =
   allSettings ++ buildInfoSettings ++ Seq(
@@ -253,7 +264,7 @@ lazy val nsqDistroless = project
   .settings(sourceDirectory := (nsq / sourceDirectory).value)
   .settings(nsqSettings ++ dockerSettingsDistroless)
   .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
-  .dependsOn(nsq % "test->test;compile->compile")
+  .dependsOn(core % "test->test;compile->compile")
 
 lazy val stdoutSettings =
   allSettings ++ buildInfoSettings ++ Seq(
@@ -271,7 +282,7 @@ lazy val stdoutDistroless = project
   .settings(sourceDirectory := (stdout / sourceDirectory).value)
   .settings(stdoutSettings ++ dockerSettingsDistroless)
   .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
-  .dependsOn(stdout % "test->test;compile->compile")
+  .dependsOn(core % "test->test;compile->compile")
 
 lazy val rabbitmqSettings =
   allSettings ++ buildInfoSettings ++ Seq(
@@ -290,4 +301,4 @@ lazy val rabbitmqDistroless = project
   .settings(sourceDirectory := (rabbitmq / sourceDirectory).value)
   .settings(rabbitmqSettings ++ dockerSettingsDistroless)
   .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
-  .dependsOn(rabbitmq % "test->test;compile->compile")
+  .dependsOn(core % "test->test;compile->compile")

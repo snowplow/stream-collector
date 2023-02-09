@@ -12,7 +12,7 @@
  * implied.  See the Apache License Version 2.0 for the specific language
  * governing permissions and limitations there under.
  */
-package com.snowplowanalytics.snowplow.collectors.scalastream.pubsub
+package com.snowplowanalytics.snowplow.collectors.scalastream.it.pubsub
 
 import scala.concurrent.duration._
 
@@ -23,7 +23,10 @@ import cats.effect.testing.specs2.CatsIO
 import org.specs2.mutable.Specification
 import org.specs2.specification.BeforeAfterAll
 
-import utils._
+import org.testcontainers.containers.GenericContainer
+
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.utils._
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.EventGenerator
 
 class GooglePubSubCollectorSpec extends Specification with CatsIO with BeforeAfterAll {
 
@@ -34,6 +37,8 @@ class GooglePubSubCollectorSpec extends Specification with CatsIO with BeforeAft
   def afterAll: Unit = Containers.stopEmulator()
 
   val stopTimeout = 20.second
+
+  val maxBytes = 10000
 
   "collector-pubsub" should {
     "be able to parse the minimal config" in {
@@ -46,7 +51,7 @@ class GooglePubSubCollectorSpec extends Specification with CatsIO with BeforeAft
       }
     }
 
-    "emit the correct number of enriched events and bad rows" in {
+    "emit the correct number of collector payloads and bad rows" in {
       val testName = "count"
       val nbGood = 1000
       val nbBad = 10
@@ -62,7 +67,8 @@ class GooglePubSubCollectorSpec extends Specification with CatsIO with BeforeAft
             collector.getHost(),
             collector.getMappedPort(Containers.collectorPort),
             nbGood,
-            nbBad
+            nbBad,
+            maxBytes
           )
           _ <- log(testName, "Data sent. Waiting for collector to work")
           _ <- IO.sleep(5.second)
@@ -74,7 +80,7 @@ class GooglePubSubCollectorSpec extends Specification with CatsIO with BeforeAft
             Containers.topicGood,
             Containers.topicBad
           )
-          _ <- IO(printBadRows(testName, collectorOutput.bad))
+          _ <- printBadRows(testName, collectorOutput.bad)
         } yield {
           collectorOutput.good.size should beEqualTo(nbGood)
           collectorOutput.bad.size should beEqualTo(nbBad)
@@ -91,7 +97,7 @@ class GooglePubSubCollectorSpec extends Specification with CatsIO with BeforeAft
         for {
           _ <- log(testName, "Sending signal")
           _ <- IO(collector.getDockerClient().killContainerCmd(collector.getContainerId()).withSignal("TERM").exec())
-          _ <- Containers.waitUntilStopped(collector, stopTimeout)
+          _ <- waitWhile[GenericContainer[_]](collector, _.isRunning, stopTimeout)
         } yield {
           collector.isRunning() must beFalse
           collector.getLogs() must contain("Server terminated")

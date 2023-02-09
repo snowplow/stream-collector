@@ -12,7 +12,7 @@
  * implied.  See the Apache License Version 2.0 for the specific language
  * governing permissions and limitations there under.
  */
-package com.snowplowanalytics.snowplow.collectors.scalastream.pubsub
+package com.snowplowanalytics.snowplow.collectors.scalastream.it.pubsub
 
 import scala.collection.JavaConverters._
 
@@ -41,7 +41,7 @@ import com.snowplowanalytics.snowplow.badrows.BadRow
 
 import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
 
-import utils._
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.utils._
 
 object PubSub {
 

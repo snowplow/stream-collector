@@ -16,5 +16,7 @@ jobs:
         run: sbt scalafmtCheckAll
       - name: Run unit tests
         run: sbt test
+      - name: Run integration tests Kinesis
+        run: sbt "project kinesisDistroless" IntegrationTest/test
       - name: Run integration tests PubSub
         run: sbt "project pubsubDistroless" IntegrationTest/test
