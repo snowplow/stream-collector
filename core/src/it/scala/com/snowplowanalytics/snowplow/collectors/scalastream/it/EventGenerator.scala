@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2022 Snowplow Analytics Ltd. All rights reserved.
+ * Copyright (c) 2022-2023 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0, and
  * you may not use this file except in compliance with the Apache License
@@ -12,7 +12,7 @@
  * implied.  See the Apache License Version 2.0 for the specific language
  * governing permissions and limitations there under.
  */
-package com.snowplowanalytics.snowplow.collectors.scalastream.pubsub
+package com.snowplowanalytics.snowplow.collectors.scalastream.it
 
 import scala.concurrent.ExecutionContext
 
@@ -24,8 +24,6 @@ import org.http4s.{Request, Method, Uri}
 import org.http4s.client.Client
 import org.http4s.client.blaze.BlazeClientBuilder
 
-import utils._
-
 object EventGenerator {
 
   private val executionContext = ExecutionContext.global
@@ -35,11 +33,12 @@ object EventGenerator {
     collectorHost: String,
     collectorPort: Int,
     nbGood: Int,
-    nbBad: Int
+    nbBad: Int,
+    maxBytes: Int
   ): IO[Unit] =
     mkHttpClient.use { client =>
       val uri = Uri.unsafeFromString(s"http://$collectorHost:$collectorPort/com.snowplowanalytics.snowplow/tp2")
-      val requests = generateEvents(uri, nbGood, valid = true) ++ generateEvents(uri, nbBad, valid = false)
+      val requests = generateEvents(uri, nbGood, valid = true, maxBytes) ++ generateEvents(uri, nbBad, valid = false, maxBytes)
       requests.traverse(client.status)
         .flatMap { responses =>
           responses.collect { case resp if resp.code != 200 => resp.reason } match {
@@ -49,7 +48,7 @@ object EventGenerator {
         }
     }
 
-  private def generateEvents(uri: Uri, nbEvents: Int, valid: Boolean): List[Request[IO]] = {
+  private def generateEvents(uri: Uri, nbEvents: Int, valid: Boolean, maxBytes: Int): List[Request[IO]] = {
     val body = if (valid) "foo" else "a" * (maxBytes + 1)
     val one = Request[IO](Method.POST, uri).withEntity(body)
     List.fill(nbEvents)(one)

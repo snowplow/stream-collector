@@ -12,27 +12,20 @@
  * implied.  See the Apache License Version 2.0 for the specific language
  * governing permissions and limitations there under.
  */
-package com.snowplowanalytics.snowplow.collectors.scalastream.pubsub
+package com.snowplowanalytics.snowplow.collectors.scalastream.it.pubsub
 
-import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
-
-import org.slf4j.LoggerFactory
 
 import org.testcontainers.containers.{BindMode, GenericContainer => JGenericContainer, Network}
 import org.testcontainers.containers.wait.strategy.Wait
-import org.testcontainers.containers.output.Slf4jLogConsumer
 
 import com.dimafeng.testcontainers.GenericContainer
 
-import cats.implicits._
-
 import cats.effect.{IO, Resource, Timer}
 
-import retry.syntax.all._
-import retry.RetryPolicies
-
 import com.snowplowanalytics.snowplow.collectors.scalastream.generated.ProjectMetadata
+
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.utils._
 
 object Containers {
 
@@ -94,29 +87,14 @@ object Containers {
     )
     container.container.withNetwork(network)
     Resource.make (
-      IO(startContainer(container.container, Some(testName)))
+      IO(startContainerWithLogs(container.container, testName))
     )(
       e => IO(e.stop())
     )
   }
 
-  private def startContainer(
-    container: JGenericContainer[_],
-    loggerName: Option[String] = None
-  ): JGenericContainer[_] = {
-    container.start()
- 
-    loggerName.foreach { name =>
-      val logger = LoggerFactory.getLogger(name)
-      val logs = new Slf4jLogConsumer(logger)
-      container.followOutput(logs)
-    }
-
-    container
-  }
-
   def startEmulator(): Unit = {
-    startContainer(pubSubEmulator)
+    pubSubEmulator.start()
     PubSub.createTopicsAndSubscriptions(
       projectId,
       emulatorHost,
@@ -126,23 +104,4 @@ object Containers {
   }
 
   def stopEmulator(): Unit = pubSubEmulator.stop()
-
-  def waitUntilStopped(
-    container: JGenericContainer[_],
-    maxDelay: FiniteDuration
-  ): IO[Boolean] = {
-    val retryPolicy = RetryPolicies.limitRetriesByCumulativeDelay(
-      maxDelay,
-      RetryPolicies.capDelay[IO](
-        2.second,
-        RetryPolicies.fullJitter[IO](1.second)
-      )
-    )
-
-    IO(container.isRunning()).retryingOnFailures(
-      _ == false,
-      retryPolicy,
-      (_, _) => IO.unit
-    )
-  }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2022 Snowplow Analytics Ltd. All rights reserved.
+ * Copyright (c) 2022-2023 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0, and
  * you may not use this file except in compliance with the Apache License
@@ -12,15 +12,26 @@
  * implied.  See the Apache License Version 2.0 for the specific language
  * governing permissions and limitations there under.
  */
-package com.snowplowanalytics.snowplow.collectors.scalastream.pubsub
+package com.snowplowanalytics.snowplow.collectors.scalastream.it
+
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext
 
 import org.apache.thrift.TDeserializer
+
+import org.slf4j.LoggerFactory
+
+import org.testcontainers.containers.GenericContainer
+import org.testcontainers.containers.output.Slf4jLogConsumer
 
 import io.circe.parser
 
 import cats.implicits._
 
-import cats.effect.IO
+import cats.effect.{IO, Timer}
+
+import retry.syntax.all._
+import retry.RetryPolicies
 
 import com.snowplowanalytics.snowplow.badrows.BadRow
 
@@ -31,7 +42,8 @@ import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPa
 
 object utils {
 
-  val maxBytes = 10000
+  private val executionContext: ExecutionContext = ExecutionContext.global
+  implicit val ioTimer: Timer[IO] = IO.timer(executionContext)
 
   def parseCollectorPayload(bytes: Array[Byte]): CollectorPayload = {
     val deserializer = new TDeserializer()
@@ -53,11 +65,42 @@ object utils {
     }
   }
 
-  def printBadRows(testName: String, badRows: List[BadRow]): Unit = {
-    println(s"[$testName] Bad rows:")
-    badRows.foreach(br => println(s"[$testName] ${br.compact}"))
+  def printBadRows(testName: String, badRows: List[BadRow]): IO[Unit] = {
+    log(testName, "Bad rows:") *>
+      badRows.traverse_(br => log(testName, br.compact))
   }
 
   def log(testName: String, line: String): IO[Unit] =
     IO(println(s"[$testName] $line"))
+
+  def startContainerWithLogs(
+    container: GenericContainer[_],
+    loggerName: String
+  ): GenericContainer[_] = {
+    container.start()
+    val logger = LoggerFactory.getLogger(loggerName)
+    val logs = new Slf4jLogConsumer(logger)
+    container.followOutput(logs)
+    container
+  }
+
+  def waitWhile[A](
+    a: A,
+    condition: A => Boolean,
+    maxDelay: FiniteDuration
+  ): IO[Boolean] = {
+    val retryPolicy = RetryPolicies.limitRetriesByCumulativeDelay(
+      maxDelay,
+      RetryPolicies.capDelay[IO](
+        2.second,
+        RetryPolicies.fullJitter[IO](1.second)
+      )
+    )
+
+    IO(condition(a)).retryingOnFailures(
+      _ == false,
+      retryPolicy,
+      (_, _) => IO.unit
+    )
+  }
 }
