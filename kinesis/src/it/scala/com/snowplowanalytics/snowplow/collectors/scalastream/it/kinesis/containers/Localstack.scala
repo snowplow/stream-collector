@@ -14,8 +14,12 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers
 
+import java.util.concurrent.Semaphore
+
 import org.testcontainers.containers.Network
 import org.testcontainers.containers.wait.strategy.Wait
+
+import org.specs2.specification.BeforeAfterAll
 
 import cats.implicits._
 
@@ -23,7 +27,16 @@ import cats.effect.IO
 
 import com.dimafeng.testcontainers.GenericContainer
 
+trait Localstack extends BeforeAfterAll {
+  def beforeAll() = Localstack.start()
+
+  def afterAll() = Localstack.stop()
+}
+
 object Localstack {
+
+  private val nbPermits = Int.MaxValue
+  private val permits = new Semaphore(nbPermits)
 
   val region = "eu-central-1"
   val host = "localhost"
@@ -47,9 +60,17 @@ object Localstack {
     container.container
   }
 
-  def start() = localstack.start()
+  def start() = synchronized {
+    permits.acquire()
+    // Calling start on an already started container has no effect
+    localstack.start()
+  }
 
-  def stop() = localstack.stop()
+  def stop() = synchronized {
+    permits.release()
+    if(permits.availablePermits() == nbPermits)
+      localstack.stop()
+  }
 
   def publicPort = localstack.getMappedPort(privatePort)
 
