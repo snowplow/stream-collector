@@ -63,7 +63,7 @@ class GooglePubSubCollectorSpec extends Specification with CatsIO with BeforeAft
       ).use { collector =>
         for {
           _ <- log(testName, "Sending data")
-          _ <- EventGenerator.sendRequests(
+          _ <- EventGenerator.sendEvents(
             collector.getHost(),
             collector.getMappedPort(Containers.collectorPort),
             nbGood,

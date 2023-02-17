@@ -21,7 +21,6 @@ import cats.effect.IO
 import cats.effect.testing.specs2.CatsIO
 
 import org.specs2.mutable.Specification
-import org.specs2.specification.BeforeAfterAll
 
 import org.testcontainers.containers.GenericContainer
 
@@ -30,13 +29,9 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.it.EventGenerator
 
 import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers._
 
-class KinesisCollectorSpec extends Specification with CatsIO with BeforeAfterAll {
+class KinesisCollectorSpec extends Specification with Localstack with CatsIO {
 
   override protected val Timeout = 5.minutes
-
-  def beforeAll: Unit = Localstack.start()
-
-  def afterAll: Unit = Localstack.stop()
 
   val stopTimeout = 20.second
 
@@ -68,7 +63,7 @@ class KinesisCollectorSpec extends Specification with CatsIO with BeforeAfterAll
       ).use { collector =>
         for {
           _ <- log(testName, "Sending data")
-          _ <- EventGenerator.sendRequests(
+          _ <- EventGenerator.sendEvents(
             collector.getHost(),
             collector.getMappedPort(Collector.port),
             nbGood,

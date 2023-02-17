@@ -14,46 +14,49 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream.it
 
-import scala.concurrent.ExecutionContext
+import cats.effect.IO
 
-import cats.implicits._
-
-import cats.effect.{ContextShift, IO, Resource}
-
-import org.http4s.{Request, Method, Uri}
-import org.http4s.client.Client
-import org.http4s.client.blaze.BlazeClientBuilder
+import org.http4s.{Method, Request, Uri}
 
 object EventGenerator {
 
-  private val executionContext = ExecutionContext.global
-  implicit val ioContextShift: ContextShift[IO] = IO.contextShift(executionContext)
-
-  def sendRequests(
+  def sendEvents(
     collectorHost: String,
     collectorPort: Int,
     nbGood: Int,
     nbBad: Int,
     maxBytes: Int
-  ): IO[Unit] =
-    mkHttpClient.use { client =>
-      val uri = Uri.unsafeFromString(s"http://$collectorHost:$collectorPort/com.snowplowanalytics.snowplow/tp2")
-      val requests = generateEvents(uri, nbGood, valid = true, maxBytes) ++ generateEvents(uri, nbBad, valid = false, maxBytes)
-      requests.traverse(client.status)
-        .flatMap { responses =>
-          responses.collect { case resp if resp.code != 200 => resp.reason } match {
-            case Nil => IO.unit
-            case errors => IO.raiseError(new RuntimeException(s"${errors.size} requests were not successful. Example error: ${errors.head}"))
-          }
+  ): IO[Unit] = {
+    val requests = generateEvents(collectorHost, collectorPort, nbGood, nbBad, maxBytes)
+    Http.sendRequests(requests)
+      .flatMap { responses =>
+        responses.collect { case resp if resp.code != 200 => resp.reason } match {
+          case Nil => IO.unit
+          case errors => IO.raiseError(new RuntimeException(s"${errors.size} requests were not successful. Example error: ${errors.head}"))
         }
-    }
-
-  private def generateEvents(uri: Uri, nbEvents: Int, valid: Boolean, maxBytes: Int): List[Request[IO]] = {
-    val body = if (valid) "foo" else "a" * (maxBytes + 1)
-    val one = Request[IO](Method.POST, uri).withEntity(body)
-    List.fill(nbEvents)(one)
+      }
   }
 
-  private def mkHttpClient: Resource[IO, Client[IO]] =
-    BlazeClientBuilder[IO](executionContext).resource
+  private def generateEvents(
+    collectorHost: String,
+    collectorPort: Int,
+    nbGood: Int,
+    nbBad: Int,
+    maxBytes: Int
+  ): List[Request[IO]] = {
+    val good = List.fill(nbGood)(mkTp2Event(collectorHost, collectorPort, valid = true, maxBytes))
+    val bad = List.fill(nbBad)(mkTp2Event(collectorHost, collectorPort, valid = false, maxBytes))
+    good ++ bad
+  }
+
+  private def mkTp2Event(
+    collectorHost: String,
+    collectorPort: Int,
+    valid: Boolean,
+    maxBytes: Int
+  ): Request[IO] = {
+    val uri = Uri.unsafeFromString(s"http://$collectorHost:$collectorPort/com.snowplowanalytics.snowplow/tp2")
+    val body = if (valid) "foo" else "a" * (maxBytes + 1)
+    Request[IO](Method.POST, uri).withEntity(body)
+  }
 }
