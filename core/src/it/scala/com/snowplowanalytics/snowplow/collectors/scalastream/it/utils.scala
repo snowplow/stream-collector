@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.output.Slf4jLogConsumer
 
-import io.circe.parser
+import io.circe.{Json, parser}
 
 import cats.implicits._
 
@@ -102,5 +102,33 @@ object utils {
       retryPolicy,
       (_, _) => IO.unit
     )
+  }
+
+  /** Return a list of config parameters from a raw JSON string. */
+  def getConfigParameters(config: String): List[(String, String)] = {
+    val parsed: Json = parser.parse(config).valueOr { case failure =>
+      throw new IllegalArgumentException("Can't parse JSON", failure.underlying)
+    }
+
+    def flatten(value: Json): Option[List[(String, Json)]] =
+      value.asObject.map(
+        _.toList.flatMap {
+          case (k, v) => flatten(v) match {
+            case None => List(k -> v)
+            case Some(fields) => fields.map {
+              case (innerK, innerV) => s"$k.$innerK" -> innerV
+            }
+          }
+        }
+      )
+
+    val fields = flatten(parsed).getOrElse(throw new IllegalArgumentException("Couldn't flatten fields"))
+
+    fields.map {
+      case (k, v) if v.isString =>
+        k -> v.asString.get
+      case (k, v) =>
+        k -> v.toString
+    }
   }
 }
