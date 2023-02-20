@@ -34,7 +34,8 @@ object Collector {
     configPath: String,
     testName: String,
     streamGood: String,
-    streamBad: String
+    streamBad: String,
+    additionalConfig: Option[String] = None
   ): Resource[IO, JGenericContainer[_]] = {
     val container = GenericContainer(
       dockerImage = s"snowplow/scala-stream-collector-kinesis:${ProjectMetadata.version}",
@@ -47,7 +48,7 @@ object Collector {
         "REGION" -> Localstack.region,
         "KINESIS_ENDPOINT" -> Localstack.privateEndpoint,
         "MAX_BYTES" -> maxBytes.toString()
-      ),
+      ) ++ configParameters(additionalConfig),
       exposedPorts = Seq(port),
       fileSystemBind = Seq(
         GenericContainer.FileSystemBind(
@@ -70,4 +71,14 @@ object Collector {
       e => IO(e.stop())
     )
   }
+
+  private def configParameters(rawConfig: Option[String]): Map[String, String] =
+    rawConfig match {
+      case None => Map.empty[String, String]
+      case Some(config) =>
+        val fields = getConfigParameters(config)
+          .map { case (k, v) => s"-D$k=$v" }
+          .mkString(" ")
+        Map("JDK_JAVA_OPTIONS" -> fields)
+    }
 }
