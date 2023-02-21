@@ -44,7 +44,7 @@ class KinesisCollectorSpec extends Specification with Localstack with CatsIO {
         s"${testName}-raw",
         s"${testName}-bad-1"
       ).use { collector =>
-        IO(collector.getLogs() must contain(("Setting health endpoint to healthy")))
+        IO(collector.container.getLogs() must contain(("Setting health endpoint to healthy")))
       }
     }
 
@@ -64,8 +64,8 @@ class KinesisCollectorSpec extends Specification with Localstack with CatsIO {
         for {
           _ <- log(testName, "Sending data")
           _ <- EventGenerator.sendEvents(
-            collector.getHost(),
-            collector.getMappedPort(Collector.port),
+            collector.host,
+            collector.port,
             nbGood,
             nbBad,
             Collector.maxBytes
@@ -90,13 +90,14 @@ class KinesisCollectorSpec extends Specification with Localstack with CatsIO {
         s"${testName}-raw",
         s"${testName}-bad-1"
       ).use { collector =>
+        val container = collector.container
         for {
           _ <- log(testName, "Sending signal")
-          _ <- IO(collector.getDockerClient().killContainerCmd(collector.getContainerId()).withSignal("TERM").exec())
-          _ <- waitWhile[GenericContainer[_]](collector, _.isRunning, stopTimeout)
+          _ <- IO(container.getDockerClient().killContainerCmd(container.getContainerId()).withSignal("TERM").exec())
+          _ <- waitWhile[GenericContainer[_]](container, _.isRunning, stopTimeout)
         } yield {
-          collector.isRunning() must beFalse
-          collector.getLogs() must contain("Server terminated")
+          container.isRunning() must beFalse
+          container.getLogs() must contain("Server terminated")
         }
       }
     }

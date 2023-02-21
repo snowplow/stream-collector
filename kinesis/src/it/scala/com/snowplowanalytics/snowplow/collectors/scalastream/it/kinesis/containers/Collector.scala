@@ -36,7 +36,7 @@ object Collector {
     streamGood: String,
     streamBad: String,
     additionalConfig: Option[String] = None
-  ): Resource[IO, JGenericContainer[_]] = {
+  ): Resource[IO, Collector] = {
     val container = GenericContainer(
       dockerImage = s"snowplow/scala-stream-collector-kinesis:${ProjectMetadata.version}",
       env = Map(
@@ -67,8 +67,9 @@ object Collector {
     Resource.make (
       Localstack.createStreams(List(streamGood, streamBad)) *>
         IO(startContainerWithLogs(container.container, testName))
+          .map(c => Collector(c, c.getHost, c.getMappedPort(Collector.port)))
     )(
-      e => IO(e.stop())
+      c => IO(c.container.stop())
     )
   }
 
@@ -82,3 +83,9 @@ object Collector {
         Map("JDK_JAVA_OPTIONS" -> fields)
     }
 }
+
+case class Collector(
+  container: JGenericContainer[_],
+  host: String,
+  port: Int
+)
