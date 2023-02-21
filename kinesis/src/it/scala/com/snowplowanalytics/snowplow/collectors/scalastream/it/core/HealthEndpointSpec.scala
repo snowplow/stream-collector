@@ -43,9 +43,7 @@ class HealthEndpointSpec extends Specification with Localstack with CatsIO {
         streamGood,
         streamBad
       ).use { collector =>
-        val host = collector.getHost()
-        val port = collector.getMappedPort(Collector.port)
-        val uri = Uri.unsafeFromString(s"http://$host:$port/health")
+        val uri = Uri.unsafeFromString(s"http://${collector.host}:${collector.port}/health")
         val request = Request[IO](Method.GET, uri)
 
         for {

@@ -37,7 +37,7 @@ object EventGenerator {
       }
   }
 
-  private def generateEvents(
+  def generateEvents(
     collectorHost: String,
     collectorPort: Int,
     nbGood: Int,
@@ -49,11 +49,11 @@ object EventGenerator {
     good ++ bad
   }
 
-  private def mkTp2Event(
+  def mkTp2Event(
     collectorHost: String,
     collectorPort: Int,
-    valid: Boolean,
-    maxBytes: Int
+    valid: Boolean = true,
+    maxBytes: Int = 100
   ): Request[IO] = {
     val uri = Uri.unsafeFromString(s"http://$collectorHost:$collectorPort/com.snowplowanalytics.snowplow/tp2")
     val body = if (valid) "foo" else "a" * (maxBytes + 1)

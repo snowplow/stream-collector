@@ -14,7 +14,11 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream.it.core
 
+import java.net.InetAddress
+
 import scala.concurrent.duration._
+
+import cats.data.NonEmptyList
 
 import cats.effect.IO
 
@@ -22,61 +26,46 @@ import cats.effect.testing.specs2.CatsIO
 
 import org.specs2.mutable.Specification
 
-import org.http4s.{Request, Method, Uri}
+import org.http4s.headers.`X-Forwarded-For`
+
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.Http
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.EventGenerator
 
 import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers._
 import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.Kinesis
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.Http
 
-class CustomPathsSpec extends Specification with Localstack with CatsIO {
+class XForwardedForSpec extends Specification with Localstack with CatsIO {
 
   override protected val Timeout = 5.minutes
 
   "collector" should {
-    "map custom paths" in {
-      val testName = "custom-paths"
+    "put X-Forwarded-For header in the collector payload" in {
+      val testName = "X-Forwarded-For"
       val streamGood = s"${testName}-raw"
       val streamBad = s"${testName}-bad-1"
 
-      val originalPaths = List(
-        "/acme/track",
-        "/acme/redirect",
-        "/acme/iglu"
-      )
-      val targetPaths = List(
-        "/com.snowplowanalytics.snowplow/tp2",
-        "/r/tp2",
-        "/com.snowplowanalytics.iglu/v1"
-      )
-      val customPaths = originalPaths.zip(targetPaths)
-      val config = s"""
-      {
-        "collector": {
-          "paths": {
-            ${customPaths.map { case (k, v) => s""""$k": "$v""""}.mkString(",\n")}
-          }
-        }
-      }"""
+      val ip = InetAddress.getByName("123.123.123.123")
 
       Collector.container(
         "kinesis/src/it/resources/collector.hocon",
         testName,
         streamGood,
-        streamBad,
-        Some(config)
+        streamBad
       ).use { collector =>
-        val requests = originalPaths.map { p =>
-          val uri = Uri.unsafeFromString(s"http://${collector.host}:${collector.port}$p")
-          Request[IO](Method.POST, uri).withEntity("foo")
-        }
+        val request = EventGenerator.mkTp2Event(collector.host, collector.port)
+          .withHeaders(`X-Forwarded-For`(NonEmptyList.one(Some(ip))))
 
         for {
-          _ <- Http.sendRequests(requests)
-          _ <- IO.sleep(5.second)
+          _ <- Http.sendRequest(request)
+        _ <- IO.sleep(5.second)
           collectorOutput <- Kinesis.readOutput(streamGood, streamBad)
-          outputPaths = collectorOutput.good.map(cp => cp.getPath())
         } yield {
-          outputPaths must beEqualTo(targetPaths)
+          val expected = "X-Forwarded-For: 123.123.123.123"
+          collectorOutput.good match {
+            case List(one) if one.headers.contains(expected) => ok
+            case List(one) => ko(s"${one.headers} doesn't contain $expected")
+            case other => ko(s"${other.size} output collector payload instead of one")
+          }
         }
       }
     }
