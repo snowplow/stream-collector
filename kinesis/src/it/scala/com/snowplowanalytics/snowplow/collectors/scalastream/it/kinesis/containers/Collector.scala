@@ -77,9 +77,7 @@ object Collector {
     rawConfig match {
       case None => Map.empty[String, String]
       case Some(config) =>
-        val fields = getConfigParameters(config)
-          .map { case (k, v) => s"-D$k=$v" }
-          .mkString(" ")
+        val fields = getConfigParameters(config).mkString(" ")
         Map("JDK_JAVA_OPTIONS" -> fields)
     }
 }

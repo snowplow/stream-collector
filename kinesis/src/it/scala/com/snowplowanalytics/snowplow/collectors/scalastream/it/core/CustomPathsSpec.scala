@@ -71,7 +71,7 @@ class CustomPathsSpec extends Specification with Localstack with CatsIO {
         }
 
         for {
-          _ <- Http.sendRequests(requests)
+          _ <- Http.statuses(requests)
           _ <- IO.sleep(5.second)
           collectorOutput <- Kinesis.readOutput(streamGood, streamBad)
           outputPaths = collectorOutput.good.map(cp => cp.getPath())

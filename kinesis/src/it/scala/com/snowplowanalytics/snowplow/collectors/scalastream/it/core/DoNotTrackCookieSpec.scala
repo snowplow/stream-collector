@@ -58,12 +58,12 @@ class DoNotTrackCookieSpec extends Specification with Localstack with CatsIO {
         val expected = List(s"Cookie: $cookieName=$cookieName", s"Cookie: $cookieValue=$cookieValue")
 
         for {
-          responses <- Http.sendRequests(requests)
+          statuses <- Http.statuses(requests)
           _ <- IO.sleep(5.second)
           collectorOutput <- Kinesis.readOutput(streamGood, streamBad)
           headers = collectorOutput.good.map(_.headers.asScala)
         } yield {
-          responses.map(_.code) must beEqualTo(List(200, 200, 200))
+          statuses.map(_.code) must beEqualTo(List(200, 200, 200))
           headers must haveSize(2)
           expected.forall(cookie => headers.exists(_.contains(cookie))) must beTrue
         }
@@ -87,12 +87,12 @@ class DoNotTrackCookieSpec extends Specification with Localstack with CatsIO {
         val expected = s"Cookie: $cookieName=$cookieValue"
 
         for {
-          response <- Http.sendRequest(request)
+          status <- Http.status(request)
           _ <- IO.sleep(5.second)
           collectorOutput <- Kinesis.readOutput(streamGood, streamBad)
           headers = collectorOutput.good.map(_.headers.asScala)
         } yield {
-          response.code must beEqualTo(200)
+          status.code must beEqualTo(200)
           headers match {
             case List(one) if one.contains(expected) => ok
             case other =>

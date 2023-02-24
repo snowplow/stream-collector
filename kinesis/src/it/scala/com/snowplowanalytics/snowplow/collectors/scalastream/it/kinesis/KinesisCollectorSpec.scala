@@ -44,7 +44,7 @@ class KinesisCollectorSpec extends Specification with Localstack with CatsIO {
         s"${testName}-raw",
         s"${testName}-bad-1"
       ).use { collector =>
-        IO(collector.container.getLogs() must contain(("Setting health endpoint to healthy")))
+        IO(collector.container.getLogs() must contain(("REST interface bound to")))
       }
     }
 
