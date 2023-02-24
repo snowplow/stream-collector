@@ -28,7 +28,7 @@ object EventGenerator {
     maxBytes: Int
   ): IO[Unit] = {
     val requests = generateEvents(collectorHost, collectorPort, nbGood, nbBad, maxBytes)
-    Http.sendRequests(requests)
+    Http.statuses(requests)
       .flatMap { responses =>
         responses.collect { case resp if resp.code != 200 => resp.reason } match {
           case Nil => IO.unit

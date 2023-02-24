@@ -47,11 +47,11 @@ class HealthEndpointSpec extends Specification with Localstack with CatsIO {
         val request = Request[IO](Method.GET, uri)
 
         for {
-          response <- Http.sendRequest(request)
+          status <- Http.status(request)
           _ <- IO.sleep(5.second)
           collectorOutput <- Kinesis.readOutput(streamGood, streamBad)
         } yield {
-          response.code must beEqualTo(200)
+          status.code must beEqualTo(200)
           collectorOutput.good.size should beEqualTo(0)
           collectorOutput.bad.size should beEqualTo(0)
         }

@@ -56,7 +56,7 @@ class XForwardedForSpec extends Specification with Localstack with CatsIO {
           .withHeaders(`X-Forwarded-For`(NonEmptyList.one(Some(ip))))
 
         for {
-          _ <- Http.sendRequest(request)
+          _ <- Http.status(request)
           _ <- IO.sleep(5.second)
           collectorOutput <- Kinesis.readOutput(streamGood, streamBad)
         } yield {

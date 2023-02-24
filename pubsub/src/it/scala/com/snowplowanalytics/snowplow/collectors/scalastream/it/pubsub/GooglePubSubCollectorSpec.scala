@@ -47,7 +47,7 @@ class GooglePubSubCollectorSpec extends Specification with CatsIO with BeforeAft
         "examples/config.pubsub.minimal.hocon",
         testName
       ).use { collector =>
-        IO(collector.getLogs() must contain(("Setting health endpoint to healthy")))
+        IO(collector.getLogs() must contain(("REST interface bound to")))
       }
     }
 

@@ -105,7 +105,7 @@ object utils {
   }
 
   /** Return a list of config parameters from a raw JSON string. */
-  def getConfigParameters(config: String): List[(String, String)] = {
+  def getConfigParameters(config: String): List[String] = {
     val parsed: Json = parser.parse(config).valueOr { case failure =>
       throw new IllegalArgumentException("Can't parse JSON", failure.underlying)
     }
@@ -122,13 +122,22 @@ object utils {
         }
       )
 
+    def withSpaces(s: String): String = if(s.contains(" ")) s""""$s"""" else s
+
     val fields = flatten(parsed).getOrElse(throw new IllegalArgumentException("Couldn't flatten fields"))
 
-    fields.map {
+    fields.flatMap {
       case (k, v) if v.isString =>
-        k -> v.asString.get
+        List(s"-D$k=${withSpaces(v.asString.get)}")
+      case (k, v) if v.isArray =>
+        v.asArray.get.toList.zipWithIndex.map {
+          case (s, i) if s.isString =>
+            s"-D$k.$i=${withSpaces(s.asString.get)}"
+          case (other, i) =>
+            s"-D$k.$i=${withSpaces(other.toString)}"
+        }
       case (k, v) =>
-        k -> v.toString
+        List(s"-D$k=${withSpaces(v.toString)}")
     }
   }
 }
