@@ -58,10 +58,10 @@ lazy val buildInfoSettings = Seq(
   buildInfoKeys := Seq[BuildInfoKey](organization, moduleName, name, version, "shortName" -> "ssc", scalaVersion)
 )
 
-// Make package (build) metadata available within source code.
+// Make package (build) metadata available within source code for integration tests.
 lazy val scalifiedSettings = Seq(
-  Compile / sourceGenerators += Def.task {
-    val file = (Compile / sourceManaged).value / "settings.scala"
+  IntegrationTest / sourceGenerators += Def.task {
+    val file = (IntegrationTest / sourceManaged).value / "settings.scala"
     IO.write(
       file,
       """package %s
@@ -69,6 +69,7 @@ lazy val scalifiedSettings = Seq(
         |  val organization = "%s"
         |  val name = "%s"
         |  val version = "%s"
+        |  val dockerTag = "%s"
         |}
         |"""
         .stripMargin
@@ -76,7 +77,8 @@ lazy val scalifiedSettings = Seq(
           buildInfoPackage.value,
           organization.value,
           name.value,
-          version.value
+          version.value,
+          dockerAlias.value.tag.get
         )
     )
     Seq(file)
@@ -114,7 +116,8 @@ lazy val dockerSettingsDistroless = Seq(
     "-jar",
     s"/opt/snowplow/lib/${(packageJavaLauncherJar / artifactPath).value.getName}"
   ),
-  dockerPermissionStrategy := DockerPermissionStrategy.CopyChown
+  dockerPermissionStrategy := DockerPermissionStrategy.CopyChown,
+  dockerAlias := dockerAlias.value.copy(tag = dockerAlias.value.tag.map(t => s"$t-distroless"))
 )
 
 lazy val dynVerSettings = Seq(
@@ -161,7 +164,7 @@ lazy val kinesis = project
 lazy val kinesisDistroless = project
   .in(file("distroless/kinesis"))
   .settings(sourceDirectory := (kinesis / sourceDirectory).value)
-  .settings(kinesisSettings ++ dockerSettingsDistroless ++ scalifiedSettings)
+  .settings(kinesisSettings ++ dockerSettingsDistroless ++ Defaults.itSettings ++ scalifiedSettings)
   .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
   .dependsOn(core % "test->test;compile->compile;it->it")
   .settings(libraryDependencies ++= Seq(
@@ -169,7 +172,6 @@ lazy val kinesisDistroless = project
     Dependencies.Libraries.specs2It,
     Dependencies.Libraries.specs2CEIt
   ))
-  .settings(Defaults.itSettings)
   .configs(IntegrationTest)
   .settings((IntegrationTest / test) := (IntegrationTest / test).dependsOn(Docker / publishLocal).value)
   .settings((IntegrationTest / testOnly) := (IntegrationTest / testOnly).dependsOn(Docker / publishLocal).evaluated)
@@ -211,7 +213,7 @@ lazy val pubsub = project
 lazy val pubsubDistroless = project
   .in(file("distroless/pubsub"))
   .settings(sourceDirectory := (pubsub / sourceDirectory).value)
-  .settings(pubsubSettings ++ dockerSettingsDistroless ++ scalifiedSettings)
+  .settings(pubsubSettings ++ dockerSettingsDistroless ++ Defaults.itSettings ++ scalifiedSettings)
   .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
   .dependsOn(core % "test->test;compile->compile;it->it")
   .settings(libraryDependencies ++= Seq(
@@ -219,7 +221,6 @@ lazy val pubsubDistroless = project
     Dependencies.Libraries.specs2It,
     Dependencies.Libraries.specs2CEIt
   ))
-  .settings(Defaults.itSettings)
   .configs(IntegrationTest)
   .settings((IntegrationTest / test) := (IntegrationTest / test).dependsOn(Docker / publishLocal).value)
   .settings((IntegrationTest / testOnly) := (IntegrationTest / testOnly).dependsOn(Docker / publishLocal).evaluated)

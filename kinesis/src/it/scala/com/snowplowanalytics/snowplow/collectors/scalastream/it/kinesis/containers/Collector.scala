@@ -38,7 +38,7 @@ object Collector {
     additionalConfig: Option[String] = None
   ): Resource[IO, Collector] = {
     val container = GenericContainer(
-      dockerImage = s"snowplow/scala-stream-collector-kinesis:${ProjectMetadata.version}",
+      dockerImage = s"snowplow/scala-stream-collector-kinesis:${ProjectMetadata.dockerTag}",
       env = Map(
         "AWS_ACCESS_KEY_ID" -> "whatever",
         "AWS_SECRET_ACCESS_KEY" -> "whatever",

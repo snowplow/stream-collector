@@ -69,7 +69,7 @@ object Containers {
     envs: Map[String, String] = Map.empty[String, String]
   ): Resource[IO, JGenericContainer[_]] = {
     val container = GenericContainer(
-      dockerImage = s"snowplow/scala-stream-collector-pubsub:${ProjectMetadata.version}",
+      dockerImage = s"snowplow/scala-stream-collector-pubsub:${ProjectMetadata.dockerTag}",
       env = Map("PUBSUB_EMULATOR_HOST" -> s"pubsub-emulator:$emulatorPort") ++ envs,
       exposedPorts = Seq(collectorPort),
       fileSystemBind = Seq(
