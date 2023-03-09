@@ -63,6 +63,10 @@ jobs:
           - suffix: ""
           - suffix: -experimental
             platform: rabbitmq
+          - platform: kinesis
+            run_snyk: ${{ !contains(github.ref, 'rc') }}
+          - platform: pubsub
+            run_snyk: ${{ !contains(github.ref, 'rc') }}
 
     steps:
       - uses: actions/checkout@v2
@@ -128,7 +132,6 @@ jobs:
           platforms: linux/amd64,linux/arm64/v8
           tags: ${{ steps.meta.outputs.tags }}
           push: true
-
       - name: Push distroless image
         uses: docker/build-push-action@v2
         with:
@@ -137,3 +140,18 @@ jobs:
           platforms: linux/amd64,linux/arm64/v8
           tags: ${{ steps.distroless-meta.outputs.tags }}
           push: true
+
+      - name: Build local distroless image, which is needed to run Snyk
+        if: matrix.run_snyk
+        run: sbt "project ${{ matrix.platform }}Distroless" docker:publishLocal
+      - name: Show local docker images
+        run: docker images
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/docker@master
+        if: matrix.run_snyk
+        with:
+          image: "snowplow/scala-stream-collector-${{ matrix.platform }}:${{ github.ref_name }}-distroless"
+          args: "--app-vulns --org=data-processing-new"
+          command: monitor
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
