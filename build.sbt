@@ -114,7 +114,8 @@ lazy val dockerSettingsDistroless = Seq(
     "-jar",
     s"/opt/snowplow/lib/${(packageJavaLauncherJar / artifactPath).value.getName}"
   ),
-  dockerPermissionStrategy := DockerPermissionStrategy.CopyChown
+  dockerPermissionStrategy := DockerPermissionStrategy.CopyChown,
+  dockerAlias := dockerAlias.value.copy(tag = dockerAlias.value.tag.map(t => s"$t-distroless"))
 )
 
 lazy val dynVerSettings = Seq(
