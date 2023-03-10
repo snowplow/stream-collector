@@ -68,7 +68,7 @@ lazy val scalifiedSettings = Seq(
         |object ProjectMetadata {
         |  val organization = "%s"
         |  val name = "%s"
-        |  val version = "%s"
+        |  val version = "%s-distroless"
         |}
         |"""
         .stripMargin
