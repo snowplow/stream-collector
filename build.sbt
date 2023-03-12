@@ -146,35 +146,34 @@ lazy val core = project
   .configs(IntegrationTest)
 
 lazy val kinesisSettings =
-  allSettings ++ buildInfoSettings ++ Seq(
+  allSettings ++ buildInfoSettings ++ Defaults.itSettings ++ scalifiedSettings ++ Seq(
     moduleName := "snowplow-stream-collector-kinesis",
     Docker / packageName := "scala-stream-collector-kinesis",
     libraryDependencies ++= Seq(
       Dependencies.Libraries.kinesis,
       Dependencies.Libraries.sts,
-      Dependencies.Libraries.sqs
-    )
+      Dependencies.Libraries.sqs,
+      // integration tests dependencies
+      Dependencies.Libraries.specs2It,
+      Dependencies.Libraries.specs2CEIt
+    ),
+    IntegrationTest / test := (IntegrationTest / test).dependsOn(Docker / publishLocal).value,
+    IntegrationTest / testOnly := (IntegrationTest / testOnly).dependsOn(Docker / publishLocal).evaluated
   )
 
 lazy val kinesis = project
   .settings(kinesisSettings ++ dockerSettings)
   .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
-  .dependsOn(core % "test->test;compile->compile")
+  .dependsOn(core % "test->test;compile->compile;it->it")
+  .configs(IntegrationTest)
 
 lazy val kinesisDistroless = project
   .in(file("distroless/kinesis"))
   .settings(sourceDirectory := (kinesis / sourceDirectory).value)
-  .settings(kinesisSettings ++ dockerSettingsDistroless ++ Defaults.itSettings ++ scalifiedSettings)
+  .settings(kinesisSettings ++ dockerSettingsDistroless)
   .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
   .dependsOn(core % "test->test;compile->compile;it->it")
-  .settings(libraryDependencies ++= Seq(
-    // integration tests dependencies
-    Dependencies.Libraries.specs2It,
-    Dependencies.Libraries.specs2CEIt
-  ))
   .configs(IntegrationTest)
-  .settings((IntegrationTest / test) := (IntegrationTest / test).dependsOn(Docker / publishLocal).value)
-  .settings((IntegrationTest / testOnly) := (IntegrationTest / testOnly).dependsOn(Docker / publishLocal).evaluated)
 
 lazy val sqsSettings =
   allSettings ++ buildInfoSettings ++ Seq(
@@ -199,31 +198,32 @@ lazy val sqsDistroless = project
   .dependsOn(core % "test->test;compile->compile")
 
 lazy val pubsubSettings =
-  allSettings ++ buildInfoSettings ++ Seq(
+  allSettings ++ buildInfoSettings ++ Defaults.itSettings ++ scalifiedSettings ++ Seq(
     moduleName := "snowplow-stream-collector-google-pubsub",
     Docker / packageName := "scala-stream-collector-pubsub",
-    libraryDependencies ++= Seq(Dependencies.Libraries.pubsub)
+    libraryDependencies ++= Seq(
+      Dependencies.Libraries.pubsub,
+      // integration tests dependencies
+      Dependencies.Libraries.specs2It,
+      Dependencies.Libraries.specs2CEIt,
+    ),
+    IntegrationTest / test := (IntegrationTest / test).dependsOn(Docker / publishLocal).value,
+    IntegrationTest / testOnly := (IntegrationTest / testOnly).dependsOn(Docker / publishLocal).evaluated
   )
 
 lazy val pubsub = project
   .settings(pubsubSettings ++ dockerSettings)
   .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
-  .dependsOn(core % "test->test;compile->compile")
+  .dependsOn(core % "test->test;compile->compile;it->it")
+  .configs(IntegrationTest)
 
 lazy val pubsubDistroless = project
   .in(file("distroless/pubsub"))
   .settings(sourceDirectory := (pubsub / sourceDirectory).value)
-  .settings(pubsubSettings ++ dockerSettingsDistroless ++ Defaults.itSettings ++ scalifiedSettings)
+  .settings(pubsubSettings ++ dockerSettingsDistroless)
   .enablePlugins(JavaAppPackaging, LauncherJarPlugin, DockerPlugin, BuildInfoPlugin)
   .dependsOn(core % "test->test;compile->compile;it->it")
-  .settings(libraryDependencies ++= Seq(
-    // integration tests dependencies
-    Dependencies.Libraries.specs2It,
-    Dependencies.Libraries.specs2CEIt
-  ))
   .configs(IntegrationTest)
-  .settings((IntegrationTest / test) := (IntegrationTest / test).dependsOn(Docker / publishLocal).value)
-  .settings((IntegrationTest / testOnly) := (IntegrationTest / testOnly).dependsOn(Docker / publishLocal).evaluated)
 
 lazy val kafkaSettings =
   allSettings ++ buildInfoSettings ++ Seq(
