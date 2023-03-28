@@ -28,7 +28,7 @@ jobs:
         id: ver
         run: |
           export PROJECT_VERSION=$(sbt "project core" version -Dsbt.log.noformat=true | perl -ne 'print "$1\n" if /info.*(\d+\.\d+\.\d+[^\r\n]*)/' | tail -n 1 | tr -d '\n')
-          echo "::set-output name=project_version::$PROJECT_VERSION"
+          echo "project_version=$PROJECT_VERSION" >> $GITHUB_OUTPUT
       - name: Create GitHub release and attach artifacts
         uses: softprops/action-gh-release@v1
         with:
@@ -80,7 +80,7 @@ jobs:
         id: ver
         run: |
           export PROJECT_VERSION=$(sbt "project core" version -Dsbt.log.noformat=true | perl -ne 'print "$1\n" if /info.*(\d+\.\d+\.\d+[^\r\n]*)/' | tail -n 1 | tr -d '\n')
-          echo "::set-output name=project_version::$PROJECT_VERSION"
+          echo "project_version=$PROJECT_VERSION" >> $GITHUB_OUTPUT
 
       - name: Stage the Docker build
         run: sbt "project ${{ matrix.platform }}" docker:stage

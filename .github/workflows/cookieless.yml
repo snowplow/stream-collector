@@ -22,14 +22,14 @@ jobs:
         id: non-anonymous
         run: |
           output=$(curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2  -d '{}' 2>&1 | grep -q 'Set-Cookie')
-          echo "::set-output name=exit_code::$?"
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
       - name: Test anonymous tracking
         id: anonymous
         if: ${{ steps.non-anonymous.outputs.exit_code == 0 }}
         run: |
           set +e
           output=$(curl -X POST -i http://0.0.0.0:12345/com.snowplowanalytics.snowplow/tp2 -H 'SP-Anonymous: *' -d '{}' 2>&1 | grep -q 'Set-Cookie')
-          echo "::set-output name=exit_code::$?"
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
       - name: Report outcome
         if: ${{ steps.non-anonymous.outputs.exit_code == 0 && steps.anonymous.outputs.exit_code == 1 }}
         run: echo "All tests successful!"
