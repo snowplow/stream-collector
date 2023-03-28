@@ -214,6 +214,11 @@ collector {
       # SQS has a record size limit of 256 kb, but records are encoded with Base64,
       # which adds approximately 33% of the size, so we set the limit to 256 kb * 3/4
       maxBytes = 192000
+
+      # When collector starts, it checks if SQS buffers exist with getQueueUrl.
+      # This is the interval for the calls.
+      # /sink-health is made healthy as soon as requests are successful or records are successfully inserted.
+      startupCheckInterval = 1 second
     }
 
     # Incoming events are stored in a buffer before being sent to Kinesis/Kafka.
