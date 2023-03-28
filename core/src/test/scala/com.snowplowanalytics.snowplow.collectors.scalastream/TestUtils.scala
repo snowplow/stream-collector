@@ -52,7 +52,7 @@ object TestUtils {
           region               = "us-east-1",
           threadPoolSize       = 12,
           aws                  = AWSConfig("cpf", "cpf"),
-          backoffPolicy        = KinesisBackoffPolicyConfig(3000L, 60000L),
+          backoffPolicy        = KinesisBackoffPolicyConfig(500L, 1500L, 3),
           customEndpoint       = None,
           sqsGoodBuffer        = Some("good-buffer"),
           sqsBadBuffer         = Some("bad-buffer"),
