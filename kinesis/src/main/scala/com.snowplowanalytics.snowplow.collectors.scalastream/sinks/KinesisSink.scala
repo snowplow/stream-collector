@@ -61,10 +61,10 @@ class KinesisSink private (
 
   private val maxBackoff      = kinesisConfig.backoffPolicy.maxBackoff
   private val minBackoff      = kinesisConfig.backoffPolicy.minBackoff
+  private val maxRetries      = kinesisConfig.backoffPolicy.maxRetries
   private val randomGenerator = new java.util.Random()
 
   private val MaxSqsBatchSizeN = 10
-  private val MaxRetries       = 3 // TODO: make this configurable
 
   implicit lazy val ec: ExecutionContextExecutorService =
     concurrent.ExecutionContext.fromExecutorService(executorService)
@@ -138,13 +138,13 @@ class KinesisSink private (
     if (batch.nonEmpty) maybeSqs match {
       // Kinesis healthy
       case _ if kinesisHealthy =>
-        writeBatchToKinesisWithRetries(batch, minBackoff, MaxRetries)
+        writeBatchToKinesisWithRetries(batch, minBackoff, maxRetries)
       // No SQS buffer
       case None =>
-        writeBatchToKinesisWithRetries(batch, minBackoff, MaxRetries)
+        writeBatchToKinesisWithRetries(batch, minBackoff, maxRetries)
       // Kinesis not healthy and SQS buffer defined
       case Some(sqs) =>
-        writeBatchToSqsWithRetries(batch, sqs, minBackoff, MaxRetries)
+        writeBatchToSqsWithRetries(batch, sqs, minBackoff, maxRetries)
     }
 
   def writeBatchToKinesisWithRetries(batch: List[Events], nextBackoff: Long, retriesLeft: Int): Unit = {
@@ -220,10 +220,10 @@ class KinesisSink private (
           log.error(
             s"SQS buffer ${sqs.sqsBufferName} defined for stream $streamName. Retrying to send the events to SQS"
           )
-          writeBatchToSqsWithRetries(failedRecords, sqs, minBackoff, MaxRetries)
+          writeBatchToSqsWithRetries(failedRecords, sqs, minBackoff, maxRetries)
         case None =>
           log.error(s"No SQS buffer defined for stream $streamName. Retrying to send the events to Kinesis")
-          writeBatchToKinesisWithRetries(failedRecords, maxBackoff, MaxRetries)
+          writeBatchToKinesisWithRetries(failedRecords, maxBackoff, maxRetries)
       }
     }
 
@@ -238,7 +238,7 @@ class KinesisSink private (
       log.error(
         s"Maximum number of retries reached for SQS buffer ${sqs.sqsBufferName} for ${failedRecords.size} records. Retrying in Kinesis"
       )
-      writeBatchToKinesisWithRetries(failedRecords, minBackoff, MaxRetries)
+      writeBatchToKinesisWithRetries(failedRecords, minBackoff, maxRetries)
     }
 
   def writeBatchToKinesis(batch: List[Events]): Future[PutRecordsResult] =

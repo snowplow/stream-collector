@@ -131,8 +131,9 @@ abstract class ConfigSpec extends Specification {
           secretKey = "iam"
         ),
         backoffPolicy = SqsBackoffPolicyConfig(
-          minBackoff = 3000,
-          maxBackoff = 600000
+          minBackoff = 500,
+          maxBackoff = 1500,
+          maxRetries = 3
         ),
         startupCheckInterval = 1.second
       )
@@ -147,8 +148,9 @@ abstract class ConfigSpec extends Specification {
           secretKey = "iam"
         ),
         backoffPolicy = KinesisBackoffPolicyConfig(
-          minBackoff = 3000,
-          maxBackoff = 600000
+          minBackoff = 500,
+          maxBackoff = 1500,
+          maxRetries = 3
         ),
         sqsBadBuffer         = None,
         sqsGoodBuffer        = None,

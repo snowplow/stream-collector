@@ -219,10 +219,16 @@ collector {
         secretKey = iam
       }
 
-      # Minimum and maximum backoff periods, in milliseconds
+      # Optional
       backoffPolicy {
-        minBackoff = 3000
-        maxBackoff = 600000
+        # Minimum backoff period in milliseconds
+        minBackoff = 500
+        # Maximum backoff period in milliseconds
+        maxBackoff = 1500
+        # Failed inserts are retried forever.
+        # In case of just Kinesis without SQS, number of retries before setting /sink-health unhealthy.
+        # In case of Kinesis + SQS, number of retries with one before retrying with the other.
+        maxRetries = 3
       }
 
       # Optional. Maximum number of bytes that a single record can contain.
