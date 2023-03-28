@@ -92,8 +92,8 @@ package model {
   final case class P3PConfig(policyRef: String, CP: String)
   final case class CrossDomainConfig(enabled: Boolean, domains: List[String], secure: Boolean)
   final case class CORSConfig(accessControlMaxAge: FiniteDuration)
-  final case class KinesisBackoffPolicyConfig(minBackoff: Long, maxBackoff: Long)
-  final case class SqsBackoffPolicyConfig(minBackoff: Long, maxBackoff: Long)
+  final case class KinesisBackoffPolicyConfig(minBackoff: Long, maxBackoff: Long, maxRetries: Int)
+  final case class SqsBackoffPolicyConfig(minBackoff: Long, maxBackoff: Long, maxRetries: Int)
   final case class GooglePubSubBackoffPolicyConfig(
     minBackoff: Long,
     maxBackoff: Long,

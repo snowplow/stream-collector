@@ -53,10 +53,10 @@ class SqsSink private (
 
   private val maxBackoff: Long        = sqsConfig.backoffPolicy.maxBackoff
   private val minBackoff: Long        = sqsConfig.backoffPolicy.minBackoff
+  private val maxRetries: Int         = sqsConfig.backoffPolicy.maxRetries
   private val randomGenerator: Random = new java.util.Random()
 
   private val MaxSqsBatchSizeN = 10
-  private val MaxRetries       = 3 // TODO: make this configurable
 
   implicit lazy val ec: ExecutionContextExecutorService =
     concurrent.ExecutionContext.fromExecutorService(executorService)
@@ -93,7 +93,7 @@ class SqsSink private (
         evts
       }
       lastFlushedTime = System.currentTimeMillis()
-      sinkBatch(eventsToSend, minBackoff, MaxRetries)
+      sinkBatch(eventsToSend, minBackoff, maxRetries)
     }
 
     def getLastFlushTime: Long = lastFlushedTime
@@ -165,7 +165,7 @@ class SqsSink private (
       log.error(
         s"Maximum number of retries reached for SQS queue $queueName for ${failedRecords.size} records"
       )
-      scheduleWrite(failedRecords, maxBackoff, MaxRetries)
+      scheduleWrite(failedRecords, maxBackoff, maxRetries)
     }
 
   /**

@@ -202,10 +202,15 @@ collector {
         secretKey = ${?COLLECTOR_STREAMS_SINK_AWS_SECRET_KEY}
       }
 
-      # Minimum and maximum backoff periods, in milliseconds
+      # Optional
       backoffPolicy {
-        minBackoff = 3000
-        maxBackoff = 600000
+        # Minimum backoff period in milliseconds
+        minBackoff = 500
+        # Maximum backoff period in milliseconds
+        maxBackoff = 1500
+        # Failed inserts are retried forever.
+        # Number of retries before setting /sink-health unhealthy.
+        maxRetries = 3
       }
 
       # Optional. Maximum number of bytes that a single record can contain.
