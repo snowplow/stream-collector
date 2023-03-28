@@ -230,6 +230,12 @@ collector {
       # Default: 1 MB
       # If SQS buffer is activated, sqsMaxBytes is used instead
       maxBytes = 1000000
+
+      # When collector starts, it checks if Kinesis streams exist with describeStreamSummary
+      # and if SQS buffers exist with getQueueUrl (if configured).
+      # This is the interval for the calls.
+      # /sink-health is made healthy as soon as requests are successful or records are successfully inserted.
+      startupCheckInterval = 1 second
     }
 
     # Incoming events are stored in a buffer before being sent to Kinesis/Kafka.

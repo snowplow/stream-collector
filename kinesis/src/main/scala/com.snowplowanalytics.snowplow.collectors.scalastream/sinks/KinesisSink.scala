@@ -69,9 +69,9 @@ class KinesisSink private (
   implicit lazy val ec: ExecutionContextExecutorService =
     concurrent.ExecutionContext.fromExecutorService(executorService)
 
-  @volatile private var kinesisHealhy: Boolean = false
-  @volatile private var sqsHealthy: Boolean    = false
-  override def isHealthy: Boolean              = kinesisHealhy || sqsHealthy
+  @volatile private var kinesisHealthy: Boolean = false
+  @volatile private var sqsHealthy: Boolean     = false
+  override def isHealthy: Boolean               = kinesisHealthy || sqsHealthy
 
   override def storeRawEvents(events: List[Array[Byte]], key: String): Unit =
     events.foreach(e => EventStorage.store(e, key))
@@ -137,7 +137,7 @@ class KinesisSink private (
   def sinkBatch(batch: List[Events]): Unit =
     if (batch.nonEmpty) maybeSqs match {
       // Kinesis healthy
-      case _ if kinesisHealhy =>
+      case _ if kinesisHealthy =>
         writeBatchToKinesisWithRetries(batch, minBackoff, MaxRetries)
       // No SQS buffer
       case None =>
@@ -151,7 +151,7 @@ class KinesisSink private (
     log.info(s"Writing ${batch.size} records to Kinesis stream $streamName")
     writeBatchToKinesis(batch).onComplete {
       case Success(s) =>
-        kinesisHealhy = true
+        kinesisHealthy = true
         val results      = s.getRecords.asScala.toList
         val failurePairs = batch.zip(results).filter(_._2.getErrorMessage != null)
         log.info(
@@ -213,7 +213,7 @@ class KinesisSink private (
       )
       scheduleRetryToKinesis(failedRecords, nextBackoff, retriesLeft - 1)
     } else {
-      kinesisHealhy = false
+      kinesisHealthy = false
       log.error(s"Maximum number of retries reached for Kinesis stream $streamName for ${failedRecords.size} records")
       maybeSqs match {
         case Some(sqs) =>
@@ -351,9 +351,9 @@ class KinesisSink private (
   }
 
   private def checkKinesisHealth(): Unit = {
-    val healthThread = new Thread() {
+    val healthThread = new Runnable {
       override def run() {
-        while (!kinesisHealhy) {
+        while (!kinesisHealthy) {
           Try {
             val describeRequest = new DescribeStreamSummaryRequest()
             describeRequest.setStreamName(streamName)
@@ -362,22 +362,22 @@ class KinesisSink private (
           } match {
             case Success("ACTIVE") =>
               log.info(s"Stream $streamName ACTIVE")
-              kinesisHealhy = true
+              kinesisHealthy = true
             case Success(other) =>
               log.warn(s"Stream $streamName not ACTIVE but $other")
-              Thread.sleep(1000L)
+              Thread.sleep(kinesisConfig.startupCheckInterval.toMillis)
             case Failure(err) =>
               log.error(s"Error while checking status of stream $streamName: ${err.getMessage()}")
-              Thread.sleep(1000L)
+              Thread.sleep(kinesisConfig.startupCheckInterval.toMillis)
           }
         }
       }
     }
-    healthThread.start()
+    executorService.execute(healthThread)
   }
 
   private def checkSqsHealth(): Unit = maybeSqs.foreach { sqs =>
-    val healthThread = new Thread() {
+    val healthThread = new Runnable {
       override def run() {
         while (!sqsHealthy) {
           Try {
@@ -389,11 +389,11 @@ class KinesisSink private (
             case Failure(err) =>
               log.error(s"SQS buffer ${sqs.sqsBufferName} doesn't exist. Error: ${err.getMessage()}")
           }
-          Thread.sleep(1000L)
+          Thread.sleep(kinesisConfig.startupCheckInterval.toMillis)
         }
       }
     }
-    healthThread.start()
+    executorService.execute(healthThread)
   }
 }
 

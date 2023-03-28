@@ -201,6 +201,11 @@ collector {
       # If a record is bigger, a size violation bad row is emitted instead
       # Default: 10 MB
       maxBytes = 10000000
+
+      # When collector starts, it checks if PubSub topics exist with listTopics.
+      # This is the interval for the calls.
+      # /sink-health is made healthy as soon as requests are successful or records are successfully inserted.
+      startupCheckInterval = 1 second
     }
 
 

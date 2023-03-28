@@ -17,6 +17,7 @@ import java.util.concurrent.Executors
 
 import scala.collection.JavaConverters._
 import scala.util._
+import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 
 import org.threeten.bp.Duration
 
@@ -43,7 +44,8 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 
 class GooglePubSubSink private (val maxBytes: Int, publisher: Publisher, projectId: String, topicName: String)
     extends Sink {
-  private val logExecutor = Executors.newSingleThreadExecutor()
+  private val logExecutor   = Executors.newSingleThreadExecutor()
+  private val checkExecutor = Executors.newSingleThreadExecutor()
 
   @volatile private var pubsubHealthy: Boolean = false
   override def isHealthy: Boolean              = pubsubHealthy
@@ -81,8 +83,12 @@ class GooglePubSubSink private (val maxBytes: Int, publisher: Publisher, project
       }
     }
 
-  override def shutdown(): Unit =
+  override def shutdown(): Unit = {
     publisher.shutdown()
+    checkExecutor.shutdown()
+    checkExecutor.awaitTermination(10000, MILLISECONDS)
+    ()
+  }
 
   /**
     * Convert event bytes to a PubsubMessage to be published
@@ -93,9 +99,10 @@ class GooglePubSubSink private (val maxBytes: Int, publisher: Publisher, project
     PubsubMessage.newBuilder.setData(ByteString.copyFrom(event)).build()
 
   private def checkPubsubHealth(
-    customProviders: Option[(TransportChannelProvider, CredentialsProvider)]
+    customProviders: Option[(TransportChannelProvider, CredentialsProvider)],
+    startupCheckInterval: FiniteDuration
   ): Unit = {
-    val healthThread = new Thread() {
+    val healthThread = new Runnable {
       override def run() {
         val topicAdmin = GooglePubSubSink.createTopicAdmin(customProviders)
 
@@ -106,10 +113,10 @@ class GooglePubSubSink private (val maxBytes: Int, publisher: Publisher, project
               pubsubHealthy = true
             case Right(false) =>
               log.error(s"Topic $topicName doesn't exist")
-              Thread.sleep(1000L)
+              Thread.sleep(startupCheckInterval.toMillis)
             case Left(err) =>
               log.error(s"Error while checking if topic $topicName exists: ${err.getCause()}")
-              Thread.sleep(1000L)
+              Thread.sleep(startupCheckInterval.toMillis)
           }
         }
 
@@ -120,7 +127,7 @@ class GooglePubSubSink private (val maxBytes: Int, publisher: Publisher, project
         }
       }
     }
-    healthThread.start()
+    checkExecutor.execute(healthThread)
   }
 }
 
@@ -143,7 +150,7 @@ object GooglePubSubSink {
       }
       publisher <- createPublisher(googlePubSubConfig.googleProjectId, topicName, batching, retry, customProviders)
       sink = new GooglePubSubSink(maxBytes, publisher, googlePubSubConfig.googleProjectId, topicName)
-      _    = sink.checkPubsubHealth(customProviders)
+      _    = sink.checkPubsubHealth(customProviders, googlePubSubConfig.startupCheckInterval)
     } yield sink
 
   private val UserAgent = s"snowplow/stream-collector-${generated.BuildInfo.version}"

@@ -117,7 +117,8 @@ package model {
     customEndpoint: Option[String],
     sqsGoodBuffer: Option[String],
     sqsBadBuffer: Option[String],
-    sqsMaxBytes: Int
+    sqsMaxBytes: Int,
+    startupCheckInterval: FiniteDuration
   ) extends SinkConfig {
     val endpoint = customEndpoint.getOrElse(region match {
       case cn @ "cn-north-1"     => s"https://kinesis.$cn.amazonaws.com.cn"
@@ -130,12 +131,14 @@ package model {
     region: String,
     threadPoolSize: Int,
     aws: AWSConfig,
-    backoffPolicy: SqsBackoffPolicyConfig
+    backoffPolicy: SqsBackoffPolicyConfig,
+    startupCheckInterval: FiniteDuration
   ) extends SinkConfig
   final case class GooglePubSub(
     maxBytes: Int,
     googleProjectId: String,
-    backoffPolicy: GooglePubSubBackoffPolicyConfig
+    backoffPolicy: GooglePubSubBackoffPolicyConfig,
+    startupCheckInterval: FiniteDuration
   ) extends SinkConfig
   final case class Kafka(
     maxBytes: Int,
