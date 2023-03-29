@@ -16,8 +16,10 @@ package sinks
 import java.util.concurrent.Executors
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable.ListBuffer
 import scala.util._
 import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
+import scala.concurrent.duration._
 
 import org.threeten.bp.Duration
 
@@ -42,10 +44,18 @@ import cats.syntax.either._
 
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 
-class GooglePubSubSink private (val maxBytes: Int, publisher: Publisher, projectId: String, topicName: String)
-    extends Sink {
-  private val logExecutor   = Executors.newSingleThreadExecutor()
-  private val checkExecutor = Executors.newSingleThreadExecutor()
+class GooglePubSubSink private (
+  val maxBytes: Int,
+  publisher: Publisher,
+  projectId: String,
+  topicName: String,
+  retryInterval: FiniteDuration
+) extends Sink {
+  private val logExecutor = Executors.newSingleThreadExecutor()
+  // 2 = 1 for health check + 1 for retrying failed inserts
+  private val scheduledExecutor = Executors.newScheduledThreadPool(2)
+
+  private val failedInsertsBuffer = ListBuffer.empty[Array[Byte]]
 
   @volatile private var pubsubHealthy: Boolean = false
   override def isHealthy: Boolean              = pubsubHealthy
@@ -75,6 +85,9 @@ class GooglePubSubSink private (val maxBytes: Int, publisher: Publisher, project
                     )
                   case t => log.error(s"Publishing message to $topicName failed with error: ${t.getMessage}")
                 }
+                failedInsertsBuffer.synchronized {
+                  failedInsertsBuffer.prepend(event)
+                }
               }
             },
             logExecutor
@@ -85,8 +98,8 @@ class GooglePubSubSink private (val maxBytes: Int, publisher: Publisher, project
 
   override def shutdown(): Unit = {
     publisher.shutdown()
-    checkExecutor.shutdown()
-    checkExecutor.awaitTermination(10000, MILLISECONDS)
+    scheduledExecutor.shutdown()
+    scheduledExecutor.awaitTermination(10000, MILLISECONDS)
     ()
   }
 
@@ -98,11 +111,26 @@ class GooglePubSubSink private (val maxBytes: Int, publisher: Publisher, project
   private def eventToPubsubMessage(event: Array[Byte]): PubsubMessage =
     PubsubMessage.newBuilder.setData(ByteString.copyFrom(event)).build()
 
+  private def retryRunnable: Runnable = new Runnable {
+    override def run() {
+      val failedInserts = failedInsertsBuffer.synchronized {
+        val records = failedInsertsBuffer.toList
+        failedInsertsBuffer.clear()
+        records
+      }
+      if (failedInserts.nonEmpty) {
+        log.info(s"Retrying to insert ${failedInserts.size} records into $topicName")
+        storeRawEvents(failedInserts, "NOT USED")
+      }
+    }
+  }
+  scheduledExecutor.scheduleWithFixedDelay(retryRunnable, retryInterval.toMillis, retryInterval.toMillis, MILLISECONDS)
+
   private def checkPubsubHealth(
     customProviders: Option[(TransportChannelProvider, CredentialsProvider)],
     startupCheckInterval: FiniteDuration
   ): Unit = {
-    val healthThread = new Runnable {
+    val healthRunnable = new Runnable {
       override def run() {
         val topicAdmin = GooglePubSubSink.createTopicAdmin(customProviders)
 
@@ -127,7 +155,7 @@ class GooglePubSubSink private (val maxBytes: Int, publisher: Publisher, project
         }
       }
     }
-    checkExecutor.execute(healthThread)
+    scheduledExecutor.execute(healthRunnable)
   }
 }
 
@@ -149,8 +177,14 @@ object GooglePubSubSink {
         (channelProvider, credentialsProvider)
       }
       publisher <- createPublisher(googlePubSubConfig.googleProjectId, topicName, batching, retry, customProviders)
-      sink = new GooglePubSubSink(maxBytes, publisher, googlePubSubConfig.googleProjectId, topicName)
-      _    = sink.checkPubsubHealth(customProviders, googlePubSubConfig.startupCheckInterval)
+      sink = new GooglePubSubSink(
+        maxBytes,
+        publisher,
+        googlePubSubConfig.googleProjectId,
+        topicName,
+        googlePubSubConfig.retryInterval
+      )
+      _ = sink.checkPubsubHealth(customProviders, googlePubSubConfig.startupCheckInterval)
     } yield sink
 
   private val UserAgent = s"snowplow/stream-collector-${generated.BuildInfo.version}"

@@ -26,11 +26,12 @@ import com.amazonaws.services.kinesis.model.{GetRecordsRequest, Record}
 
 import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
 
+import com.snowplowanalytics.snowplow.badrows.BadRow
+
 import com.snowplowanalytics.snowplow.collectors.scalastream.it.CollectorOutput
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.utils._
 
 import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers.Localstack
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.utils._
-import com.snowplowanalytics.snowplow.badrows.BadRow
 
 object Kinesis {
 

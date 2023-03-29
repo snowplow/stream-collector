@@ -63,7 +63,7 @@ class CustomPathsSpec extends Specification with Localstack with CatsIO {
         testName,
         streamGood,
         streamBad,
-        Some(config)
+        additionalConfig = Some(config)
       ).use { collector =>
         val requests = originalPaths.map { p =>
           val uri = Uri.unsafeFromString(s"http://${collector.host}:${collector.port}$p")

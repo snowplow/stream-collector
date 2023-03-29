@@ -351,7 +351,7 @@ class KinesisSink private (
   }
 
   private def checkKinesisHealth(): Unit = {
-    val healthThread = new Runnable {
+    val healthRunnable = new Runnable {
       override def run() {
         while (!kinesisHealthy) {
           Try {
@@ -373,11 +373,11 @@ class KinesisSink private (
         }
       }
     }
-    executorService.execute(healthThread)
+    executorService.execute(healthRunnable)
   }
 
   private def checkSqsHealth(): Unit = maybeSqs.foreach { sqs =>
-    val healthThread = new Runnable {
+    val healthRunnable = new Runnable {
       override def run() {
         while (!sqsHealthy) {
           Try {
@@ -393,7 +393,7 @@ class KinesisSink private (
         }
       }
     }
-    executorService.execute(healthThread)
+    executorService.execute(healthRunnable)
   }
 }
 

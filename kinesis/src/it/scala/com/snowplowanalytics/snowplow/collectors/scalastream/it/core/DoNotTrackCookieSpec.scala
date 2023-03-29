@@ -47,7 +47,7 @@ class DoNotTrackCookieSpec extends Specification with Localstack with CatsIO {
         testName,
         streamGood,
         streamBad,
-        Some(mkConfig(true, cookieName, cookieValue))
+        additionalConfig = Some(mkConfig(true, cookieName, cookieValue))
       ).use { collector =>
         val requests = List(
           EventGenerator.mkTp2Event(collector.host, collector.port).addCookie(cookieName, cookieName),
@@ -80,7 +80,7 @@ class DoNotTrackCookieSpec extends Specification with Localstack with CatsIO {
         testName,
         streamGood,
         streamBad,
-        Some(mkConfig(false, cookieName, cookieValue))
+        additionalConfig = Some(mkConfig(false, cookieName, cookieValue))
       ).use { collector =>
         val request = EventGenerator.mkTp2Event(collector.host, collector.port).addCookie(cookieName, cookieValue)
 

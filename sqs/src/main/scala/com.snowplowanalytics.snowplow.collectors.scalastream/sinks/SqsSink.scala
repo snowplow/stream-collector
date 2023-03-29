@@ -246,7 +246,7 @@ class SqsSink private (
   }
 
   private def checkSqsHealth(): Unit = {
-    val healthThread = new Runnable {
+    val healthRunnable = new Runnable {
       override def run() {
         while (!sqsHealthy) {
           Try {
@@ -262,7 +262,7 @@ class SqsSink private (
         }
       }
     }
-    executorService.execute(healthThread)
+    executorService.execute(healthRunnable)
   }
 }
 
