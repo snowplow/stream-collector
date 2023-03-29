@@ -138,7 +138,8 @@ package model {
     maxBytes: Int,
     googleProjectId: String,
     backoffPolicy: GooglePubSubBackoffPolicyConfig,
-    startupCheckInterval: FiniteDuration
+    startupCheckInterval: FiniteDuration,
+    retryInterval: FiniteDuration
   ) extends SinkConfig
   final case class Kafka(
     maxBytes: Int,

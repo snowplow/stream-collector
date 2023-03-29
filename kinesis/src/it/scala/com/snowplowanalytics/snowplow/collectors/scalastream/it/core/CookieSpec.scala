@@ -51,7 +51,7 @@ class CookieSpec extends Specification with Localstack with CatsIO {
           testName,
           streamGood,
           streamBad,
-          Some(
+          additionalConfig = Some(
             mkConfig(
               name = name,
               expiration = expiration,
@@ -98,7 +98,7 @@ class CookieSpec extends Specification with Localstack with CatsIO {
           testName,
           streamGood,
           streamBad,
-          Some(
+          additionalConfig = Some(
             mkConfig(
               secure = secure,
               httpOnly = httpOnly
@@ -131,7 +131,7 @@ class CookieSpec extends Specification with Localstack with CatsIO {
         testName,
         streamGood,
         streamBad,
-        Some(mkConfig())
+        additionalConfig = Some(mkConfig())
       ).use { collector =>
         val request = EventGenerator.mkTp2Event(collector.host, collector.port)
           .withHeaders(Header("SP-Anonymous", "*"))
@@ -154,7 +154,7 @@ class CookieSpec extends Specification with Localstack with CatsIO {
         testName,
         streamGood,
         streamBad,
-        Some(mkConfig())
+        additionalConfig = Some(mkConfig())
       ).use { collector =>
         val request = EventGenerator.mkTp2Event(collector.host, collector.port)
           .withHeaders(Header("Origin", "http://my.domain"))
@@ -181,7 +181,7 @@ class CookieSpec extends Specification with Localstack with CatsIO {
         testName,
         streamGood,
         streamBad,
-        Some(mkConfig(
+        additionalConfig = Some(mkConfig(
           domains = Some(List(domain, subDomain)),
           fallbackDomain = Some(fallbackDomain)
         ))
@@ -214,7 +214,7 @@ class CookieSpec extends Specification with Localstack with CatsIO {
         testName,
         streamGood,
         streamBad,
-        Some(mkConfig(
+        additionalConfig = Some(mkConfig(
           domains = Some(List(domain)),
           fallbackDomain = Some(fallbackDomain)
         ))

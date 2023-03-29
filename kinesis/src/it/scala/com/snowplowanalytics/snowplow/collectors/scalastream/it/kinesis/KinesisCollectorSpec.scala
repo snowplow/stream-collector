@@ -20,12 +20,14 @@ import cats.effect.IO
 
 import cats.effect.testing.specs2.CatsIO
 
+import org.http4s.{Request, Method, Uri, Status}
+
 import org.specs2.mutable.Specification
 
 import org.testcontainers.containers.GenericContainer
 
 import com.snowplowanalytics.snowplow.collectors.scalastream.it.utils._
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.EventGenerator
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.{EventGenerator, Http}
 
 import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers._
 
@@ -98,6 +100,46 @@ class KinesisCollectorSpec extends Specification with Localstack with CatsIO {
         } yield {
           container.isRunning() must beFalse
           container.getLogs() must contain("Server terminated")
+        }
+      }
+    }
+
+    "start with /sink-health unhealthy and insert pending events when streams become available" in {
+      val testName = "sink-health"
+      val nbGood = 10
+      val nbBad = 10
+      val streamGood = s"${testName}-raw"
+      val streamBad = s"${testName}-bad-1"
+
+      Collector.container(
+        "kinesis/src/it/resources/collector.hocon",
+        testName,
+        streamGood,
+        streamBad,
+        createStreams = false
+      ).use { collector =>
+        val uri = Uri.unsafeFromString(s"http://${collector.host}:${collector.port}/sink-health")
+        val request = Request[IO](Method.GET, uri)
+
+        for {
+          statusBeforeCreate <- Http.status(request)
+          _ <- EventGenerator.sendEvents(
+            collector.host,
+            collector.port,
+            nbGood,
+            nbBad,
+            Collector.maxBytes
+          )
+          _ <- Localstack.createStreams(List(streamGood, streamBad))
+          _ <- IO.sleep(10.second)
+          statusAfterCreate <- Http.status(request)
+          collectorOutput <- Kinesis.readOutput(streamGood, streamBad)
+          _ <- printBadRows(testName, collectorOutput.bad)
+        } yield {
+          statusBeforeCreate should beEqualTo(Status.ServiceUnavailable)
+          statusAfterCreate should beEqualTo(Status.Ok)
+          collectorOutput.good.size should beEqualTo(nbGood)
+          collectorOutput.bad.size should beEqualTo(nbBad)
         }
       }
     }

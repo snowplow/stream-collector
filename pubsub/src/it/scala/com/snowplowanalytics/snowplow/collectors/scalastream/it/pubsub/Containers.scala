@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2022 Snowplow Analytics Ltd. All rights reserved.
+ * Copyright (c) 2022-2023 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0, and
  * you may not use this file except in compliance with the Apache License
@@ -16,7 +16,7 @@ package com.snowplowanalytics.snowplow.collectors.scalastream.it.pubsub
 
 import scala.concurrent.ExecutionContext
 
-import org.testcontainers.containers.{BindMode, GenericContainer => JGenericContainer, Network}
+import org.testcontainers.containers.{BindMode, Network}
 import org.testcontainers.containers.wait.strategy.Wait
 
 import com.dimafeng.testcontainers.GenericContainer
@@ -26,6 +26,7 @@ import cats.effect.{IO, Resource, Timer}
 import com.snowplowanalytics.snowplow.collectors.scalastream.generated.ProjectMetadata
 
 import com.snowplowanalytics.snowplow.collectors.scalastream.it.utils._
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.CollectorContainer
 
 object Containers {
 
@@ -66,11 +67,22 @@ object Containers {
   def collector(
     configPath: String,
     testName: String,
+    topicGood: String,
+    topicBad: String,
+    createTopics: Boolean = true,
     envs: Map[String, String] = Map.empty[String, String]
-  ): Resource[IO, JGenericContainer[_]] = {
+  ): Resource[IO, CollectorContainer] = {
     val container = GenericContainer(
       dockerImage = s"snowplow/scala-stream-collector-pubsub:${ProjectMetadata.dockerTag}",
-      env = Map("PUBSUB_EMULATOR_HOST" -> s"pubsub-emulator:$emulatorPort") ++ envs,
+      env = Map(
+        "PUBSUB_EMULATOR_HOST" -> s"pubsub-emulator:$emulatorPort",
+        "PORT" -> collectorPort.toString,
+        "TOPIC_GOOD" -> topicGood,
+        "TOPIC_BAD" -> topicBad,
+        "GOOGLE_PROJECT_ID" -> projectId,
+        "MAX_BYTES" -> Integer.MAX_VALUE.toString,
+        "JDK_JAVA_OPTIONS" -> "-Dorg.slf4j.simpleLogger.log.com.snowplowanalytics.snowplow.collectors.scalastream.sinks.GooglePubSubSink=warn"
+      ) ++ envs,
       exposedPorts = Seq(collectorPort),
       fileSystemBind = Seq(
         GenericContainer.FileSystemBind(
@@ -86,22 +98,28 @@ object Containers {
       ,waitStrategy = Wait.forLogMessage(s".*REST interface bound to.*", 1)
     )
     container.container.withNetwork(network)
+
+    val create =
+      if(createTopics)
+        PubSub.createTopicsAndSubscriptions(
+          projectId,
+          emulatorHost,
+          emulatorHostPort,
+          List(topicGood, topicBad)
+        )
+      else
+        IO.unit
+
     Resource.make (
-      IO(startContainerWithLogs(container.container, testName))
+      create *>
+        IO(startContainerWithLogs(container.container, testName))
+          .map(c => CollectorContainer(c, c.getHost, c.getMappedPort(collectorPort)))
     )(
-      e => IO(e.stop())
+      c => IO(c.container.stop())
     )
   }
 
-  def startEmulator(): Unit = {
-    pubSubEmulator.start()
-    PubSub.createTopicsAndSubscriptions(
-      projectId,
-      emulatorHost,
-      emulatorHostPort,
-      List(topicGood, topicBad)
-    )
-  }
+  def startEmulator(): Unit = pubSubEmulator.start()
 
   def stopEmulator(): Unit = pubSubEmulator.stop()
 }

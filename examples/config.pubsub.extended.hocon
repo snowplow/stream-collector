@@ -202,10 +202,15 @@ collector {
       # Default: 10 MB
       maxBytes = 10000000
 
-      # When collector starts, it checks if PubSub topics exist with listTopics.
+      # Optional. When collector starts, it checks if PubSub topics exist with listTopics.
       # This is the interval for the calls.
       # /sink-health is made healthy as soon as requests are successful or records are successfully inserted.
       startupCheckInterval = 1 second
+
+      # Optional. Collector uses built-in retry mechanism of PubSub API.
+      # In case of failure of these retries, the events are added to a buffer
+      # and every retryInterval collector retries to send them.
+      retryInterval = 10 seconds
     }
 
 

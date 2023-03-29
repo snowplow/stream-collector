@@ -119,7 +119,8 @@ abstract class ConfigSpec extends Specification {
           maxRpcTimeout        = 10000,
           rpcTimeoutMultiplier = 2
         ),
-        startupCheckInterval = 1.second
+        startupCheckInterval = 1.second,
+        retryInterval        = 10.seconds
       )
     case "sqs" =>
       Sqs(
