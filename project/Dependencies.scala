@@ -37,6 +37,7 @@ object Dependencies {
     val jackson      = "2.12.7" // force this version to mitigate security vulnerabilities
     val thrift       = "0.15.0" // force this version to mitigate security vulnerabilities
     val jnrUnixsock  = "0.38.17" // force this version to mitigate security vulnerabilities
+    val protobuf     = "3.21.7" // force this version to mitigate security vulnerabilities
     // Scala
     val collectorPayload = "0.0.0"
     val tracker          = "1.0.0"
@@ -72,6 +73,7 @@ object Dependencies {
     val config         = "com.typesafe"                     % "config"                  % V.config
     val jnrUnixsocket  = "com.github.jnr"                   % "jnr-unixsocket"          % V.jnrUnixsock
     val rabbitMQ       = "com.rabbitmq"                     % "amqp-client"             % V.rabbitMQ
+    val protobuf       = "com.google.protobuf"              % "protobuf-java"           % V.protobuf
 
     // Scala
     val collectorPayload = "com.snowplowanalytics" % "collector-payload-1"                % V.collectorPayload
