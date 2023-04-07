@@ -177,6 +177,7 @@ lazy val pubsubSettings =
     Docker / packageName := "scala-stream-collector-pubsub",
     libraryDependencies ++= Seq(
       Dependencies.Libraries.pubsub,
+      Dependencies.Libraries.protobuf,
       // integration tests dependencies
       Dependencies.Libraries.specs2It,
       Dependencies.Libraries.specs2CEIt,
