@@ -31,6 +31,7 @@ object TestUtils {
       cookie = CookieConfig(
         true,
         "sp",
+        None,
         365.days,
         None,
         None,

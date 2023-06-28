@@ -45,6 +45,7 @@ abstract class ConfigSpec extends Specification {
       enabled        = true,
       expiration     = 365.days,
       name           = "sp",
+      oldName        = None,
       domains        = None,
       fallbackDomain = None,
       secure         = true,

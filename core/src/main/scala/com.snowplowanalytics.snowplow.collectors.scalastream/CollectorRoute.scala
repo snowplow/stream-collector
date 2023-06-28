@@ -51,19 +51,40 @@ trait CollectorRoute {
   def routes: Route =
     doNotTrack(collectorService.doNotTrackCookie) { dnt =>
       cookieIfWanted(collectorService.cookieName) { reqCookie =>
-        val cookie = reqCookie.map(_.toCookie)
-        headers { (userAgent, refererURI, rawRequestURI, spAnonymous) =>
-          val qs = queryString(rawRequestURI)
-          extractors(spAnonymous) { (host, ip, request) =>
-            // get the adapter vendor and version from the path
-            path(Segment / Segment) { (vendor, version) =>
-              val path = collectorService.determinePath(vendor, version)
-              post {
-                extractContentType { ct =>
-                  entity(as[String]) { body =>
+        cookieIfWanted(collectorService.oldCookieName) { oldReqCookie =>
+          val cookie = reqCookie.map(_.toCookie).orElse(oldReqCookie.map((_.toCookie)))
+          headers { (userAgent, refererURI, rawRequestURI, spAnonymous) =>
+            val qs = queryString(rawRequestURI)
+            extractors(spAnonymous) { (host, ip, request) =>
+              // get the adapter vendor and version from the path
+              path(Segment / Segment) { (vendor, version) =>
+                val path = collectorService.determinePath(vendor, version)
+                post {
+                  extractContentType { ct =>
+                    entity(as[String]) { body =>
+                      val r = collectorService.cookie(
+                        qs,
+                        Some(body),
+                        path,
+                        cookie,
+                        userAgent,
+                        refererURI,
+                        host,
+                        ip,
+                        request,
+                        pixelExpected = false,
+                        doNotTrack    = dnt,
+                        Some(ct),
+                        spAnonymous
+                      )
+                      complete(r)
+                    }
+                  }
+                } ~
+                  (get | head) {
                     val r = collectorService.cookie(
                       qs,
-                      Some(body),
+                      None,
                       path,
                       cookie,
                       userAgent,
@@ -71,55 +92,37 @@ trait CollectorRoute {
                       host,
                       ip,
                       request,
-                      pixelExpected = false,
+                      pixelExpected = true,
                       doNotTrack    = dnt,
-                      Some(ct),
+                      None,
+                      spAnonymous
+                    )
+                    complete(r)
+                  }
+              } ~
+                path("""ice\.png""".r | "i".r) { path =>
+                  (get | head) {
+                    val r = collectorService.cookie(
+                      qs,
+                      None,
+                      "/" + path,
+                      cookie,
+                      userAgent,
+                      refererURI,
+                      host,
+                      ip,
+                      request,
+                      pixelExpected = true,
+                      doNotTrack    = dnt,
+                      None,
                       spAnonymous
                     )
                     complete(r)
                   }
                 }
-              } ~
-                (get | head) {
-                  val r = collectorService.cookie(
-                    qs,
-                    None,
-                    path,
-                    cookie,
-                    userAgent,
-                    refererURI,
-                    host,
-                    ip,
-                    request,
-                    pixelExpected = true,
-                    doNotTrack    = dnt,
-                    None,
-                    spAnonymous
-                  )
-                  complete(r)
-                }
-            } ~
-              path("""ice\.png""".r | "i".r) { path =>
-                (get | head) {
-                  val r = collectorService.cookie(
-                    qs,
-                    None,
-                    "/" + path,
-                    cookie,
-                    userAgent,
-                    refererURI,
-                    host,
-                    ip,
-                    request,
-                    pixelExpected = true,
-                    doNotTrack    = dnt,
-                    None,
-                    spAnonymous
-                  )
-                  complete(r)
-                }
-              }
+            }
           }
+
         }
       }
     } ~ corsRoute ~ healthRoute ~ sinkHealthRoute ~ crossDomainRoute ~ rootRoute ~ robotsRoute ~ {

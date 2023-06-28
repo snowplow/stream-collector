@@ -49,6 +49,7 @@ class CollectorRouteSpec extends Specification with Specs2RouteTest {
           spAnonymous: Option[String]      = spAnonymous
         ): HttpResponse                                            = HttpResponse(200, entity = s"cookie")
         def cookieName: Option[String]                             = Some("name")
+        def oldCookieName: Option[String]                          = None
         def doNotTrackCookie: Option[DntCookieMatcher]             = None
         def determinePath(vendor: String, version: String): String = "/p1/p2"
         def enableDefaultRedirect: Boolean                         = withRedirects

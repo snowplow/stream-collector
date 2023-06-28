@@ -58,6 +58,7 @@ trait Service {
     spAnonymous: Option[String]      = None
   ): HttpResponse
   def cookieName: Option[String]
+  def oldCookieName: Option[String]
   def doNotTrackCookie: Option[DntCookieMatcher]
   def determinePath(vendor: String, version: String): String
   def enableDefaultRedirect: Boolean
@@ -83,6 +84,7 @@ class CollectorService(
     config.streams.sink.getClass.getSimpleName.toLowerCase
 
   override val cookieName            = config.cookieName
+  override val oldCookieName         = config.oldCookieName
   override val doNotTrackCookie      = config.doNotTrackHttpCookie
   override val enableDefaultRedirect = config.enableDefaultRedirect
   override def sinksHealthy          = sinks.good.isHealthy && sinks.bad.isHealthy
