@@ -92,10 +92,16 @@ object Dependencies {
     val specs2It          = "org.specs2"        %% "specs2-core"                   % V.specs2         % IntegrationTest
     val specs2CEIt        = "com.codecommit"    %% "cats-effect-testing-specs2"    % V.specs2CE       % IntegrationTest
     val testcontainersIt  = "com.dimafeng"      %% "testcontainers-scala-core"     % V.testcontainers % IntegrationTest
+    val catsRetry         = "com.github.cb372"  %% "cats-retry"                    % V.catsRetry      % Test 
     val catsRetryIt       = "com.github.cb372"  %% "cats-retry"                    % V.catsRetry      % IntegrationTest
+    val http4sClient      = "org.http4s"        %% "http4s-blaze-client"           % V.http4s         % Test 
     val http4sClientIt    = "org.http4s"        %% "http4s-blaze-client"           % V.http4s         % IntegrationTest
     val akkaTestkit       = "com.typesafe.akka" %% "akka-testkit"                  % V.akka           % Test
     val akkaHttpTestkit   = "com.typesafe.akka" %% "akka-http-testkit"             % V.akkaHttp       % Test
     val akkaStreamTestkit = "com.typesafe.akka" %% "akka-stream-testkit"           % V.akka           % Test
+    val doobie            = "org.tpolecat"      %% "doobie-core"                   % "0.13.4"         % Test
+    val snowflakeJdbc     = "net.snowflake"      % "snowflake-jdbc"                % "3.13.30"        % Test
+    val http4sCirce       = "org.http4s"        %% "http4s-circe"                  % V.http4s         % Test
+    val circeLiteral      = "io.circe"          %% "circe-literal"                 % "0.14.1"         % Test
   }
 }

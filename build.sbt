@@ -42,8 +42,14 @@ lazy val commonDependencies = Seq(
   Dependencies.Libraries.specs2,
   // Integration tests
   Dependencies.Libraries.testcontainersIt,
+  Dependencies.Libraries.http4sClient,
   Dependencies.Libraries.http4sClientIt,
-  Dependencies.Libraries.catsRetryIt
+  Dependencies.Libraries.catsRetry,
+  Dependencies.Libraries.catsRetryIt,
+  Dependencies.Libraries.doobie,
+  Dependencies.Libraries.snowflakeJdbc,
+  Dependencies.Libraries.http4sCirce,
+  Dependencies.Libraries.circeLiteral
 )
 
 lazy val commonExclusions = Seq(
