@@ -14,27 +14,10 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
-import com.snowplowanalytics.snowplow.collectors.scalastream.generated.BuildInfo
-import com.snowplowanalytics.snowplow.collectors.scalastream.model._
-import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.StdoutSink
-import com.snowplowanalytics.snowplow.collectors.scalastream.telemetry.TelemetryAkkaService
+import cats.effect.{ExitCode, IO, IOApp}
 
-object StdoutCollector extends Collector {
+object StdoutCollector extends IOApp {
 
-  def appName      = BuildInfo.shortName
-  def appVersion   = BuildInfo.version
-  def scalaVersion = BuildInfo.scalaVersion
-
-  def main(args: Array[String]): Unit = {
-    val (collectorConf, akkaConf) = parseConfig(args)
-    val telemetry                 = TelemetryAkkaService.initWithCollector(collectorConf, BuildInfo.moduleName, appVersion)
-    val sinks = {
-      val (good, bad) = collectorConf.streams.sink match {
-        case s: Stdout => (new StdoutSink(s.maxBytes, "out"), new StdoutSink(s.maxBytes, "err"))
-        case _         => throw new IllegalArgumentException("Configured sink is not stdout")
-      }
-      CollectorSinks(good, bad)
-    }
-    run(collectorConf, akkaConf, sinks, telemetry)
-  }
+  def run(args: List[String]): IO[ExitCode] =
+    CollectorApp.run()
 }

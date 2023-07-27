@@ -87,6 +87,11 @@ object Dependencies {
     val pureconfig       = "com.github.pureconfig" %% "pureconfig"                        % V.pureconfig
     val akkaHttpMetrics  = "fr.davit"              %% "akka-http-metrics-datadog"         % V.akkaHttpMetrics
 
+    
+    //http4s
+    val http4sDsl = "org.http4s" %% "http4s-dsl" % "0.23.23"
+    val http4sServer = "org.http4s" %% "http4s-ember-server" % "0.23.23"
+    
     // Scala (test only)
     val specs2            = "org.specs2"        %% "specs2-core"                   % V.specs2         % Test
     val specs2It          = "org.specs2"        %% "specs2-core"                   % V.specs2         % IntegrationTest
