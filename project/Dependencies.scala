@@ -52,7 +52,8 @@ object Dependencies {
     val specs2CE       = "0.4.1"
     val testcontainers = "0.40.10"
     val catsRetry      = "2.1.0"
-    val http4s         = "0.21.33"
+    val http4s         = "0.23.23"
+    val http4sIT       = "0.21.33"
   }
 
   object Libraries {
@@ -87,13 +88,18 @@ object Dependencies {
     val pureconfig       = "com.github.pureconfig" %% "pureconfig"                        % V.pureconfig
     val akkaHttpMetrics  = "fr.davit"              %% "akka-http-metrics-datadog"         % V.akkaHttpMetrics
 
+    
+    //http4s
+    val http4sDsl    = "org.http4s" %% "http4s-dsl"          % V.http4s 
+    val http4sServer = "org.http4s" %% "http4s-ember-server" % V.http4s 
+    
     // Scala (test only)
     val specs2            = "org.specs2"        %% "specs2-core"                   % V.specs2         % Test
     val specs2It          = "org.specs2"        %% "specs2-core"                   % V.specs2         % IntegrationTest
     val specs2CEIt        = "com.codecommit"    %% "cats-effect-testing-specs2"    % V.specs2CE       % IntegrationTest
     val testcontainersIt  = "com.dimafeng"      %% "testcontainers-scala-core"     % V.testcontainers % IntegrationTest
     val catsRetryIt       = "com.github.cb372"  %% "cats-retry"                    % V.catsRetry      % IntegrationTest
-    val http4sClientIt    = "org.http4s"        %% "http4s-blaze-client"           % V.http4s         % IntegrationTest
+    val http4sClientIt    = "org.http4s"        %% "http4s-blaze-client"           % V.http4sIT       % IntegrationTest
     val akkaTestkit       = "com.typesafe.akka" %% "akka-testkit"                  % V.akka           % Test
     val akkaHttpTestkit   = "com.typesafe.akka" %% "akka-http-testkit"             % V.akkaHttp       % Test
     val akkaStreamTestkit = "com.typesafe.akka" %% "akka-stream-testkit"           % V.akka           % Test
