@@ -90,6 +90,7 @@ lazy val buildSettings = Seq(
   name := "snowplow-stream-collector",
   description := "Scala Stream Collector for Snowplow raw events",
   scalaVersion := "2.12.10",
+  scalacOptions ++= Seq("-Ypartial-unification"),
   javacOptions := Seq("-source", "11", "-target", "11"),
   resolvers ++= Dependencies.resolutionRepos
 )
@@ -109,7 +110,7 @@ lazy val allSettings = buildSettings ++
 lazy val root = project
   .in(file("."))
   .settings(buildSettings ++ dynVerSettings)
-  .aggregate(core, kinesis, pubsub, kafka, nsq, stdout, sqs, rabbitmq)
+  .aggregate(core, kinesis, pubsub, kafka, nsq, stdout, sqs, rabbitmq, http4s)
 
 lazy val core = project
   .settings(moduleName := "snowplow-stream-collector-core")
@@ -118,6 +119,17 @@ lazy val core = project
   .settings(excludeDependencies ++= commonExclusions)
   .settings(Defaults.itSettings)
   .configs(IntegrationTest)
+
+lazy val http4s = project
+  .settings(moduleName := "snowplow-stream-collector-http4s-core")
+  .settings(buildSettings ++ BuildSettings.sbtAssemblySettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      Dependencies.Libraries.http4sDsl,
+      Dependencies.Libraries.http4sServer,
+      Dependencies.Libraries.specs2
+    )
+  )
 
 lazy val kinesisSettings =
   allSettings ++ buildInfoSettings ++ Defaults.itSettings ++ scalifiedSettings ++ Seq(
@@ -251,14 +263,14 @@ lazy val stdoutSettings =
 lazy val stdout = project
   .settings(stdoutSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDockerPlugin, BuildInfoPlugin)
-  .dependsOn(core % "test->test;compile->compile")
+  .dependsOn(http4s % "test->test;compile->compile")
 
 lazy val stdoutDistroless = project
   .in(file("distroless/stdout"))
   .settings(sourceDirectory := (stdout / sourceDirectory).value)
   .settings(stdoutSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDistrolessDockerPlugin, BuildInfoPlugin)
-  .dependsOn(core % "test->test;compile->compile")
+  .dependsOn(http4s % "test->test;compile->compile")
 
 lazy val rabbitmqSettings =
   allSettings ++ buildInfoSettings ++ Seq(
