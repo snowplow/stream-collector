@@ -1,16 +1,12 @@
-/*
- * Copyright (c) 2013-2022 Snowplow Analytics Ltd. All rights reserved.
+/**
+ * Copyright (c) 2013-present Snowplow Analytics Ltd.
+ * All rights reserved.
  *
- * This program is licensed to you under the Apache License Version 2.0, and
- * you may not use this file except in compliance with the Apache License
- * Version 2.0.  You may obtain a copy of the Apache License Version 2.0 at
- * http://www.apache.org/licenses/LICENSE-2.0.
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the Apache License Version 2.0 is distributed on an "AS
- * IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
- * implied.  See the Apache License Version 2.0 for the specific language
- * governing permissions and limitations there under.
+ * This software is made available by Snowplow Analytics, Ltd.,
+ * under the terms of the Snowplow Limited Use License Agreement, Version 1.0
+ * located at https://docs.snowplow.io/limited-use-license-1.0
+ * BY INSTALLING, DOWNLOADING, ACCESSING, USING OR DISTRIBUTING ANY PORTION
+ * OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
  */
 import com.typesafe.sbt.packager.docker._
 import sbtbuildinfo.BuildInfoPlugin.autoImport.buildInfoPackage
@@ -90,6 +86,7 @@ lazy val buildSettings = Seq(
   name := "snowplow-stream-collector",
   description := "Scala Stream Collector for Snowplow raw events",
   scalaVersion := "2.12.10",
+  scalacOptions ++= Seq("-Ypartial-unification"),
   javacOptions := Seq("-source", "11", "-target", "11"),
   resolvers ++= Dependencies.resolutionRepos
 )
@@ -109,7 +106,7 @@ lazy val allSettings = buildSettings ++
 lazy val root = project
   .in(file("."))
   .settings(buildSettings ++ dynVerSettings)
-  .aggregate(core, kinesis, pubsub, kafka, nsq, stdout, sqs, rabbitmq)
+  .aggregate(core, kinesis, pubsub, kafka, nsq, stdout, sqs, rabbitmq, http4s)
 
 lazy val core = project
   .settings(moduleName := "snowplow-stream-collector-core")
@@ -118,6 +115,21 @@ lazy val core = project
   .settings(excludeDependencies ++= commonExclusions)
   .settings(Defaults.itSettings)
   .configs(IntegrationTest)
+
+lazy val http4s = project
+  .settings(moduleName := "snowplow-stream-collector-http4s-core")
+  .settings(buildSettings ++ BuildSettings.sbtAssemblySettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      Dependencies.Libraries.http4sDsl,
+      Dependencies.Libraries.http4sEmber,
+      Dependencies.Libraries.http4sBlaze,
+      Dependencies.Libraries.http4sNetty,
+      Dependencies.Libraries.log4cats,
+      Dependencies.Libraries.slf4j,
+      Dependencies.Libraries.specs2
+    )
+  )
 
 lazy val kinesisSettings =
   allSettings ++ buildInfoSettings ++ Defaults.itSettings ++ scalifiedSettings ++ Seq(
@@ -251,14 +263,14 @@ lazy val stdoutSettings =
 lazy val stdout = project
   .settings(stdoutSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDockerPlugin, BuildInfoPlugin)
-  .dependsOn(core % "test->test;compile->compile")
+  .dependsOn(http4s % "test->test;compile->compile")
 
 lazy val stdoutDistroless = project
   .in(file("distroless/stdout"))
   .settings(sourceDirectory := (stdout / sourceDirectory).value)
   .settings(stdoutSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDistrolessDockerPlugin, BuildInfoPlugin)
-  .dependsOn(core % "test->test;compile->compile")
+  .dependsOn(http4s % "test->test;compile->compile")
 
 lazy val rabbitmqSettings =
   allSettings ++ buildInfoSettings ++ Seq(
