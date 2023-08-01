@@ -47,12 +47,15 @@ object Dependencies {
     val pureconfig       = "0.17.2"
     val akkaHttpMetrics  = "1.7.1"
     val badRows          = "2.1.1"
+    val log4cats         = "2.6.0"
     // Scala (test only)
     val specs2         = "4.11.0"
     val specs2CE       = "0.4.1"
     val testcontainers = "0.40.10"
     val catsRetry      = "2.1.0"
     val http4s         = "0.23.23"
+    val blaze          = "0.23.15"
+    val http4sNetty    = "0.5.9"
     val http4sIT       = "0.21.33"
   }
 
@@ -87,11 +90,14 @@ object Dependencies {
     val akkaSlf4j        = "com.typesafe.akka"     %% "akka-slf4j"                        % V.akka
     val pureconfig       = "com.github.pureconfig" %% "pureconfig"                        % V.pureconfig
     val akkaHttpMetrics  = "fr.davit"              %% "akka-http-metrics-datadog"         % V.akkaHttpMetrics
+    val log4cats         = "org.typelevel"         %% "log4cats-slf4j"                    % V.log4cats
 
     
     //http4s
     val http4sDsl    = "org.http4s" %% "http4s-dsl"          % V.http4s 
-    val http4sServer = "org.http4s" %% "http4s-ember-server" % V.http4s 
+    val http4sEmber  = "org.http4s" %% "http4s-ember-server" % V.http4s 
+    val http4sBlaze  = "org.http4s" %% "http4s-blaze-server" % V.blaze
+    val http4sNetty  = "org.http4s" %% "http4s-netty-server" % V.http4sNetty
     
     // Scala (test only)
     val specs2            = "org.specs2"        %% "specs2-core"                   % V.specs2         % Test

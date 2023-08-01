@@ -126,7 +126,11 @@ lazy val http4s = project
   .settings(
     libraryDependencies ++= Seq(
       Dependencies.Libraries.http4sDsl,
-      Dependencies.Libraries.http4sServer,
+      Dependencies.Libraries.http4sEmber,
+      Dependencies.Libraries.http4sBlaze,
+      Dependencies.Libraries.http4sNetty,
+      Dependencies.Libraries.log4cats,
+      Dependencies.Libraries.slf4j,
       Dependencies.Libraries.specs2
     )
   )
