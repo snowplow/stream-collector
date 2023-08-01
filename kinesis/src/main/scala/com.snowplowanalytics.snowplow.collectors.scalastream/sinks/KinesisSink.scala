@@ -213,16 +213,26 @@ class KinesisSink private (
       )
       scheduleRetryToKinesis(failedRecords, nextBackoff, retriesLeft - 1)
     } else {
-      kinesisHealthy = false
       log.error(s"Maximum number of retries reached for Kinesis stream $streamName for ${failedRecords.size} records")
       maybeSqs match {
         case Some(sqs) =>
           log.error(
             s"SQS buffer ${sqs.sqsBufferName} defined for stream $streamName. Retrying to send the events to SQS"
           )
+          // If Kinesis was already unhealthy, the background check is already running.
+          // It can happen when the collector switches back and forth between Kinesis and SQS.
+          if (kinesisHealthy) {
+            this.synchronized {
+              if (kinesisHealthy) {
+                kinesisHealthy = false
+                checkKinesisHealth()
+              }
+            }
+          }
           writeBatchToSqsWithRetries(failedRecords, sqs, minBackoff, maxRetries)
         case None =>
           log.error(s"No SQS buffer defined for stream $streamName. Retrying to send the events to Kinesis")
+          kinesisHealthy = false
           writeBatchToKinesisWithRetries(failedRecords, maxBackoff, maxRetries)
       }
     }
@@ -234,7 +244,16 @@ class KinesisSink private (
       )
       scheduleRetryToSqs(failedRecords, sqs, nextBackoff, retriesLeft - 1)
     } else {
-      sqsHealthy = false
+      // If SQS was already unhealthy, the background check is already running.
+      // It can happen when the collector switches back and forth between Kinesis and SQS.
+      if (sqsHealthy) {
+        this.synchronized {
+          if (sqsHealthy) {
+            sqsHealthy = false
+            checkSqsHealth()
+          }
+        }
+      }
       log.error(
         s"Maximum number of retries reached for SQS buffer ${sqs.sqsBufferName} for ${failedRecords.size} records. Retrying in Kinesis"
       )
@@ -353,6 +372,7 @@ class KinesisSink private (
   private def checkKinesisHealth(): Unit = {
     val healthRunnable = new Runnable {
       override def run() {
+        log.info(s"Starting background check for Kinesis stream $streamName")
         while (!kinesisHealthy) {
           Try {
             val describeRequest = new DescribeStreamSummaryRequest()
@@ -379,6 +399,7 @@ class KinesisSink private (
   private def checkSqsHealth(): Unit = maybeSqs.foreach { sqs =>
     val healthRunnable = new Runnable {
       override def run() {
+        log.info(s"Starting background check for SQS buffer ${sqs.sqsBufferName}")
         while (!sqsHealthy) {
           Try {
             sqs.sqsClient.getQueueUrl(sqs.sqsBufferName)
