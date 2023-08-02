@@ -62,7 +62,7 @@ class GooglePubSubSink private (
 
   override def storeRawEvents(events: List[Array[Byte]], key: String): Unit =
     if (events.nonEmpty) {
-      log.info(s"Writing ${events.size} records to PubSub topic $topicName")
+      log.debug(s"Writing ${events.size} records to PubSub topic $topicName")
 
       events.foreach { event =>
         publisher.asRight.map { p =>
