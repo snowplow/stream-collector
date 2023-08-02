@@ -11,7 +11,8 @@ class CollectorRoutesSpec extends Specification {
   "Health endpoint" should {
     "return OK always because collector always works" in {
       val request  = Request[IO](method = Method.GET, uri = uri"/health")
-      val response = new CollectorRoutes[IO].value.run(request).unsafeRunSync()
+      val routes   = new CollectorRoutes[IO](CollectorTestUtils.noopSink, CollectorTestUtils.noopSink)
+      val response = routes.value.run(request).unsafeRunSync()
 
       response.status must beEqualTo(Status.Ok)
       response.as[String].unsafeRunSync() must beEqualTo("OK")
