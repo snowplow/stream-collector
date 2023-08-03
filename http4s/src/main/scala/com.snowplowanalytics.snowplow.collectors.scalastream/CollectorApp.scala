@@ -16,17 +16,27 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import java.net.InetSocketAddress
 import scala.concurrent.duration.{DurationLong, FiniteDuration}
 
+import com.snowplowanalytics.snowplow.collectors.scalastream.model._
+
 object CollectorApp {
 
   implicit private def unsafeLogger[F[_]: Sync]: Logger[F] =
     Slf4jLogger.getLogger[F]
 
-  def run[F[_]: Async](mkGood: Resource[F, Sink[F]], mkBad: Resource[F, Sink[F]]): F[ExitCode] = {
+  def run[F[_]: Async](
+    mkGood: Resource[F, Sink[F]],
+    mkBad: Resource[F, Sink[F]],
+    config: CollectorConfig,
+    appName: String,
+    appVersion: String
+  ): F[ExitCode] = {
     val resources = for {
       bad  <- mkBad
       good <- mkGood
       _ <- withGracefulShutdown(610.seconds) {
-        buildHttpServer[F](new CollectorRoutes[F](good, bad).value)
+        val sinks                                 = CollectorSinks(good, bad)
+        val collectorService: CollectorService[F] = new CollectorService[F](config, sinks, appName, appVersion)
+        buildHttpServer[F](new CollectorRoutes[F](collectorService).value)
       }
     } yield ()
 
