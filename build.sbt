@@ -124,6 +124,9 @@ lazy val http4s = project
       Dependencies.Libraries.http4sBlaze,
       Dependencies.Libraries.http4sNetty,
       Dependencies.Libraries.log4cats,
+      Dependencies.Libraries.thrift,
+      Dependencies.Libraries.badRows,
+      Dependencies.Libraries.collectorPayload,
       Dependencies.Libraries.slf4j,
       Dependencies.Libraries.specs2
     )

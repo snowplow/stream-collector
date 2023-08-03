@@ -15,12 +15,21 @@ import cats.implicits._
 import java.util.Base64
 import java.io.PrintStream
 
+import com.snowplowanalytics.snowplow.collectors.scalastream.model._
+import com.snowplowanalytics.snowplow.collectors.scalastream.generated.BuildInfo
+
 object StdoutCollector extends IOApp {
 
   def run(args: List[String]): IO[ExitCode] = {
     val good = Resource.pure[IO, Sink[IO]](printingSink(System.out))
     val bad  = Resource.pure[IO, Sink[IO]](printingSink(System.err))
-    CollectorApp.run[IO](good, bad)
+    CollectorApp.run[IO](
+      good,
+      bad,
+      CollectorConfig(Map.empty),
+      BuildInfo.shortName,
+      BuildInfo.version
+    )
   }
 
   private def printingSink[F[_]: Sync](stream: PrintStream): Sink[F] = new Sink[F] {
