@@ -8,6 +8,7 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
+import scala.concurrent.duration._
 import cats.effect.kernel.Resource
 import cats.effect.{ExitCode, IO, IOApp}
 import com.snowplowanalytics.snowplow.collectors.scalastream.generated.BuildInfo
@@ -21,7 +22,19 @@ object StdoutCollector extends IOApp {
     CollectorApp.run[IO](
       good,
       bad,
-      CollectorConfig(Map.empty),
+      CollectorConfig(
+        Map.empty,
+        cookie = CookieConfig(
+          enabled        = true,
+          name           = "sp",
+          expiration     = 365.days,
+          domains        = List.empty,
+          fallbackDomain = None,
+          secure         = false,
+          httpOnly       = false,
+          sameSite       = None
+        )
+      ),
       BuildInfo.shortName,
       BuildInfo.version
     )
