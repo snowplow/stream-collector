@@ -1,5 +1,9 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
+import scala.concurrent.duration._
+
+import org.http4s.SameSite
+
 import io.circe.Json
 
 object model {
@@ -27,7 +31,21 @@ object model {
     */
   final case class SplitBatchResult(goodBatches: List[List[Json]], failedBigEvents: List[Json])
 
-  final case class CollectorConfig(
-    paths: Map[String, String]
+  final case class CookieConfig(
+    enabled: Boolean,
+    name: String,
+    expiration: FiniteDuration,
+    domains: List[String],
+    fallbackDomain: Option[String],
+    secure: Boolean,
+    httpOnly: Boolean,
+    sameSite: Option[SameSite]
   )
+
+  final case class CollectorConfig(
+    paths: Map[String, String],
+    cookie: CookieConfig
+  ) {
+    val cookieConfig = if (cookie.enabled) Some(cookie) else None
+  }
 }
