@@ -1,11 +1,15 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
+import scala.concurrent.duration._
 import scala.collection.JavaConverters._
-import cats.effect.IO
+import cats.effect.{Clock, IO}
 import cats.effect.unsafe.implicits.global
+import cats.data.NonEmptyList
 import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
-import org.http4s.{Headers, Method, Request, RequestCookie, Status}
+import org.http4s._
 import org.http4s.headers._
+import org.http4s.implicits._
+import org.typelevel.ci._
 import com.comcast.ip4s.IpAddress
 import org.specs2.mutable.Specification
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
@@ -43,6 +47,26 @@ class CollectorServiceSpec extends Specification {
 
   "The collector service" should {
     "cookie" in {
+      "not set a cookie if SP-Anonymous is present" in {
+        val r = service
+          .cookie(
+            queryString   = Some("nuid=12"),
+            body          = IO.pure(Some("b")),
+            path          = "p",
+            cookie        = None,
+            userAgent     = None,
+            refererUri    = None,
+            hostname      = IO.pure(Some("h")),
+            ip            = None,
+            request       = Request[IO](),
+            pixelExpected = false,
+            doNotTrack    = false,
+            contentType   = None,
+            spAnonymous   = Some("*")
+          )
+          .unsafeRunSync()
+        r.headers.get(ci"Set-Cookie") must beNone
+      }
       "respond with a 200 OK and a good row in good sink" in {
         val ProbeService(service, good, bad) = probeService()
         val headers = Headers(
@@ -226,6 +250,254 @@ class CollectorServiceSpec extends Specification {
         val (ip, pkey) = service.ipAndPartitionKey(None, true)
         ip shouldEqual "unknown"
         pkey must beMatching(uuidRegex)
+      }
+    }
+
+    "cookieHeader" in {
+      val testCookieConfig = CookieConfig(
+        enabled        = true,
+        name           = "name",
+        expiration     = 5.seconds,
+        domains        = List("domain"),
+        fallbackDomain = None,
+        secure         = false,
+        httpOnly       = false,
+        sameSite       = None
+      )
+      val now = Clock[IO].realTime.unsafeRunSync()
+
+      "give back a cookie header with the appropriate configuration" in {
+        val nuid = "nuid"
+        val conf = testCookieConfig
+        val Some(`Set-Cookie`(cookie)) = service.cookieHeader(
+          headers       = Headers.empty,
+          cookieConfig  = Some(conf),
+          networkUserId = nuid,
+          doNotTrack    = false,
+          spAnonymous   = None,
+          now           = now
+        )
+
+        cookie.name shouldEqual conf.name
+        cookie.content shouldEqual nuid
+        cookie.domain shouldEqual None
+        cookie.path shouldEqual Some("/")
+        cookie.expires must beSome
+        (cookie.expires.get.toDuration - now).toMillis must beCloseTo(conf.expiration.toMillis, 1000L)
+        cookie.secure must beFalse
+        cookie.httpOnly must beFalse
+        cookie.extension must beEmpty
+      }
+      "give back None if no configuration is given" in {
+        service.cookieHeader(
+          headers       = Headers.empty,
+          cookieConfig  = None,
+          networkUserId = "nuid",
+          doNotTrack    = false,
+          spAnonymous   = None,
+          now           = now
+        ) shouldEqual None
+      }
+      "give back None if doNoTrack is true" in {
+        val conf = testCookieConfig
+        service.cookieHeader(
+          headers       = Headers.empty,
+          cookieConfig  = Some(conf),
+          networkUserId = "nuid",
+          doNotTrack    = true,
+          spAnonymous   = None,
+          now           = now
+        ) shouldEqual None
+      }
+      "give back None if SP-Anonymous header is present" in {
+        val conf = testCookieConfig
+        service.cookieHeader(
+          headers       = Headers.empty,
+          cookieConfig  = Some(conf),
+          networkUserId = "nuid",
+          doNotTrack    = true,
+          spAnonymous   = Some("*"),
+          now           = now
+        ) shouldEqual None
+      }
+      "give back a cookie header with Secure, HttpOnly and SameSite=None" in {
+        val nuid = "nuid"
+        val conf = testCookieConfig.copy(
+          secure   = true,
+          httpOnly = true,
+          sameSite = Some(SameSite.None)
+        )
+        val Some(`Set-Cookie`(cookie)) =
+          service.cookieHeader(
+            headers       = Headers.empty,
+            cookieConfig  = Some(conf),
+            networkUserId = nuid,
+            doNotTrack    = false,
+            spAnonymous   = None,
+            now           = now
+          )
+        cookie.secure must beTrue
+        cookie.httpOnly must beTrue
+        cookie.sameSite must beSome(SameSite.None)
+        cookie.extension must beNone
+        service.cookieHeader(
+          headers       = Headers.empty,
+          cookieConfig  = Some(conf),
+          networkUserId = nuid,
+          doNotTrack    = true,
+          spAnonymous   = None,
+          now           = now
+        ) shouldEqual None
+      }
+    }
+
+    "cookieDomain" in {
+      val testCookieConfig = CookieConfig(
+        enabled        = true,
+        name           = "name",
+        expiration     = 5.seconds,
+        domains        = List.empty,
+        fallbackDomain = None,
+        secure         = false,
+        httpOnly       = false,
+        sameSite       = None
+      )
+      "not return a domain" in {
+        "if a list of domains is not supplied in the config and there is no fallback domain" in {
+          val headers      = Headers.empty
+          val cookieConfig = testCookieConfig
+          service.cookieDomain(headers, cookieConfig.domains, cookieConfig.fallbackDomain) shouldEqual None
+        }
+        "if a list of domains is supplied in the config but the Origin request header is empty and there is no fallback domain" in {
+          val headers      = Headers.empty
+          val cookieConfig = testCookieConfig.copy(domains = List("domain.com"))
+          service.cookieDomain(headers, cookieConfig.domains, cookieConfig.fallbackDomain) shouldEqual None
+        }
+        "if none of the domains in the request's Origin header has a match in the list of domains supplied with the config and there is no fallback domain" in {
+          val origin: Origin = Origin.HostList(
+            NonEmptyList.of(
+              Origin.Host(scheme = Uri.Scheme.http, host = Uri.Host.unsafeFromString("origin.com")),
+              Origin
+                .Host(scheme = Uri.Scheme.http, host = Uri.Host.unsafeFromString("otherorigin.com"), port = Some(8080))
+            )
+          )
+          val headers = Headers(origin.toRaw1)
+          val cookieConfig = testCookieConfig.copy(
+            domains = List("domain.com", "otherdomain.com")
+          )
+          service.cookieDomain(headers, cookieConfig.domains, cookieConfig.fallbackDomain) shouldEqual None
+        }
+      }
+      "return the fallback domain" in {
+        "if a list of domains is not supplied in the config but a fallback domain is configured" in {
+          val headers = Headers.empty
+          val cookieConfig = testCookieConfig.copy(
+            fallbackDomain = Some("fallbackDomain")
+          )
+          service.cookieDomain(headers, cookieConfig.domains, cookieConfig.fallbackDomain) shouldEqual Some(
+            "fallbackDomain"
+          )
+        }
+        "if the Origin header is empty and a fallback domain is configured" in {
+          val headers = Headers.empty
+          val cookieConfig = testCookieConfig.copy(
+            domains        = List("domain.com"),
+            fallbackDomain = Some("fallbackDomain")
+          )
+          service.cookieDomain(headers, cookieConfig.domains, cookieConfig.fallbackDomain) shouldEqual Some(
+            "fallbackDomain"
+          )
+        }
+        "if none of the domains in the request's Origin header has a match in the list of domains supplied with the config but a fallback domain is configured" in {
+          val origin: Origin = Origin.HostList(
+            NonEmptyList.of(
+              Origin.Host(scheme = Uri.Scheme.http, host = Uri.Host.unsafeFromString("origin.com")),
+              Origin
+                .Host(scheme = Uri.Scheme.http, host = Uri.Host.unsafeFromString("otherorigin.com"), port = Some(8080))
+            )
+          )
+          val headers = Headers(origin.toRaw1)
+          val cookieConfig = testCookieConfig.copy(
+            domains        = List("domain.com", "otherdomain.com"),
+            fallbackDomain = Some("fallbackDomain")
+          )
+          service.cookieDomain(headers, cookieConfig.domains, cookieConfig.fallbackDomain) shouldEqual Some(
+            "fallbackDomain"
+          )
+        }
+      }
+      "return the matched domain" in {
+        "if there is only one domain in the request's Origin header and it matches in the list of domains supplied with the config" in {
+          val origin: Origin = Origin.HostList(
+            NonEmptyList.of(
+              Origin.Host(scheme = Uri.Scheme.http, host = Uri.Host.unsafeFromString("www.domain.com"))
+            )
+          )
+          val headers = Headers(origin.toRaw1)
+          val cookieConfig = testCookieConfig.copy(
+            domains        = List("domain.com", "otherdomain.com"),
+            fallbackDomain = Some("fallbackDomain")
+          )
+          service.cookieDomain(headers, cookieConfig.domains, cookieConfig.fallbackDomain) shouldEqual Some(
+            "domain.com"
+          )
+        }
+        "if multiple domains from the request's Origin header have matches in the list of domains supplied with the config" in {
+          val origin: Origin = Origin.HostList(
+            NonEmptyList.of(
+              Origin.Host(scheme = Uri.Scheme.http, host = Uri.Host.unsafeFromString("www.domain2.com")),
+              Origin.Host(scheme = Uri.Scheme.http, host = Uri.Host.unsafeFromString("www.domain.com")),
+              Origin.Host(
+                scheme = Uri.Scheme.http,
+                host   = Uri.Host.unsafeFromString("www.otherdomain.com"),
+                port   = Some(8080)
+              )
+            )
+          )
+          val headers = Headers(origin.toRaw1)
+          val cookieConfig = testCookieConfig.copy(
+            domains        = List("domain.com", "otherdomain.com"),
+            fallbackDomain = Some("fallbackDomain")
+          )
+          service.cookieDomain(headers, cookieConfig.domains, cookieConfig.fallbackDomain) shouldEqual Some(
+            "domain.com"
+          )
+        }
+      }
+    }
+
+    "extractHosts" in {
+      "correctly extract the host names from a list of values in the request's Origin header" in {
+        val origin: Origin = Origin.HostList(
+          NonEmptyList.of(
+            Origin.Host(scheme = Uri.Scheme.https, host = Uri.Host.unsafeFromString("origin.com")),
+            Origin.Host(
+              scheme = Uri.Scheme.http,
+              host   = Uri.Host.unsafeFromString("subdomain.otherorigin.gov.co.uk"),
+              port   = Some(8080)
+            )
+          )
+        )
+        val headers = Headers(origin.toRaw1)
+        service.extractHosts(headers) shouldEqual Seq("origin.com", "subdomain.otherorigin.gov.co.uk")
+      }
+    }
+
+    "validMatch" in {
+      val domain = "snplow.com"
+      "true for valid matches" in {
+        val validHost1 = "snplow.com"
+        val validHost2 = "blog.snplow.com"
+        val validHost3 = "blog.snplow.com.snplow.com"
+        service.validMatch(validHost1, domain) shouldEqual true
+        service.validMatch(validHost2, domain) shouldEqual true
+        service.validMatch(validHost3, domain) shouldEqual true
+      }
+      "false for invalid matches" in {
+        val invalidHost1 = "notsnplow.com"
+        val invalidHost2 = "blog.snplow.comsnplow.com"
+        service.validMatch(invalidHost1, domain) shouldEqual false
+        service.validMatch(invalidHost2, domain) shouldEqual false
       }
     }
 
