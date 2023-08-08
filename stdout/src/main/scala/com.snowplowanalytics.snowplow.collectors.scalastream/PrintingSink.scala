@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2022 Snowplow Analytics Ltd. All rights reserved.
+ * Copyright (c) 2013-2023 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0, and
  * you may not use this file except in compliance with the Apache License
@@ -14,22 +14,22 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
-import cats.effect.kernel.Resource
-import cats.effect.{ExitCode, IO, IOApp}
-import com.snowplowanalytics.snowplow.collectors.scalastream.generated.BuildInfo
-import com.snowplowanalytics.snowplow.collectors.scalastream.model._
+import cats.effect.Sync
+import cats.implicits._
 
-object StdoutCollector extends IOApp {
+import java.io.PrintStream
+import java.util.Base64
 
-  def run(args: List[String]): IO[ExitCode] = {
-    val good = Resource.pure[IO, Sink[IO]](new PrintingSink[IO](System.out))
-    val bad  = Resource.pure[IO, Sink[IO]](new PrintingSink[IO](System.err))
-    CollectorApp.run[IO](
-      good,
-      bad,
-      CollectorConfig(Map.empty),
-      BuildInfo.shortName,
-      BuildInfo.version
-    )
-  }
+class PrintingSink[F[_]: Sync](stream: PrintStream) extends Sink[F] {
+  private val encoder: Base64.Encoder = Base64.getEncoder.withoutPadding()
+
+  override val maxBytes: Int         = Int.MaxValue // TODO: configurable?
+  override def isHealthy: F[Boolean] = Sync[F].pure(true)
+
+  override def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit] =
+    events.traverse_ { event =>
+      Sync[F].delay {
+        stream.println(encoder.encodeToString(event))
+      }
+    }
 }
