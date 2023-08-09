@@ -2,11 +2,15 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import java.util.UUID
 
+import org.apache.commons.codec.binary.Base64
+
 import scala.concurrent.duration._
 import scala.collection.JavaConverters._
 
 import cats.effect.{Clock, Sync}
 import cats.implicits._
+
+import fs2.Stream
 
 import org.http4s._
 import org.http4s.headers._
@@ -38,12 +42,19 @@ trait Service[F[_]] {
   def determinePath(vendor: String, version: String): String
 }
 
+object CollectorService {
+  // Contains an invisible pixel to return for `/i` requests.
+  val pixel = Base64.decodeBase64("R0lGODlhAQABAPAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==")
+}
+
 class CollectorService[F[_]: Sync](
   config: CollectorConfig,
   sinks: CollectorSinks[F],
   appName: String,
   appVersion: String
 ) extends Service[F] {
+
+  val pixelStream = Stream.iterable[F, Byte](CollectorService.pixel)
 
   // TODO: Add sink type as well
   private val collector = s"$appName-$appVersion"
@@ -70,8 +81,7 @@ class CollectorService[F[_]: Sync](
       hostname <- hostname
       // TODO: Get ipAsPartitionKey from config
       (ipAddress, partitionKey) = ipAndPartitionKey(ip, ipAsPartitionKey = false)
-      // TODO: nuid should be set properly
-      nuid = UUID.randomUUID().toString
+      nuid                      = UUID.randomUUID().toString // TODO: nuid should be set properly
       event = buildEvent(
         queryString,
         body,
@@ -93,9 +103,13 @@ class CollectorService[F[_]: Sync](
         spAnonymous   = spAnonymous,
         now           = now
       )
-      responseHeaders = Headers(setCookie.toList.map(_.toRaw1))
+      headerList = List(
+        setCookie.map(_.toRaw1),
+        cacheControl(pixelExpected).map(_.toRaw1)
+      ).flatten
+      responseHeaders = Headers(headerList)
       _ <- sinkEvent(event, partitionKey)
-    } yield buildHttpResponse(responseHeaders)
+    } yield buildHttpResponse(responseHeaders, pixelExpected)
 
   def determinePath(vendor: String, version: String): String = {
     val original = s"/$vendor/$version"
@@ -135,8 +149,23 @@ class CollectorService[F[_]: Sync](
   }
 
   // TODO: Handle necessary cases to build http response in here
-  def buildHttpResponse(headers: Headers): Response[F] =
-    Response(status = Ok, headers = headers)
+  def buildHttpResponse(
+    headers: Headers,
+    pixelExpected: Boolean
+  ): Response[F] =
+    pixelExpected match {
+      case true =>
+        Response[F](
+          headers = headers.put(`Content-Type`(MediaType.image.gif)),
+          body    = pixelStream
+        )
+      // See https://github.com/snowplow/snowplow-javascript-tracker/issues/482
+      case false =>
+        Response[F](
+          status  = Ok,
+          headers = headers
+        ).withEntity("ok")
+    }
 
   // TODO: Since Remote-Address and Raw-Request-URI is akka-specific headers,
   // they aren't included in here. It might be good to search for counterparts in Http4s.
@@ -152,6 +181,12 @@ class CollectorService[F[_]: Sync](
         case _ => Some(h.toString())
       }
     }
+
+  /** If the pixel is requested, this attaches cache control headers to the response to prevent any caching. */
+  def cacheControl(pixelExpected: Boolean): Option[`Cache-Control`] =
+    if (pixelExpected)
+      Some(`Cache-Control`(CacheDirective.`no-cache`(), CacheDirective.`no-store`, CacheDirective.`must-revalidate`))
+    else None
 
   /** Produces the event to the configured sink. */
   def sinkEvent(
