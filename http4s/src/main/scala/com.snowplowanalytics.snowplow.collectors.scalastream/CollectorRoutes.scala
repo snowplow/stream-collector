@@ -18,27 +18,48 @@ class CollectorRoutes[F[_]: Sync](collectorService: Service[F]) extends Http4sDs
   }
 
   private val cookieRoutes = HttpRoutes.of[F] {
-    case req @ POST -> Root / vendor / version =>
+    case req @ (POST | GET | HEAD) -> Root / vendor / version =>
       val path        = collectorService.determinePath(vendor, version)
       val userAgent   = extractHeader(req, "User-Agent")
       val referer     = extractHeader(req, "Referer")
       val spAnonymous = extractHeader(req, "SP-Anonymous")
+      val hostname    = req.remoteHost.map(_.map(_.toString))
+      val ip          = req.remoteAddr.map(_.toUriString)
 
-      collectorService.cookie(
-        queryString   = Some(req.queryString),
-        body          = req.bodyText.compile.string.map(Some(_)),
-        path          = path,
-        cookie        = None, //TODO: cookie will be added later
-        userAgent     = userAgent,
-        refererUri    = referer,
-        hostname      = req.remoteHost.map(_.map(_.toString)),
-        ip            = req.remoteAddr.map(_.toUriString), // TODO: Do not set the ip if request contains SP-Anonymous header
-        request       = req,
-        pixelExpected = false,
-        doNotTrack    = false,
-        contentType   = req.contentType.map(_.value.toLowerCase),
-        spAnonymous   = spAnonymous
-      )
+      req.method match {
+        case POST =>
+          collectorService.cookie(
+            queryString   = Some(req.queryString),
+            body          = req.bodyText.compile.string.map(Some(_)),
+            path          = path,
+            cookie        = None, //TODO: cookie will be added later
+            userAgent     = userAgent,
+            refererUri    = referer,
+            hostname      = hostname,
+            ip            = ip, // TODO: Do not set the ip if request contains SP-Anonymous header
+            request       = req,
+            pixelExpected = false,
+            doNotTrack    = false,
+            contentType   = req.contentType.map(_.value.toLowerCase),
+            spAnonymous   = spAnonymous
+          )
+        case GET | HEAD =>
+          collectorService.cookie(
+            queryString   = Some(req.queryString),
+            body          = Sync[F].delay(None),
+            path          = path,
+            cookie        = None, //TODO: cookie will be added later
+            userAgent     = userAgent,
+            refererUri    = referer,
+            hostname      = hostname,
+            ip            = ip, // TODO: Do not set the ip if request contains SP-Anonymous header
+            request       = req,
+            pixelExpected = true,
+            doNotTrack    = false,
+            contentType   = None,
+            spAnonymous   = spAnonymous
+          )
+      }
   }
 
   val value: HttpApp[F] = (healthRoutes <+> cookieRoutes).orNotFound

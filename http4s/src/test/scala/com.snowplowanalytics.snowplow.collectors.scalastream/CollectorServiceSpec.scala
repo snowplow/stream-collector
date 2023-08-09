@@ -26,6 +26,11 @@ class CollectorServiceSpec extends Specification {
   )
   val event     = new CollectorPayload("iglu-schema", "ip", System.currentTimeMillis, "UTF-8", "collector")
   val uuidRegex = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}".r
+  val hs = Headers(
+    `X-Forwarded-For`(IpAddress.fromString("127.0.0.1")),
+    Cookie(RequestCookie("cookie", "value")),
+    `Access-Control-Allow-Credentials`()
+  )
 
   def probeService(): ProbeService = {
     val good = new TestSink
@@ -162,6 +167,30 @@ class CollectorServiceSpec extends Specification {
           "image/gif"
         ).asJava
       }
+
+      "return necessary cache control headers and respond with pixel when pixelExpected is true" in {
+        val r = service
+          .cookie(
+            queryString   = Some("nuid=12"),
+            body          = IO.pure(Some("b")),
+            path          = "p",
+            cookie        = None,
+            userAgent     = None,
+            refererUri    = None,
+            hostname      = IO.pure(Some("h")),
+            ip            = None,
+            request       = Request[IO](),
+            pixelExpected = true,
+            doNotTrack    = false,
+            contentType   = None,
+            spAnonymous   = Some("*")
+          )
+          .unsafeRunSync()
+        r.headers.get[`Cache-Control`] shouldEqual Some(
+          `Cache-Control`(CacheDirective.`no-cache`(), CacheDirective.`no-store`, CacheDirective.`must-revalidate`)
+        )
+        r.body.compile.toList.unsafeRunSync().toArray shouldEqual CollectorService.pixel
+      }
     }
 
     "buildEvent" in {
@@ -232,6 +261,20 @@ class CollectorServiceSpec extends Specification {
         good.storedRawEvents must have size 1
         bad.storedRawEvents must have size 0
         good.storedRawEvents.head.zip(serializer.serialize(event)).forall { case (a, b) => a mustEqual b }
+      }
+    }
+
+    "buildHttpResponse" in {
+      "send back a gif if pixelExpected is true" in {
+        val res = service.buildHttpResponse(hs, pixelExpected = true)
+        res.status shouldEqual Status.Ok
+        res.headers shouldEqual hs.put(`Content-Type`(MediaType.image.gif))
+        res.body.compile.toList.unsafeRunSync().toArray shouldEqual CollectorService.pixel
+      }
+      "send back ok otherwise" in {
+        val res = service.buildHttpResponse(hs, pixelExpected = false)
+        res.status shouldEqual Status.Ok
+        res.bodyText.compile.toList.unsafeRunSync() shouldEqual List("ok")
       }
     }
 
