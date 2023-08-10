@@ -10,7 +10,7 @@ import org.http4s._
 import org.http4s.headers._
 import org.http4s.implicits._
 import org.typelevel.ci._
-import com.comcast.ip4s.IpAddress
+import com.comcast.ip4s.{IpAddress, SocketAddress}
 import org.specs2.mutable.Specification
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 import org.apache.thrift.{TDeserializer, TSerializer}
@@ -26,10 +26,18 @@ class CollectorServiceSpec extends Specification {
   )
   val event     = new CollectorPayload("iglu-schema", "ip", System.currentTimeMillis, "UTF-8", "collector")
   val uuidRegex = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}".r
-  val hs = Headers(
+  val testHeaders = Headers(
+    `User-Agent`(ProductId("testUserAgent")),
+    Referer(Uri.unsafeFromString("example.com")),
+    `Content-Type`(MediaType.application.json),
     `X-Forwarded-For`(IpAddress.fromString("127.0.0.1")),
     Cookie(RequestCookie("cookie", "value")),
     `Access-Control-Allow-Credentials`()
+  )
+  val testConnection = Request.Connection(
+    local  = SocketAddress.fromStringIp("127.0.0.1:80").get,
+    remote = SocketAddress.fromStringIp("127.0.0.1:80").get,
+    secure = false
   )
 
   def probeService(): ProbeService = {
@@ -53,51 +61,36 @@ class CollectorServiceSpec extends Specification {
   "The collector service" should {
     "cookie" in {
       "not set a cookie if SP-Anonymous is present" in {
+        val request = Request[IO]().withHeaders(Header.Raw(ci"SP-Anonymous", "*"))
         val r = service
           .cookie(
-            queryString   = Some("nuid=12"),
             body          = IO.pure(Some("b")),
             path          = "p",
             cookie        = None,
-            userAgent     = None,
-            refererUri    = None,
-            hostname      = IO.pure(Some("h")),
-            ip            = None,
-            request       = Request[IO](),
+            request       = request,
             pixelExpected = false,
             doNotTrack    = false,
-            contentType   = None,
-            spAnonymous   = Some("*")
+            contentType   = None
           )
           .unsafeRunSync()
         r.headers.get(ci"Set-Cookie") must beNone
       }
       "respond with a 200 OK and a good row in good sink" in {
         val ProbeService(service, good, bad) = probeService()
-        val headers = Headers(
-          `X-Forwarded-For`(IpAddress.fromString("127.0.0.1")),
-          Cookie(RequestCookie("cookie", "value")),
-          `Access-Control-Allow-Credentials`()
-        )
         val req = Request[IO](
           method  = Method.POST,
-          headers = headers
-        )
+          headers = testHeaders,
+          uri     = Uri(query = Query.unsafeFromString("a=b"))
+        ).withAttribute(Request.Keys.ConnectionInfo, testConnection)
         val r = service
           .cookie(
-            queryString   = Some("a=b"),
             body          = IO.pure(Some("b")),
             path          = "p",
             cookie        = None,
-            userAgent     = Some("ua"),
-            refererUri    = Some("ref"),
-            hostname      = IO.pure(Some("h")),
-            ip            = Some("ip"),
             request       = req,
             pixelExpected = false,
             doNotTrack    = false,
-            contentType   = Some("image/gif"),
-            spAnonymous   = None
+            contentType   = Some("image/gif")
           )
           .unsafeRunSync()
 
@@ -108,17 +101,20 @@ class CollectorServiceSpec extends Specification {
         val e = emptyCollectorPayload
         deserializer.deserialize(e, good.storedRawEvents.head)
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
-        e.ipAddress shouldEqual "ip"
+        e.ipAddress shouldEqual "127.0.0.1"
         e.encoding shouldEqual "UTF-8"
         e.collector shouldEqual s"appName-appVersion"
         e.querystring shouldEqual "a=b"
         e.body shouldEqual "b"
         e.path shouldEqual "p"
-        e.userAgent shouldEqual "ua"
-        e.refererUri shouldEqual "ref"
-        e.hostname shouldEqual "h"
+        e.userAgent shouldEqual "testUserAgent"
+        e.refererUri shouldEqual "example.com"
+        e.hostname shouldEqual "localhost"
         //e.networkUserId shouldEqual "nuid" //TODO: add check for nuid as well
         e.headers shouldEqual List(
+          "User-Agent: testUserAgent",
+          "Referer: example.com",
+          "Content-Type: application/json",
           "X-Forwarded-For: 127.0.0.1",
           "Cookie: cookie=value",
           "Access-Control-Allow-Credentials: true",
@@ -129,30 +125,20 @@ class CollectorServiceSpec extends Specification {
 
       "sink event with headers removed when spAnonymous set" in {
         val ProbeService(service, good, bad) = probeService()
-        val headers = Headers(
-          `X-Forwarded-For`(IpAddress.fromString("127.0.0.1")),
-          Cookie(RequestCookie("cookie", "value")),
-          `Access-Control-Allow-Credentials`()
-        )
+
         val req = Request[IO](
           method  = Method.POST,
-          headers = headers
+          headers = testHeaders.put(Header.Raw(ci"SP-Anonymous", "*"))
         )
         val r = service
           .cookie(
-            queryString   = Some("a=b"),
             body          = IO.pure(Some("b")),
             path          = "p",
             cookie        = None,
-            userAgent     = Some("ua"),
-            refererUri    = Some("ref"),
-            hostname      = IO.pure(Some("h")),
-            ip            = Some("ip"),
             request       = req,
             pixelExpected = false,
             doNotTrack    = false,
-            contentType   = Some("image/gif"),
-            spAnonymous   = Some("*")
+            contentType   = Some("image/gif")
           )
           .unsafeRunSync()
 
@@ -163,7 +149,11 @@ class CollectorServiceSpec extends Specification {
         val e = emptyCollectorPayload
         deserializer.deserialize(e, good.storedRawEvents.head)
         e.headers shouldEqual List(
+          "User-Agent: testUserAgent",
+          "Referer: example.com",
+          "Content-Type: application/json",
           "Access-Control-Allow-Credentials: true",
+          "SP-Anonymous: *",
           "image/gif"
         ).asJava
       }
@@ -171,19 +161,13 @@ class CollectorServiceSpec extends Specification {
       "return necessary cache control headers and respond with pixel when pixelExpected is true" in {
         val r = service
           .cookie(
-            queryString   = Some("nuid=12"),
             body          = IO.pure(Some("b")),
             path          = "p",
             cookie        = None,
-            userAgent     = None,
-            refererUri    = None,
-            hostname      = IO.pure(Some("h")),
-            ip            = None,
             request       = Request[IO](),
             pixelExpected = true,
             doNotTrack    = false,
-            contentType   = None,
-            spAnonymous   = Some("*")
+            contentType   = None
           )
           .unsafeRunSync()
         r.headers.get[`Cache-Control`] shouldEqual Some(
@@ -266,14 +250,15 @@ class CollectorServiceSpec extends Specification {
 
     "buildHttpResponse" in {
       "send back a gif if pixelExpected is true" in {
-        val res = service.buildHttpResponse(hs, pixelExpected = true)
+        val res = service.buildHttpResponse(testHeaders, pixelExpected = true)
         res.status shouldEqual Status.Ok
-        res.headers shouldEqual hs.put(`Content-Type`(MediaType.image.gif))
+        res.headers shouldEqual testHeaders.put(`Content-Type`(MediaType.image.gif))
         res.body.compile.toList.unsafeRunSync().toArray shouldEqual CollectorService.pixel
       }
       "send back ok otherwise" in {
-        val res = service.buildHttpResponse(hs, pixelExpected = false)
+        val res = service.buildHttpResponse(testHeaders, pixelExpected = false)
         res.status shouldEqual Status.Ok
+        res.headers shouldEqual testHeaders
         res.bodyText.compile.toList.unsafeRunSync() shouldEqual List("ok")
       }
     }
