@@ -19,25 +19,21 @@ import org.http4s.Status._
 
 import org.typelevel.ci._
 
+import com.comcast.ip4s.Dns
+
 import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
 
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 
 trait Service[F[_]] {
   def cookie(
-    queryString: Option[String],
     body: F[Option[String]],
     path: String,
     cookie: Option[RequestCookie],
-    userAgent: Option[String],
-    refererUri: Option[String],
-    hostname: F[Option[String]],
-    ip: Option[String],
     request: Request[F],
     pixelExpected: Boolean,
     doNotTrack: Boolean,
-    contentType: Option[String] = None,
-    spAnonymous: Option[String] = None
+    contentType: Option[String] = None
   ): F[Response[F]]
   def determinePath(vendor: String, version: String): String
 }
@@ -54,6 +50,8 @@ class CollectorService[F[_]: Sync](
   appVersion: String
 ) extends Service[F] {
 
+  implicit val dns: Dns[F] = Dns.forSync[F]
+
   val pixelStream = Stream.iterable[F, Byte](CollectorService.pixel)
 
   // TODO: Add sink type as well
@@ -62,23 +60,22 @@ class CollectorService[F[_]: Sync](
   private val splitBatch: SplitBatch = SplitBatch(appName, appVersion)
 
   def cookie(
-    queryString: Option[String],
     body: F[Option[String]],
     path: String,
     cookie: Option[RequestCookie],
-    userAgent: Option[String],
-    refererUri: Option[String],
-    hostname: F[Option[String]],
-    ip: Option[String],
     request: Request[F],
     pixelExpected: Boolean,
     doNotTrack: Boolean,
-    contentType: Option[String] = None,
-    spAnonymous: Option[String] = None
+    contentType: Option[String] = None
   ): F[Response[F]] =
     for {
       body     <- body
-      hostname <- hostname
+      hostname <- request.remoteHost.map(_.map(_.toString))
+      userAgent   = extractHeader(request, "User-Agent")
+      refererUri  = extractHeader(request, "Referer")
+      spAnonymous = extractHeader(request, "SP-Anonymous")
+      ip          = request.remoteAddr.map(_.toUriString)
+      queryString = Some(request.queryString)
       // TODO: Get ipAsPartitionKey from config
       (ipAddress, partitionKey) = ipAndPartitionKey(ip, ipAsPartitionKey = false)
       nuid                      = UUID.randomUUID().toString // TODO: nuid should be set properly
@@ -115,6 +112,9 @@ class CollectorService[F[_]: Sync](
     val original = s"/$vendor/$version"
     config.paths.getOrElse(original, original)
   }
+
+  def extractHeader(req: Request[F], headerName: String): Option[String] =
+    req.headers.get(CIString(headerName)).map(_.head.value)
 
   /** Builds a raw event from an Http request. */
   def buildEvent(
@@ -163,8 +163,9 @@ class CollectorService[F[_]: Sync](
       case false =>
         Response[F](
           status  = Ok,
-          headers = headers
-        ).withEntity("ok")
+          headers = headers,
+          body    = Stream.emit("ok").through(fs2.text.utf8.encode)
+        )
     }
 
   // TODO: Since Remote-Address and Raw-Request-URI is akka-specific headers,
