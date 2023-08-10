@@ -14,6 +14,13 @@ class Routes[F[_]: Sync](enableDefaultRedirect: Boolean, service: IService[F]) e
   private val healthRoutes = HttpRoutes.of[F] {
     case GET -> Root / "health" =>
       Ok("ok")
+    case GET -> Root / "sink-health" =>
+      service
+        .sinksHealthy
+        .ifM(
+          ifTrue  = Ok("ok"),
+          ifFalse = ServiceUnavailable("Service Unavailable")
+        )
   }
 
   private val corsRoute = HttpRoutes.of[F] {

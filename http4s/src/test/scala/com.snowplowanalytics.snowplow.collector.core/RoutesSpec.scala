@@ -55,6 +55,8 @@ class RoutesSpec extends Specification {
       }
 
     override def determinePath(vendor: String, version: String): String = "/p1/p2"
+
+    override def sinksHealthy: IO[Boolean] = IO.pure(true)
   }
 
   def createTestServices(enabledDefaultRedirect: Boolean = true) = {

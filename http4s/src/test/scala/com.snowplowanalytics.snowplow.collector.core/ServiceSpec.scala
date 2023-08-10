@@ -402,7 +402,7 @@ class ServiceSpec extends Specification {
           Header.Raw(ci"Access-Control-Allow-Origin", "*"),
           `Access-Control-Allow-Credentials`(),
           `Access-Control-Allow-Headers`(ci"Content-Type", ci"SP-Anonymous"),
-          `Access-Control-Max-Age`.Cache(60).asInstanceOf[`Access-Control-Max-Age`]
+          `Access-Control-Max-Age`.Cache(3600).asInstanceOf[`Access-Control-Max-Age`]
         )
         service.preflightResponse(Request[IO]()).unsafeRunSync.headers shouldEqual expected
       }

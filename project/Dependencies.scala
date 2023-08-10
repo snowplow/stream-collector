@@ -48,13 +48,19 @@ object Dependencies {
     val decline          = "2.4.1"
     val circe            = "0.14.1"
     val circeConfig      = "0.10.0"
+    val fs2PubSub        = "0.22.0"
+    val catsRetry        = "3.1.0"
+
     // Scala (test only)
     val specs2         = "4.11.0"
-    val specs2CE       = "0.4.1"
-    val specs2CE3      = "1.5.0"
+    val specs2CE       = "1.5.0"
     val testcontainers = "0.40.10"
-    val catsRetry      = "2.1.0"
-    val http4sIT       = "0.21.33"
+
+    object LegacyIT {
+      val specs2CE  = "0.4.1"
+      val catsRetry = "2.1.0"
+      val http4s    = "0.21.33"
+    }
   }
 
   object Libraries {
@@ -91,24 +97,43 @@ object Dependencies {
     val log4cats         = "org.typelevel"         %% "log4cats-slf4j"                    % V.log4cats
 
     // http4s
-    val http4sDsl    = "org.http4s"   %% "http4s-dsl"          % V.http4s
-    val http4sEmber  = "org.http4s"   %% "http4s-ember-server" % V.http4s
-    val http4sBlaze  = "org.http4s"   %% "http4s-blaze-server" % V.blaze
-    val http4sNetty  = "org.http4s"   %% "http4s-netty-server" % V.http4sNetty
-    val decline      = "com.monovore" %% "decline-effect"      % V.decline
-    val circeGeneric = "io.circe"     %% "circe-generic"       % V.circe
-    val circeConfig  = "io.circe"     %% "circe-config"        % V.circeConfig
+    val http4sDsl    = "org.http4s"       %% "http4s-dsl"             % V.http4s
+    val http4sEmber  = "org.http4s"       %% "http4s-ember-server"    % V.http4s
+    val http4sBlaze  = "org.http4s"       %% "http4s-blaze-server"    % V.blaze
+    val http4sNetty  = "org.http4s"       %% "http4s-netty-server"    % V.http4sNetty
+    val decline      = "com.monovore"     %% "decline-effect"         % V.decline
+    val circeGeneric = "io.circe"         %% "circe-generic"          % V.circe
+    val circeConfig  = "io.circe"         %% "circe-config"           % V.circeConfig
+    val catsRetry    = "com.github.cb372" %% "cats-retry"             % V.catsRetry
+    val fs2PubSub    = "com.permutive"    %% "fs2-google-pubsub-grpc" % V.fs2PubSub
 
     // Scala (test only)
-    val specs2            = "org.specs2"        %% "specs2-core"                   % V.specs2         % Test
-    val specs2CE3         = "org.typelevel"     %% "cats-effect-testing-specs2"    % V.specs2CE3      % Test
-    val specs2It          = "org.specs2"        %% "specs2-core"                   % V.specs2         % IntegrationTest
-    val specs2CEIt        = "com.codecommit"    %% "cats-effect-testing-specs2"    % V.specs2CE       % IntegrationTest
-    val testcontainersIt  = "com.dimafeng"      %% "testcontainers-scala-core"     % V.testcontainers % IntegrationTest
-    val catsRetryIt       = "com.github.cb372"  %% "cats-retry"                    % V.catsRetry      % IntegrationTest
-    val http4sClientIt    = "org.http4s"        %% "http4s-blaze-client"           % V.http4sIT       % IntegrationTest
-    val akkaTestkit       = "com.typesafe.akka" %% "akka-testkit"                  % V.akka           % Test
-    val akkaHttpTestkit   = "com.typesafe.akka" %% "akka-http-testkit"             % V.akkaHttp       % Test
-    val akkaStreamTestkit = "com.typesafe.akka" %% "akka-stream-testkit"           % V.akka           % Test
+
+    // Test common
+    val specs2   = "org.specs2"    %% "specs2-core"                % V.specs2    % Test
+    val specs2CE = "org.typelevel" %% "cats-effect-testing-specs2" % V.specs2CE  % Test 
+
+    // Test Akka
+    val akkaTestkit = "com.typesafe.akka" %% "akka-testkit" % V.akka % Test
+    val akkaHttpTestkit = "com.typesafe.akka" %% "akka-http-testkit" % V.akkaHttp % Test
+    val akkaStreamTestkit = "com.typesafe.akka" %% "akka-stream-testkit" % V.akka % Test
+
+    // Integration tests
+    object IT {
+      val testcontainers = "com.dimafeng" %% "testcontainers-scala-core" % V.testcontainers % IntegrationTest
+      val specs2 = "org.specs2" %% "specs2-core" % V.specs2 % IntegrationTest
+      val specs2CE = "org.typelevel" %% "cats-effect-testing-specs2" % V.specs2CE % IntegrationTest
+      val catsRetry = "com.github.cb372" %% "cats-retry" % V.catsRetry % IntegrationTest
+      val http4sClient = "org.http4s" %% "http4s-blaze-client" % V.blaze % IntegrationTest
+    }
+
+    // Integration test legacy
+    object LegacyIT {
+      val testcontainers = "com.dimafeng" %% "testcontainers-scala-core" % V.testcontainers % IntegrationTest
+      val specs2 = "org.specs2" %% "specs2-core" % V.specs2 % IntegrationTest
+      val specs2CE = "com.codecommit" %% "cats-effect-testing-specs2" % V.LegacyIT.specs2CE % IntegrationTest
+      val catsRetry = "com.github.cb372" %% "cats-retry" % V.LegacyIT.catsRetry % IntegrationTest
+      val http4sClient = "org.http4s" %% "http4s-blaze-client" % V.LegacyIT.http4s % IntegrationTest
+    }
   }
 }

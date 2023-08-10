@@ -9,22 +9,16 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream.it.pubsub
 
 import scala.concurrent.duration._
-
 import cats.effect.IO
-
-import org.http4s.{Request, Method, Uri, Status}
-
-import cats.effect.testing.specs2.CatsIO
-
+import org.http4s.{Method, Request, Status, Uri}
+import cats.effect.testing.specs2.CatsEffect
 import org.specs2.mutable.Specification
 import org.specs2.specification.BeforeAfterAll
-
 import org.testcontainers.containers.GenericContainer
-
 import com.snowplowanalytics.snowplow.collectors.scalastream.it.utils._
 import com.snowplowanalytics.snowplow.collectors.scalastream.it.{EventGenerator, Http}
 
-class GooglePubSubCollectorSpec extends Specification with CatsIO with BeforeAfterAll {
+class GooglePubSubCollectorSpec extends Specification with CatsEffect with BeforeAfterAll {
 
   override protected val Timeout = 5.minutes
 
@@ -46,7 +40,7 @@ class GooglePubSubCollectorSpec extends Specification with CatsIO with BeforeAft
         "good",
         "bad"
       ).use { collector =>
-        IO(collector.container.getLogs() must contain(("REST interface bound to")))
+        IO(collector.container.getLogs() must contain("Service bound to address"))
       }
     }
 
@@ -107,7 +101,7 @@ class GooglePubSubCollectorSpec extends Specification with CatsIO with BeforeAft
           _ <- waitWhile[GenericContainer[_]](container, _.isRunning, stopTimeout)
         } yield {
           container.isRunning() must beFalse
-          container.getLogs() must contain("Server terminated")
+          container.getLogs() must contain("Closing NIO1 channel")
         }
       }
     }
