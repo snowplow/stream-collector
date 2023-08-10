@@ -35,9 +35,9 @@ lazy val commonDependencies = Seq(
   Dependencies.Libraries.akkaStreamTestkit,
   Dependencies.Libraries.specs2,
   // Integration tests
-  Dependencies.Libraries.testcontainersIt,
-  Dependencies.Libraries.http4sClientIt,
-  Dependencies.Libraries.catsRetryIt
+  Dependencies.Libraries.LegacyIT.testcontainers,
+  Dependencies.Libraries.LegacyIT.http4sClient,
+  Dependencies.Libraries.LegacyIT.catsRetry
 )
 
 lazy val commonExclusions = Seq(
@@ -136,9 +136,18 @@ lazy val http4s = project
       Dependencies.Libraries.decline,
       Dependencies.Libraries.circeGeneric,
       Dependencies.Libraries.circeConfig,
-      Dependencies.Libraries.specs2CE3
+      Dependencies.Libraries.specs2,
+      Dependencies.Libraries.specs2CE,
+
+      //Integration tests
+      Dependencies.Libraries.IT.testcontainers,
+      Dependencies.Libraries.IT.http4sClient,
+      Dependencies.Libraries.IT.catsRetry
+
     )
   )
+  .settings(Defaults.itSettings)
+  .configs(IntegrationTest)
 
 lazy val kinesisSettings =
   allSettings ++ buildInfoSettings ++ Defaults.itSettings ++ scalifiedSettings ++ Seq(
@@ -149,8 +158,8 @@ lazy val kinesisSettings =
       Dependencies.Libraries.sts,
       Dependencies.Libraries.sqs,
       // integration tests dependencies
-      Dependencies.Libraries.specs2It,
-      Dependencies.Libraries.specs2CEIt
+      Dependencies.Libraries.LegacyIT.specs2,
+      Dependencies.Libraries.LegacyIT.specs2CE
     ),
     IntegrationTest / test := (IntegrationTest / test).dependsOn(Docker / publishLocal).value,
     IntegrationTest / testOnly := (IntegrationTest / testOnly).dependsOn(Docker / publishLocal).evaluated
@@ -193,15 +202,16 @@ lazy val sqsDistroless = project
   .dependsOn(core % "test->test;compile->compile")
 
 lazy val pubsubSettings =
-  allSettings ++ buildInfoSettings ++ Defaults.itSettings ++ scalifiedSettings ++ Seq(
+  allSettings ++ buildInfoSettings ++ http4sBuildInfoSettings ++ Defaults.itSettings ++ scalifiedSettings ++ Seq(
     moduleName := "snowplow-stream-collector-google-pubsub",
+    buildInfoPackage := s"com.snowplowanalytics.snowplow.collectors.scalastream",
     Docker / packageName := "scala-stream-collector-pubsub",
     libraryDependencies ++= Seq(
-      Dependencies.Libraries.pubsub,
-      Dependencies.Libraries.protobuf,
+      Dependencies.Libraries.catsRetry,
+      Dependencies.Libraries.fs2PubSub,
       // integration tests dependencies
-      Dependencies.Libraries.specs2It,
-      Dependencies.Libraries.specs2CEIt,
+      Dependencies.Libraries.IT.specs2, 
+      Dependencies.Libraries.IT.specs2CE,
     ),
     IntegrationTest / test := (IntegrationTest / test).dependsOn(Docker / publishLocal).value,
     IntegrationTest / testOnly := (IntegrationTest / testOnly).dependsOn(Docker / publishLocal).evaluated
@@ -210,7 +220,7 @@ lazy val pubsubSettings =
 lazy val pubsub = project
   .settings(pubsubSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDockerPlugin, BuildInfoPlugin)
-  .dependsOn(core % "test->test;compile->compile;it->it")
+  .dependsOn(http4s % "test->test;compile->compile;it->it")
   .configs(IntegrationTest)
 
 lazy val pubsubDistroless = project
@@ -218,7 +228,7 @@ lazy val pubsubDistroless = project
   .settings(sourceDirectory := (pubsub / sourceDirectory).value)
   .settings(pubsubSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDistrolessDockerPlugin, BuildInfoPlugin)
-  .dependsOn(core % "test->test;compile->compile;it->it")
+  .dependsOn(http4s % "test->test;compile->compile;it->it")
   .configs(IntegrationTest)
 
 lazy val kafkaSettings =
@@ -266,12 +276,12 @@ lazy val nsqDistroless = project
 lazy val stdoutSettings =
   allSettings ++ buildInfoSettings ++ http4sBuildInfoSettings ++ Seq(
     moduleName := "snowplow-stream-collector-stdout",
+    buildInfoPackage := s"com.snowplowanalytics.snowplow.collector.stdout",
     Docker / packageName := "scala-stream-collector-stdout"
   )
 
 lazy val stdout = project
   .settings(stdoutSettings)
-  .settings(buildInfoPackage := s"com.snowplowanalytics.snowplow.collector.stdout")
   .enablePlugins(JavaAppPackaging, SnowplowDockerPlugin, BuildInfoPlugin)
   .dependsOn(http4s % "test->test;compile->compile")
 
