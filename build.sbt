@@ -13,7 +13,7 @@
  * governing permissions and limitations there under.
  */
 import com.typesafe.sbt.packager.docker._
-import sbtbuildinfo.BuildInfoPlugin.autoImport.buildInfoPackage
+import sbtbuildinfo.BuildInfoPlugin.autoImport._
 
 lazy val commonDependencies = Seq(
   // Java
@@ -90,7 +90,7 @@ lazy val buildSettings = Seq(
   name := "snowplow-stream-collector",
   description := "Scala Stream Collector for Snowplow raw events",
   scalaVersion := "2.12.10",
-  scalacOptions ++= Seq("-Ypartial-unification"),
+  scalacOptions ++= Seq("-Ypartial-unification", "-Ywarn-macros:after"),
   javacOptions := Seq("-source", "11", "-target", "11"),
   resolvers ++= Dependencies.resolutionRepos
 )
@@ -98,6 +98,11 @@ lazy val buildSettings = Seq(
 lazy val dynVerSettings = Seq(
   ThisBuild / dynverVTagPrefix := false, // Otherwise git tags required to have v-prefix
   ThisBuild / dynverSeparator := "-"     // to be compatible with docker
+)
+
+lazy val http4sBuildInfoSettings = Seq(
+  buildInfoKeys := Seq[BuildInfoKey](name, dockerAlias, version),
+  buildInfoOptions += BuildInfoOption.Traits("com.snowplowanalytics.snowplow.collector.core.AppInfo")
 )
 
 lazy val allSettings = buildSettings ++
@@ -134,6 +139,9 @@ lazy val http4s = project
       Dependencies.Libraries.badRows,
       Dependencies.Libraries.collectorPayload,
       Dependencies.Libraries.slf4j,
+      Dependencies.Libraries.decline,
+      Dependencies.Libraries.circeGeneric,
+      Dependencies.Libraries.circeConfig,
       Dependencies.Libraries.specs2
     )
   )
@@ -262,13 +270,14 @@ lazy val nsqDistroless = project
   .dependsOn(core % "test->test;compile->compile")
 
 lazy val stdoutSettings =
-  allSettings ++ buildInfoSettings ++ Seq(
+  allSettings ++ buildInfoSettings ++ http4sBuildInfoSettings ++ Seq(
     moduleName := "snowplow-stream-collector-stdout",
     Docker / packageName := "scala-stream-collector-stdout"
   )
 
 lazy val stdout = project
   .settings(stdoutSettings)
+  .settings(buildInfoPackage := s"com.snowplowanalytics.snowplow.collector.stdout")
   .enablePlugins(JavaAppPackaging, SnowplowDockerPlugin, BuildInfoPlugin)
   .dependsOn(http4s % "test->test;compile->compile")
 
