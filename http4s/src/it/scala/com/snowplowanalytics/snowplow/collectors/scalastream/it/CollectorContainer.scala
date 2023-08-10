@@ -1,5 +1,5 @@
-/**
- * Copyright (c) 2013-present Snowplow Analytics Ltd.
+/*
+ * Copyright (c) 2023-present Snowplow Analytics Ltd.
  * All rights reserved.
  *
  * This software is made available by Snowplow Analytics, Ltd.,
@@ -8,10 +8,12 @@
  * BY INSTALLING, DOWNLOADING, ACCESSING, USING OR DISTRIBUTING ANY PORTION
  * OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
  */
-package com.snowplowanalytics.snowplow.collectors.scalastream
+package com.snowplowanalytics.snowplow.collectors.scalastream.it
 
-import com.snowplowanalytics.snowplow.collectors.scalastream.config.ConfigSpec
+import org.testcontainers.containers.GenericContainer
 
-class PubsubConfigSpec extends ConfigSpec {
-  makeConfigTest("pubsub", "", "")
-}
+case class CollectorContainer(
+  container: GenericContainer[_],
+  host: String,
+  port: Int
+)

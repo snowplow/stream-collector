@@ -72,7 +72,7 @@ object TestUtils {
       Map.empty[String, String],
       ""
     ),
-    cors = CORS(60.seconds),
+    cors = CORS(60.minutes),
     streams = Streams(
       "raw",
       "bad-1",
