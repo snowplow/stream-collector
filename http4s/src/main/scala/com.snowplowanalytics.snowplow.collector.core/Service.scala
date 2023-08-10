@@ -34,6 +34,7 @@ trait IService[F[_]] {
     contentType: Option[String] = None
   ): F[Response[F]]
   def determinePath(vendor: String, version: String): String
+  def sinksHealthy: F[Boolean]
 }
 
 object Service {
@@ -112,6 +113,8 @@ class Service[F[_]: Sync](
         pixelExpected = pixelExpected
       )
     } yield resp
+
+  override def sinksHealthy: F[Boolean] = (sinks.good.isHealthy, sinks.bad.isHealthy).mapN(_ && _)
 
   override def determinePath(vendor: String, version: String): String = {
     val original = s"/$vendor/$version"
@@ -392,4 +395,5 @@ class Service[F[_]: Sync](
       case Some(_) => Some(Service.spAnonymousNuid)
       case None    => request.uri.query.params.get("nuid").orElse(requestCookie.map(_.content))
     }
+
 }
