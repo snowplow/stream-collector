@@ -42,9 +42,12 @@ object model {
     sameSite: Option[SameSite]
   )
 
+  final case class CORSConfig(accessControlMaxAge: FiniteDuration)
+
   final case class CollectorConfig(
     paths: Map[String, String],
-    cookie: CookieConfig
+    cookie: CookieConfig,
+    cors: CORSConfig
   ) {
     val cookieConfig = if (cookie.enabled) Some(cookie) else None
   }

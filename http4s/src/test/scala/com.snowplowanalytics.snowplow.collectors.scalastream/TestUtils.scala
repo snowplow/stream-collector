@@ -20,6 +20,7 @@ object TestUtils {
       secure         = false,
       httpOnly       = false,
       sameSite       = None
-    )
+    ),
+    cors = CORSConfig(60.seconds)
   )
 }
