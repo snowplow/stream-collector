@@ -28,6 +28,9 @@ class CollectorRoutesSpec extends Specification {
 
     def getCookieCalls: List[CookieParams] = cookieCalls.toList
 
+    override def preflightResponse(req: Request[IO]): IO[Response[IO]] =
+      IO.pure(Response[IO](status = Ok, body = Stream.emit("preflight response").through(text.utf8.encode)))
+
     override def cookie(
       body: IO[Option[String]],
       path: String,
@@ -67,6 +70,18 @@ class CollectorRoutesSpec extends Specification {
 
       response.status must beEqualTo(Status.Ok)
       response.as[String].unsafeRunSync() must beEqualTo("OK")
+    }
+
+    "respond to the cors route with a preflight response" in {
+      val (_, routes) = createTestServices
+      def test(uri: Uri) = {
+        val request  = Request[IO](method = Method.OPTIONS, uri = uri)
+        val response = routes.run(request).unsafeRunSync()
+        response.as[String].unsafeRunSync() shouldEqual "preflight response"
+      }
+      test(uri"/i")
+      test(uri"/health")
+      test(uri"/p3/p4")
     }
 
     "respond to the post cookie route with the cookie response" in {
