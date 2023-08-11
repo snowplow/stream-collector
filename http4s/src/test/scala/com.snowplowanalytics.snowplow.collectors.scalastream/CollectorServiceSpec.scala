@@ -175,6 +175,73 @@ class CollectorServiceSpec extends Specification {
         )
         r.body.compile.toList.unsafeRunSync().toArray shouldEqual CollectorService.pixel
       }
+
+      "include CORS headers in the response" in {
+        val r = service
+          .cookie(
+            body          = IO.pure(Some("b")),
+            path          = "p",
+            cookie        = None,
+            request       = Request[IO](),
+            pixelExpected = true,
+            doNotTrack    = false,
+            contentType   = None
+          )
+          .unsafeRunSync()
+        r.headers.get[`Access-Control-Allow-Credentials`] shouldEqual Some(
+          `Access-Control-Allow-Credentials`()
+        )
+        r.headers.get(ci"Access-Control-Allow-Origin").map(_.head) shouldEqual Some(
+          Header.Raw(ci"Access-Control-Allow-Origin", "*")
+        )
+      }
+
+      "include the origin if given to CORS headers in the response" in {
+        val headers = Headers(
+          Origin
+            .HostList(
+              NonEmptyList.of(
+                Origin.Host(scheme = Uri.Scheme.http, host = Uri.Host.unsafeFromString("origin.com")),
+                Origin.Host(
+                  scheme = Uri.Scheme.http,
+                  host   = Uri.Host.unsafeFromString("otherorigin.com"),
+                  port   = Some(8080)
+                )
+              )
+            )
+            .asInstanceOf[Origin]
+        )
+        val request = Request[IO](headers = headers)
+        val r = service
+          .cookie(
+            body          = IO.pure(Some("b")),
+            path          = "p",
+            cookie        = None,
+            request       = request,
+            pixelExpected = true,
+            doNotTrack    = false,
+            contentType   = None
+          )
+          .unsafeRunSync()
+        r.headers.get[`Access-Control-Allow-Credentials`] shouldEqual Some(
+          `Access-Control-Allow-Credentials`()
+        )
+        r.headers.get(ci"Access-Control-Allow-Origin").map(_.head) shouldEqual Some(
+          Header.Raw(ci"Access-Control-Allow-Origin", "http://origin.com")
+        )
+      }
+    }
+
+    "preflightResponse" in {
+      "return a response appropriate to cors preflight options requests" in {
+        val expected = Headers(
+          Header.Raw(ci"Access-Control-Allow-Origin", "*"),
+          `Access-Control-Allow-Credentials`(),
+          `Access-Control-Allow-Headers`(ci"Content-Type", ci"SP-Anonymous"),
+          `Access-Control-Max-Age`.Cache(60).asInstanceOf[`Access-Control-Max-Age`]
+        )
+        service.preflightResponse(Request[IO]()).unsafeRunSync.headers shouldEqual expected
+      }
     }
 
     "buildEvent" in {
@@ -379,6 +446,46 @@ class CollectorServiceSpec extends Specification {
       }
     }
 
+    "accessControlAllowOriginHeader" in {
+      "give a restricted ACAO header if there is an Origin header in the request" in {
+        val headers = Headers(
+          Origin
+            .HostList(
+              NonEmptyList.of(
+                Origin.Host(scheme = Uri.Scheme.http, host = Uri.Host.unsafeFromString("origin.com"))
+              )
+            )
+            .asInstanceOf[Origin]
+        )
+        val request  = Request[IO](headers = headers)
+        val expected = Header.Raw(ci"Access-Control-Allow-Origin", "http://origin.com")
+        service.accessControlAllowOriginHeader(request) shouldEqual expected
+      }
+      "give a restricted ACAO header if there are multiple Origin headers in the request" in {
+        val headers = Headers(
+          Origin
+            .HostList(
+              NonEmptyList.of(
+                Origin.Host(scheme = Uri.Scheme.http, host = Uri.Host.unsafeFromString("origin.com")),
+                Origin.Host(
+                  scheme = Uri.Scheme.http,
+                  host   = Uri.Host.unsafeFromString("otherorigin.com"),
+                  port   = Some(8080)
+                )
+              )
+            )
+            .asInstanceOf[Origin]
+        )
+        val request  = Request[IO](headers = headers)
+        val expected = Header.Raw(ci"Access-Control-Allow-Origin", "http://origin.com")
+        service.accessControlAllowOriginHeader(request) shouldEqual expected
+      }
+      "give an open ACAO header if there are no Origin headers in the request" in {
+        val expected = Header.Raw(ci"Access-Control-Allow-Origin", "*")
+        service.accessControlAllowOriginHeader(Request[IO]()) shouldEqual expected
+      }
+    }
+
     "cookieDomain" in {
       val testCookieConfig = CookieConfig(
         enabled        = true,
@@ -496,18 +603,17 @@ class CollectorServiceSpec extends Specification {
 
     "extractHosts" in {
       "correctly extract the host names from a list of values in the request's Origin header" in {
-        val origin: Origin = Origin.HostList(
-          NonEmptyList.of(
-            Origin.Host(scheme = Uri.Scheme.https, host = Uri.Host.unsafeFromString("origin.com")),
-            Origin.Host(
-              scheme = Uri.Scheme.http,
-              host   = Uri.Host.unsafeFromString("subdomain.otherorigin.gov.co.uk"),
-              port   = Some(8080)
-            )
+        val originHostList = NonEmptyList.of(
+          Origin.Host(scheme = Uri.Scheme.https, host = Uri.Host.unsafeFromString("origin.com")),
+          Origin.Host(
+            scheme = Uri.Scheme.http,
+            host   = Uri.Host.unsafeFromString("subdomain.otherorigin.gov.co.uk"),
+            port   = Some(8080)
           )
         )
-        val headers = Headers(origin.toRaw1)
-        service.extractHosts(headers) shouldEqual Seq("origin.com", "subdomain.otherorigin.gov.co.uk")
+        val origin: Origin = Origin.HostList(originHostList)
+        val headers        = Headers(origin.toRaw1)
+        service.extractHostsFromOrigin(headers) shouldEqual originHostList.toList
       }
     }
 

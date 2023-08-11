@@ -33,7 +33,8 @@ object StdoutCollector extends IOApp {
           secure         = false,
           httpOnly       = false,
           sameSite       = None
-        )
+        ),
+        cors = CORSConfig(60.seconds)
       ),
       BuildInfo.shortName,
       BuildInfo.version
