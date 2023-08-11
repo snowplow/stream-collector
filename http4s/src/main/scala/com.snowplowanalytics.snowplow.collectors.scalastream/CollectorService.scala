@@ -26,6 +26,7 @@ import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPa
 import com.snowplowanalytics.snowplow.collectors.scalastream.model._
 
 trait Service[F[_]] {
+  def preflightResponse(req: Request[F]): F[Response[F]]
   def cookie(
     body: F[Option[String]],
     path: String,
@@ -59,7 +60,7 @@ class CollectorService[F[_]: Sync](
 
   private val splitBatch: SplitBatch = SplitBatch(appName, appVersion)
 
-  def cookie(
+  override def cookie(
     body: F[Option[String]],
     path: String,
     cookie: Option[RequestCookie],
@@ -102,15 +103,28 @@ class CollectorService[F[_]: Sync](
       )
       headerList = List(
         setCookie.map(_.toRaw1),
-        cacheControl(pixelExpected).map(_.toRaw1)
+        cacheControl(pixelExpected).map(_.toRaw1),
+        accessControlAllowOriginHeader(request).some,
+        `Access-Control-Allow-Credentials`().toRaw1.some
       ).flatten
       responseHeaders = Headers(headerList)
       _ <- sinkEvent(event, partitionKey)
     } yield buildHttpResponse(responseHeaders, pixelExpected)
 
-  def determinePath(vendor: String, version: String): String = {
+  override def determinePath(vendor: String, version: String): String = {
     val original = s"/$vendor/$version"
     config.paths.getOrElse(original, original)
+  }
+
+  override def preflightResponse(req: Request[F]): F[Response[F]] = Sync[F].pure {
+    Response[F](
+      headers = Headers(
+        accessControlAllowOriginHeader(req),
+        `Access-Control-Allow-Credentials`(),
+        `Access-Control-Allow-Headers`(ci"Content-Type", ci"SP-Anonymous"),
+        `Access-Control-Max-Age`.Cache(config.cors.accessControlMaxAge.toSeconds).asInstanceOf[`Access-Control-Max-Age`]
+      )
+    )
   }
 
   def extractHeader(req: Request[F], headerName: String): Option[String] =
@@ -241,6 +255,19 @@ class CollectorService[F[_]: Sync](
     }
 
   /**
+    * Creates an Access-Control-Allow-Origin header which specifically allows the domain which made
+    * the request
+    *
+    * @param request Incoming request
+    * @return Header allowing only the domain which made the request or everything
+    */
+  def accessControlAllowOriginHeader(request: Request[F]): Header.Raw =
+    Header.Raw(
+      ci"Access-Control-Allow-Origin",
+      extractHostsFromOrigin(request.headers).headOption.map(_.renderString).getOrElse("*")
+    )
+
+  /**
     * Determines the cookie domain to be used by inspecting the Origin header of the request
     * and trying to find a match in the list of domains specified in the config file.
     *
@@ -259,12 +286,12 @@ class CollectorService[F[_]: Sync](
     (domains match {
       case Nil => None
       case _ =>
-        val originHosts = extractHosts(headers)
-        domains.find(domain => originHosts.exists(validMatch(_, domain)))
+        val originDomains = extractHostsFromOrigin(headers).map(_.host.value)
+        domains.find(domain => originDomains.exists(validMatch(_, domain)))
     }).orElse(fallbackDomain)
 
   /** Extracts the host names from a list of values in the request's Origin header. */
-  def extractHosts(headers: Headers): List[String] =
+  def extractHostsFromOrigin(headers: Headers): List[Origin.Host] =
     (for {
       // We can't use 'headers.get[Origin]' function in here because of the bug
       // reported here: https://github.com/http4s/http4s/issues/7236
@@ -272,14 +299,11 @@ class CollectorService[F[_]: Sync](
       // and parse items individually.
       originSplit <- headers.get(ci"Origin").map(_.head.value.split(' '))
       parsed = originSplit.map(Origin.parse(_).toOption).toList.flatten
-      hosts  = parsed.flatMap(extractHostFromOrigin)
+      hosts = parsed.flatMap {
+        case Origin.Null            => List.empty
+        case Origin.HostList(hosts) => hosts.toList
+      }
     } yield hosts).getOrElse(List.empty)
-
-  private def extractHostFromOrigin(originHeader: Origin): List[String] =
-    originHeader match {
-      case Origin.Null            => List.empty
-      case Origin.HostList(hosts) => hosts.map(_.host.value).toList
-    }
 
   /**
     * Ensures a match is valid.

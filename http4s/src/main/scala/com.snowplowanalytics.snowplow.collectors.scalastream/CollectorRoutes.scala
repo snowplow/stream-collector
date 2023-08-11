@@ -2,7 +2,7 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import cats.implicits._
 import cats.effect.Sync
-import org.http4s.{HttpApp, HttpRoutes}
+import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.implicits._
 import com.comcast.ip4s.Dns
@@ -14,6 +14,11 @@ class CollectorRoutes[F[_]: Sync](collectorService: Service[F]) extends Http4sDs
   private val healthRoutes = HttpRoutes.of[F] {
     case GET -> Root / "health" =>
       Ok("OK")
+  }
+
+  private val corsRoute = HttpRoutes.of[F] {
+    case req @ OPTIONS -> _ =>
+      collectorService.preflightResponse(req)
   }
 
   private val cookieRoutes = HttpRoutes.of[F] {
@@ -53,5 +58,5 @@ class CollectorRoutes[F[_]: Sync](collectorService: Service[F]) extends Http4sDs
       )
   }
 
-  val value: HttpApp[F] = (healthRoutes <+> cookieRoutes).orNotFound
+  val value: HttpApp[F] = (healthRoutes <+> corsRoute <+> cookieRoutes).orNotFound
 }
