@@ -30,13 +30,13 @@ class CollectorServiceSpec extends Specification {
     `User-Agent`(ProductId("testUserAgent")),
     Referer(Uri.unsafeFromString("example.com")),
     `Content-Type`(MediaType.application.json),
-    `X-Forwarded-For`(IpAddress.fromString("127.0.0.1")),
+    `X-Forwarded-For`(IpAddress.fromString("192.0.2.3")),
     Cookie(RequestCookie("cookie", "value")),
     `Access-Control-Allow-Credentials`()
   )
   val testConnection = Request.Connection(
-    local  = SocketAddress.fromStringIp("127.0.0.1:80").get,
-    remote = SocketAddress.fromStringIp("127.0.0.1:80").get,
+    local  = SocketAddress.fromStringIp("192.0.2.1:80").get,
+    remote = SocketAddress.fromStringIp("192.0.2.2:80").get,
     secure = false
   )
 
@@ -61,12 +61,15 @@ class CollectorServiceSpec extends Specification {
   "The collector service" should {
     "cookie" in {
       "not set a cookie if SP-Anonymous is present" in {
-        val request = Request[IO]().withHeaders(Header.Raw(ci"SP-Anonymous", "*"))
+        val request = Request[IO](
+          headers = Headers(
+            Header.Raw(ci"SP-Anonymous", "*")
+          )
+        )
         val r = service
           .cookie(
             body          = IO.pure(Some("b")),
             path          = "p",
-            cookie        = None,
             request       = request,
             pixelExpected = false,
             doNotTrack    = false,
@@ -75,18 +78,147 @@ class CollectorServiceSpec extends Specification {
           .unsafeRunSync()
         r.headers.get(ci"Set-Cookie") must beNone
       }
-      "respond with a 200 OK and a good row in good sink" in {
+      "not set a network_userid from cookie if SP-Anonymous is present" in {
+        val ProbeService(service, good, bad) = probeService()
+        val nuid                             = "test-nuid"
+        val req = Request[IO](
+          method = Method.POST,
+          headers = Headers(
+            Header.Raw(ci"SP-Anonymous", "*")
+          )
+        ).addCookie(TestUtils.testConf.cookie.name, nuid)
+        val r = service
+          .cookie(
+            body          = IO.pure(Some("b")),
+            path          = "p",
+            request       = req,
+            pixelExpected = false,
+            doNotTrack    = false,
+            contentType   = Some("image/gif")
+          )
+          .unsafeRunSync()
+
+        r.status mustEqual Status.Ok
+        good.storedRawEvents must have size 1
+        bad.storedRawEvents must have size 0
+        val e = emptyCollectorPayload
+        deserializer.deserialize(e, good.storedRawEvents.head)
+        e.networkUserId shouldEqual "00000000-0000-0000-0000-000000000000"
+      }
+      "network_userid from cookie should persist if SP-Anonymous is not present" in {
+        val ProbeService(service, good, bad) = probeService()
+        val nuid                             = "test-nuid"
+        val req = Request[IO](
+          method = Method.POST
+        ).addCookie(TestUtils.testConf.cookie.name, nuid)
+        val r = service
+          .cookie(
+            body          = IO.pure(Some("b")),
+            path          = "p",
+            request       = req,
+            pixelExpected = false,
+            doNotTrack    = false,
+            contentType   = Some("image/gif")
+          )
+          .unsafeRunSync()
+
+        r.status mustEqual Status.Ok
+        good.storedRawEvents must have size 1
+        bad.storedRawEvents must have size 0
+        val e = emptyCollectorPayload
+        deserializer.deserialize(e, good.storedRawEvents.head)
+        e.networkUserId shouldEqual "test-nuid"
+      }
+      "use the ip address from 'X-Forwarded-For' header if it exists" in {
         val ProbeService(service, good, bad) = probeService()
         val req = Request[IO](
-          method  = Method.POST,
-          headers = testHeaders,
-          uri     = Uri(query = Query.unsafeFromString("a=b"))
+          method = Method.POST,
+          headers = Headers(
+            `X-Forwarded-For`(IpAddress.fromString("192.0.2.4"))
+          )
         ).withAttribute(Request.Keys.ConnectionInfo, testConnection)
         val r = service
           .cookie(
             body          = IO.pure(Some("b")),
             path          = "p",
-            cookie        = None,
+            request       = req,
+            pixelExpected = false,
+            doNotTrack    = false,
+            contentType   = Some("image/gif")
+          )
+          .unsafeRunSync()
+
+        r.status mustEqual Status.Ok
+        good.storedRawEvents must have size 1
+        bad.storedRawEvents must have size 0
+        val e = emptyCollectorPayload
+        deserializer.deserialize(e, good.storedRawEvents.head)
+        e.ipAddress shouldEqual "192.0.2.4"
+      }
+      "use the ip address from remote address if 'X-Forwarded-For' header doesn't exist" in {
+        val ProbeService(service, good, bad) = probeService()
+        val req = Request[IO](
+          method = Method.POST
+        ).withAttribute(Request.Keys.ConnectionInfo, testConnection)
+        val r = service
+          .cookie(
+            body          = IO.pure(Some("b")),
+            path          = "p",
+            request       = req,
+            pixelExpected = false,
+            doNotTrack    = false,
+            contentType   = Some("image/gif")
+          )
+          .unsafeRunSync()
+
+        r.status mustEqual Status.Ok
+        good.storedRawEvents must have size 1
+        bad.storedRawEvents must have size 0
+        val e = emptyCollectorPayload
+        deserializer.deserialize(e, good.storedRawEvents.head)
+        e.ipAddress shouldEqual "192.0.2.2"
+      }
+      "set the ip address to 'unknown' if if SP-Anonymous is present" in {
+        val ProbeService(service, good, bad) = probeService()
+        val req = Request[IO](
+          method = Method.POST,
+          headers = Headers(
+            Header.Raw(ci"SP-Anonymous", "*")
+          )
+        ).withAttribute(Request.Keys.ConnectionInfo, testConnection)
+        val r = service
+          .cookie(
+            body          = IO.pure(Some("b")),
+            path          = "p",
+            request       = req,
+            pixelExpected = false,
+            doNotTrack    = false,
+            contentType   = Some("image/gif")
+          )
+          .unsafeRunSync()
+
+        r.status mustEqual Status.Ok
+        good.storedRawEvents must have size 1
+        bad.storedRawEvents must have size 0
+        val e = emptyCollectorPayload
+        deserializer.deserialize(e, good.storedRawEvents.head)
+        e.ipAddress shouldEqual "unknown"
+      }
+      "respond with a 200 OK and a good row in good sink" in {
+        val ProbeService(service, good, bad) = probeService()
+        val nuid                             = "dfdb716e-ecf9-4d00-8b10-44edfbc8a108"
+        val req = Request[IO](
+          method  = Method.POST,
+          headers = testHeaders,
+          uri = Uri(
+            query     = Query.unsafeFromString("a=b"),
+            authority = Some(Uri.Authority(host = Uri.RegName("example.com")))
+          )
+        ).withAttribute(Request.Keys.ConnectionInfo, testConnection).addCookie(TestUtils.testConf.cookie.name, nuid)
+        val r = service
+          .cookie(
+            body          = IO.pure(Some("b")),
+            path          = "p",
             request       = req,
             pixelExpected = false,
             doNotTrack    = false,
@@ -101,7 +233,7 @@ class CollectorServiceSpec extends Specification {
         val e = emptyCollectorPayload
         deserializer.deserialize(e, good.storedRawEvents.head)
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
-        e.ipAddress shouldEqual "127.0.0.1"
+        e.ipAddress shouldEqual "192.0.2.3"
         e.encoding shouldEqual "UTF-8"
         e.collector shouldEqual s"appName-appVersion"
         e.querystring shouldEqual "a=b"
@@ -109,15 +241,15 @@ class CollectorServiceSpec extends Specification {
         e.path shouldEqual "p"
         e.userAgent shouldEqual "testUserAgent"
         e.refererUri shouldEqual "example.com"
-        e.hostname shouldEqual "localhost"
-        //e.networkUserId shouldEqual "nuid" //TODO: add check for nuid as well
+        e.hostname shouldEqual "example.com"
+        e.networkUserId shouldEqual nuid
         e.headers shouldEqual List(
           "User-Agent: testUserAgent",
           "Referer: example.com",
           "Content-Type: application/json",
-          "X-Forwarded-For: 127.0.0.1",
-          "Cookie: cookie=value",
+          "X-Forwarded-For: 192.0.2.3",
           "Access-Control-Allow-Credentials: true",
+          "Cookie: cookie=value; sp=dfdb716e-ecf9-4d00-8b10-44edfbc8a108",
           "image/gif"
         ).asJava
         e.contentType shouldEqual "image/gif"
@@ -134,7 +266,6 @@ class CollectorServiceSpec extends Specification {
           .cookie(
             body          = IO.pure(Some("b")),
             path          = "p",
-            cookie        = None,
             request       = req,
             pixelExpected = false,
             doNotTrack    = false,
@@ -163,7 +294,6 @@ class CollectorServiceSpec extends Specification {
           .cookie(
             body          = IO.pure(Some("b")),
             path          = "p",
-            cookie        = None,
             request       = Request[IO](),
             pixelExpected = true,
             doNotTrack    = false,
@@ -181,7 +311,6 @@ class CollectorServiceSpec extends Specification {
           .cookie(
             body          = IO.pure(Some("b")),
             path          = "p",
-            cookie        = None,
             request       = Request[IO](),
             pixelExpected = true,
             doNotTrack    = false,
@@ -216,7 +345,6 @@ class CollectorServiceSpec extends Specification {
           .cookie(
             body          = IO.pure(Some("b")),
             path          = "p",
-            cookie        = None,
             request       = request,
             pixelExpected = true,
             doNotTrack    = false,
@@ -443,6 +571,90 @@ class CollectorServiceSpec extends Specification {
           spAnonymous   = None,
           now           = now
         ) shouldEqual None
+      }
+    }
+
+    "headers" in {
+      "don't filter out the headers if SP-Anonymous is not present" in {
+        val request = Request[IO](
+          headers = Headers(
+            `User-Agent`(ProductId("testUserAgent")),
+            `X-Forwarded-For`(IpAddress.fromString("127.0.0.1")),
+            Header.Raw(ci"X-Real-Ip", "127.0.0.1"),
+            Cookie(RequestCookie("cookie", "value"))
+          )
+        )
+        val expected = List(
+          "User-Agent: testUserAgent",
+          "X-Forwarded-For: 127.0.0.1",
+          "X-Real-Ip: 127.0.0.1",
+          "Cookie: cookie=value"
+        )
+        service.headers(request, None) shouldEqual expected
+      }
+      "filter out the headers if SP-Anonymous is present" in {
+        val request = Request[IO](
+          headers = Headers(
+            `User-Agent`(ProductId("testUserAgent")),
+            `X-Forwarded-For`(IpAddress.fromString("127.0.0.1")),
+            Header.Raw(ci"X-Real-Ip", "127.0.0.1"),
+            Cookie(RequestCookie("cookie", "value"))
+          )
+        )
+        val expected = List(
+          "User-Agent: testUserAgent"
+        )
+        service.headers(request, Some("*")) shouldEqual expected
+      }
+    }
+
+    "networkUserId" in {
+      "with SP-Anonymous header not present" in {
+        "give back the nuid query param if present" in {
+          service.networkUserId(
+            Request[IO]().withUri(Uri().withQueryParam("nuid", "12")),
+            Some(RequestCookie("nuid", "13")),
+            None
+          ) shouldEqual Some("12")
+        }
+        "give back the request cookie if there no nuid query param" in {
+          service.networkUserId(
+            Request[IO](),
+            Some(RequestCookie("nuid", "13")),
+            None
+          ) shouldEqual Some("13")
+        }
+        "give back none otherwise" in {
+          service.networkUserId(
+            Request[IO](),
+            None,
+            None
+          ) shouldEqual None
+        }
+      }
+
+      "with SP-Anonymous header present give back the dummy nuid" in {
+        "if query param is present" in {
+          service.networkUserId(
+            Request[IO]().withUri(Uri().withQueryParam("nuid", "12")),
+            Some(RequestCookie("nuid", "13")),
+            Some("*")
+          ) shouldEqual Some("00000000-0000-0000-0000-000000000000")
+        }
+        "if the request cookie can be used in place of a missing nuid query param" in {
+          service.networkUserId(
+            Request[IO](),
+            Some(RequestCookie("nuid", "13")),
+            Some("*")
+          ) shouldEqual Some("00000000-0000-0000-0000-000000000000")
+        }
+        "in any other case" in {
+          service.networkUserId(
+            Request[IO](),
+            None,
+            Some("*")
+          ) shouldEqual Some("00000000-0000-0000-0000-000000000000")
+        }
       }
     }
 

@@ -27,7 +27,6 @@ class CollectorRoutes[F[_]: Sync](collectorService: Service[F]) extends Http4sDs
       collectorService.cookie(
         body          = req.bodyText.compile.string.map(Some(_)),
         path          = path,
-        cookie        = None, //TODO: cookie will be added later
         request       = req,
         pixelExpected = false,
         doNotTrack    = false,
@@ -39,7 +38,6 @@ class CollectorRoutes[F[_]: Sync](collectorService: Service[F]) extends Http4sDs
       collectorService.cookie(
         body          = Sync[F].pure(None),
         path          = path,
-        cookie        = None, //TODO: cookie will be added later
         request       = req,
         pixelExpected = true,
         doNotTrack    = false,
@@ -50,7 +48,6 @@ class CollectorRoutes[F[_]: Sync](collectorService: Service[F]) extends Http4sDs
       collectorService.cookie(
         body          = Sync[F].pure(None),
         path          = req.pathInfo.renderString,
-        cookie        = None, //TODO: cookie will be added later
         request       = req,
         pixelExpected = true,
         doNotTrack    = false,
