@@ -15,7 +15,6 @@ class CollectorRoutesSpec extends Specification {
   case class CookieParams(
     body: IO[Option[String]],
     path: String,
-    cookie: Option[RequestCookie],
     request: Request[IO],
     pixelExpected: Boolean,
     doNotTrack: Boolean,
@@ -34,7 +33,6 @@ class CollectorRoutesSpec extends Specification {
     override def cookie(
       body: IO[Option[String]],
       path: String,
-      cookie: Option[RequestCookie],
       request: Request[IO],
       pixelExpected: Boolean,
       doNotTrack: Boolean,
@@ -44,7 +42,6 @@ class CollectorRoutesSpec extends Specification {
         cookieCalls += CookieParams(
           body,
           path,
-          cookie,
           request,
           pixelExpected,
           doNotTrack,
@@ -95,7 +92,6 @@ class CollectorRoutesSpec extends Specification {
       val List(cookieParams) = collectorService.getCookieCalls
       cookieParams.body.unsafeRunSync() shouldEqual Some("testBody")
       cookieParams.path shouldEqual "/p1/p2"
-      cookieParams.cookie shouldEqual None
       cookieParams.pixelExpected shouldEqual false
       cookieParams.doNotTrack shouldEqual false
       cookieParams.contentType shouldEqual Some("application/json")
@@ -114,7 +110,6 @@ class CollectorRoutesSpec extends Specification {
         val List(cookieParams) = collectorService.getCookieCalls
         cookieParams.body.unsafeRunSync() shouldEqual None
         cookieParams.path shouldEqual "/p1/p2"
-        cookieParams.cookie shouldEqual None
         cookieParams.pixelExpected shouldEqual true
         cookieParams.doNotTrack shouldEqual false
         cookieParams.contentType shouldEqual None
@@ -137,7 +132,6 @@ class CollectorRoutesSpec extends Specification {
         val List(cookieParams) = collectorService.getCookieCalls
         cookieParams.body.unsafeRunSync() shouldEqual None
         cookieParams.path shouldEqual uri
-        cookieParams.cookie shouldEqual None
         cookieParams.pixelExpected shouldEqual true
         cookieParams.doNotTrack shouldEqual false
         cookieParams.contentType shouldEqual None
