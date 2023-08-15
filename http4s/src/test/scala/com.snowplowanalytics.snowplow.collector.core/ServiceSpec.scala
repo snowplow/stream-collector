@@ -25,7 +25,7 @@ import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPa
 import com.snowplowanalytics.snowplow.collector.core.model._
 
 class ServiceSpec extends Specification {
-  case class ProbeService(service: Service[IO, Any], good: TestSink, bad: TestSink)
+  case class ProbeService(service: Service[IO], good: TestSink, bad: TestSink)
 
   val service = new Service(
     config  = TestUtils.testConfig,

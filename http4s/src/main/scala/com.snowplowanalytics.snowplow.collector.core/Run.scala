@@ -54,7 +54,7 @@ object Run {
   ): F[ExitCode] = {
     val resources = for {
       sinks <- mkSinks(config.streams)
-      collectorService = new Service[F, SinkConfig](
+      collectorService = new Service[F](
         config,
         Sinks(sinks.good, sinks.bad),
         appInfo

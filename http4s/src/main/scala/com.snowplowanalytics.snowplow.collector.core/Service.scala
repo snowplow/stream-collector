@@ -43,8 +43,8 @@ object Service {
   val spAnonymousNuid = "00000000-0000-0000-0000-000000000000"
 }
 
-class Service[F[_]: Sync, SinkConfig](
-  config: Config[SinkConfig],
+class Service[F[_]: Sync](
+  config: Config[Any],
   sinks: Sinks[F],
   appInfo: AppInfo
 ) extends IService[F] {
