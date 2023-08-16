@@ -1,28 +1,36 @@
-package com.snowplowanalytics.snowplow.collectors.scalastream
+package com.snowplowanalytics.snowplow.collector.core
 
 import scala.concurrent.duration._
 import scala.collection.JavaConverters._
+
+import org.specs2.mutable.Specification
+
+import org.typelevel.ci._
+
+import org.apache.thrift.{TDeserializer, TSerializer}
+
+import com.comcast.ip4s.{IpAddress, SocketAddress}
+
+import cats.data.NonEmptyList
+
 import cats.effect.{Clock, IO}
 import cats.effect.unsafe.implicits.global
-import cats.data.NonEmptyList
-import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
+
 import org.http4s._
 import org.http4s.headers._
 import org.http4s.implicits._
-import org.typelevel.ci._
-import com.comcast.ip4s.{IpAddress, SocketAddress}
-import org.specs2.mutable.Specification
-import com.snowplowanalytics.snowplow.collectors.scalastream.model._
-import org.apache.thrift.{TDeserializer, TSerializer}
 
-class CollectorServiceSpec extends Specification {
-  case class ProbeService(service: CollectorService[IO], good: TestSink, bad: TestSink)
+import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
 
-  val service = new CollectorService[IO](
-    config     = TestUtils.testConf,
-    sinks      = CollectorSinks[IO](new TestSink, new TestSink),
-    appName    = "appName",
-    appVersion = "appVersion"
+import com.snowplowanalytics.snowplow.collector.core.model._
+
+class ServiceSpec extends Specification {
+  case class ProbeService(service: Service[IO], good: TestSink, bad: TestSink)
+
+  val service = new Service(
+    config  = TestUtils.testConfig,
+    sinks   = Sinks(new TestSink, new TestSink),
+    appInfo = TestUtils.appInfo
   )
   val event     = new CollectorPayload("iglu-schema", "ip", System.currentTimeMillis, "UTF-8", "collector")
   val uuidRegex = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}".r
@@ -43,11 +51,10 @@ class CollectorServiceSpec extends Specification {
   def probeService(): ProbeService = {
     val good = new TestSink
     val bad  = new TestSink
-    val service = new CollectorService[IO](
-      config     = TestUtils.testConf,
-      sinks      = CollectorSinks[IO](good, bad),
-      appName    = "appName",
-      appVersion = "appVersion"
+    val service = new Service(
+      config  = TestUtils.testConfig,
+      sinks   = Sinks(good, bad),
+      appInfo = TestUtils.appInfo
     )
     ProbeService(service, good, bad)
   }
@@ -86,7 +93,7 @@ class CollectorServiceSpec extends Specification {
           headers = Headers(
             Header.Raw(ci"SP-Anonymous", "*")
           )
-        ).addCookie(TestUtils.testConf.cookie.name, nuid)
+        ).addCookie(TestUtils.testConfig.cookie.name, nuid)
         val r = service
           .cookie(
             body          = IO.pure(Some("b")),
@@ -110,7 +117,7 @@ class CollectorServiceSpec extends Specification {
         val nuid                             = "test-nuid"
         val req = Request[IO](
           method = Method.POST
-        ).addCookie(TestUtils.testConf.cookie.name, nuid)
+        ).addCookie(TestUtils.testConfig.cookie.name, nuid)
         val r = service
           .cookie(
             body          = IO.pure(Some("b")),
@@ -214,7 +221,7 @@ class CollectorServiceSpec extends Specification {
             query     = Query.unsafeFromString("a=b"),
             authority = Some(Uri.Authority(host = Uri.RegName("example.com")))
           )
-        ).withAttribute(Request.Keys.ConnectionInfo, testConnection).addCookie(TestUtils.testConf.cookie.name, nuid)
+        ).withAttribute(Request.Keys.ConnectionInfo, testConnection).addCookie(TestUtils.testConfig.cookie.name, nuid)
         val r = service
           .cookie(
             body          = IO.pure(Some("b")),
@@ -235,7 +242,7 @@ class CollectorServiceSpec extends Specification {
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
         e.ipAddress shouldEqual "192.0.2.3"
         e.encoding shouldEqual "UTF-8"
-        e.collector shouldEqual s"appName-appVersion"
+        e.collector shouldEqual s"${TestUtils.appName}:${TestUtils.appVersion}"
         e.querystring shouldEqual "a=b"
         e.body shouldEqual "b"
         e.path shouldEqual "p"
@@ -303,7 +310,7 @@ class CollectorServiceSpec extends Specification {
         r.headers.get[`Cache-Control`] shouldEqual Some(
           `Cache-Control`(CacheDirective.`no-cache`(), CacheDirective.`no-store`, CacheDirective.`must-revalidate`)
         )
-        r.body.compile.toList.unsafeRunSync().toArray shouldEqual CollectorService.pixel
+        r.body.compile.toList.unsafeRunSync().toArray shouldEqual Service.pixel
       }
 
       "include CORS headers in the response" in {
@@ -391,7 +398,7 @@ class CollectorServiceSpec extends Specification {
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
         e.ipAddress shouldEqual "ip"
         e.encoding shouldEqual "UTF-8"
-        e.collector shouldEqual s"appName-appVersion"
+        e.collector shouldEqual s"${TestUtils.appName}:${TestUtils.appVersion}"
         e.querystring shouldEqual "q"
         e.body shouldEqual "b"
         e.path shouldEqual "p"
@@ -420,7 +427,7 @@ class CollectorServiceSpec extends Specification {
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
         e.ipAddress shouldEqual "ip"
         e.encoding shouldEqual "UTF-8"
-        e.collector shouldEqual s"appName-appVersion"
+        e.collector shouldEqual s"${TestUtils.appName}:${TestUtils.appVersion}"
         e.querystring shouldEqual null
         e.body shouldEqual null
         e.path shouldEqual "p"
@@ -448,7 +455,7 @@ class CollectorServiceSpec extends Specification {
         val res = service.buildHttpResponse(testHeaders, pixelExpected = true)
         res.status shouldEqual Status.Ok
         res.headers shouldEqual testHeaders.put(`Content-Type`(MediaType.image.gif))
-        res.body.compile.toList.unsafeRunSync().toArray shouldEqual CollectorService.pixel
+        res.body.compile.toList.unsafeRunSync().toArray shouldEqual Service.pixel
       }
       "send back ok otherwise" in {
         val res = service.buildHttpResponse(testHeaders, pixelExpected = false)
@@ -477,7 +484,7 @@ class CollectorServiceSpec extends Specification {
     }
 
     "cookieHeader" in {
-      val testCookieConfig = CookieConfig(
+      val testCookieConfig = Config.Cookie(
         enabled        = true,
         name           = "name",
         expiration     = 5.seconds,
@@ -491,30 +498,29 @@ class CollectorServiceSpec extends Specification {
 
       "give back a cookie header with the appropriate configuration" in {
         val nuid = "nuid"
-        val conf = testCookieConfig
         val Some(`Set-Cookie`(cookie)) = service.cookieHeader(
           headers       = Headers.empty,
-          cookieConfig  = Some(conf),
+          cookieConfig  = testCookieConfig,
           networkUserId = nuid,
           doNotTrack    = false,
           spAnonymous   = None,
           now           = now
         )
 
-        cookie.name shouldEqual conf.name
+        cookie.name shouldEqual testCookieConfig.name
         cookie.content shouldEqual nuid
         cookie.domain shouldEqual None
         cookie.path shouldEqual Some("/")
         cookie.expires must beSome
-        (cookie.expires.get.toDuration - now).toMillis must beCloseTo(conf.expiration.toMillis, 1000L)
+        (cookie.expires.get.toDuration - now).toMillis must beCloseTo(testCookieConfig.expiration.toMillis, 1000L)
         cookie.secure must beFalse
         cookie.httpOnly must beFalse
         cookie.extension must beEmpty
       }
-      "give back None if no configuration is given" in {
+      "give back None if cookie is not enabled" in {
         service.cookieHeader(
           headers       = Headers.empty,
-          cookieConfig  = None,
+          cookieConfig  = testCookieConfig.copy(enabled = false),
           networkUserId = "nuid",
           doNotTrack    = false,
           spAnonymous   = None,
@@ -522,10 +528,9 @@ class CollectorServiceSpec extends Specification {
         ) shouldEqual None
       }
       "give back None if doNoTrack is true" in {
-        val conf = testCookieConfig
         service.cookieHeader(
           headers       = Headers.empty,
-          cookieConfig  = Some(conf),
+          cookieConfig  = testCookieConfig,
           networkUserId = "nuid",
           doNotTrack    = true,
           spAnonymous   = None,
@@ -533,10 +538,9 @@ class CollectorServiceSpec extends Specification {
         ) shouldEqual None
       }
       "give back None if SP-Anonymous header is present" in {
-        val conf = testCookieConfig
         service.cookieHeader(
           headers       = Headers.empty,
-          cookieConfig  = Some(conf),
+          cookieConfig  = testCookieConfig,
           networkUserId = "nuid",
           doNotTrack    = true,
           spAnonymous   = Some("*"),
@@ -553,7 +557,7 @@ class CollectorServiceSpec extends Specification {
         val Some(`Set-Cookie`(cookie)) =
           service.cookieHeader(
             headers       = Headers.empty,
-            cookieConfig  = Some(conf),
+            cookieConfig  = conf,
             networkUserId = nuid,
             doNotTrack    = false,
             spAnonymous   = None,
@@ -565,7 +569,7 @@ class CollectorServiceSpec extends Specification {
         cookie.extension must beNone
         service.cookieHeader(
           headers       = Headers.empty,
-          cookieConfig  = Some(conf),
+          cookieConfig  = conf,
           networkUserId = nuid,
           doNotTrack    = true,
           spAnonymous   = None,
@@ -699,7 +703,7 @@ class CollectorServiceSpec extends Specification {
     }
 
     "cookieDomain" in {
-      val testCookieConfig = CookieConfig(
+      val testCookieConfig = Config.Cookie(
         enabled        = true,
         name           = "name",
         expiration     = 5.seconds,
@@ -711,9 +715,8 @@ class CollectorServiceSpec extends Specification {
       )
       "not return a domain" in {
         "if a list of domains is not supplied in the config and there is no fallback domain" in {
-          val headers      = Headers.empty
-          val cookieConfig = testCookieConfig
-          service.cookieDomain(headers, cookieConfig.domains, cookieConfig.fallbackDomain) shouldEqual None
+          val headers = Headers.empty
+          service.cookieDomain(headers, testCookieConfig.domains, testCookieConfig.fallbackDomain) shouldEqual None
         }
         "if a list of domains is supplied in the config but the Origin request header is empty and there is no fallback domain" in {
           val headers      = Headers.empty
@@ -864,11 +867,10 @@ class CollectorServiceSpec extends Specification {
       }
 
       "should pass on the original path if no mapping for it can be found" in {
-        val service = new CollectorService(
-          TestUtils.testConf.copy(paths = Map.empty[String, String]),
-          CollectorSinks(new TestSink, new TestSink),
-          "",
-          ""
+        val service = new Service(
+          TestUtils.testConfig.copy(paths = Map.empty[String, String]),
+          Sinks(new TestSink, new TestSink),
+          TestUtils.appInfo
         )
         val expected1 = "/com.acme/track"
         val expected2 = "/com.acme/redirect"

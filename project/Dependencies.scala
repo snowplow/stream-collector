@@ -34,22 +34,26 @@ object Dependencies {
     val protobuf     = "3.21.7" // force this version to mitigate security vulnerabilities
     // Scala
     val collectorPayload = "0.0.0"
-    val tracker          = "1.0.0"
+    val tracker          = "1.0.1"
     val akkaHttp         = "10.2.7"
     val akka             = "2.6.16"
     val scopt            = "4.0.1"
     val pureconfig       = "0.17.2"
     val akkaHttpMetrics  = "1.7.1"
-    val badRows          = "2.1.1"
+    val badRows          = "2.2.1"
     val log4cats         = "2.6.0"
+    val http4s           = "0.23.23"
+    val blaze            = "0.23.15"
+    val http4sNetty      = "0.5.9"
+    val decline          = "2.4.1"
+    val circe            = "0.14.1"
+    val circeConfig      = "0.10.0"
     // Scala (test only)
     val specs2         = "4.11.0"
     val specs2CE       = "0.4.1"
+    val specs2CE3      = "1.5.0"
     val testcontainers = "0.40.10"
     val catsRetry      = "2.1.0"
-    val http4s         = "0.23.23"
-    val blaze          = "0.23.15"
-    val http4sNetty    = "0.5.9"
     val http4sIT       = "0.21.33"
   }
 
@@ -86,15 +90,18 @@ object Dependencies {
     val akkaHttpMetrics  = "fr.davit"              %% "akka-http-metrics-datadog"         % V.akkaHttpMetrics
     val log4cats         = "org.typelevel"         %% "log4cats-slf4j"                    % V.log4cats
 
-    
-    //http4s
-    val http4sDsl    = "org.http4s" %% "http4s-dsl"          % V.http4s 
-    val http4sEmber  = "org.http4s" %% "http4s-ember-server" % V.http4s 
-    val http4sBlaze  = "org.http4s" %% "http4s-blaze-server" % V.blaze
-    val http4sNetty  = "org.http4s" %% "http4s-netty-server" % V.http4sNetty
-    
+    // http4s
+    val http4sDsl    = "org.http4s"   %% "http4s-dsl"          % V.http4s
+    val http4sEmber  = "org.http4s"   %% "http4s-ember-server" % V.http4s
+    val http4sBlaze  = "org.http4s"   %% "http4s-blaze-server" % V.blaze
+    val http4sNetty  = "org.http4s"   %% "http4s-netty-server" % V.http4sNetty
+    val decline      = "com.monovore" %% "decline-effect"      % V.decline
+    val circeGeneric = "io.circe"     %% "circe-generic"       % V.circe
+    val circeConfig  = "io.circe"     %% "circe-config"        % V.circeConfig
+
     // Scala (test only)
     val specs2            = "org.specs2"        %% "specs2-core"                   % V.specs2         % Test
+    val specs2CE3         = "org.typelevel"     %% "cats-effect-testing-specs2"    % V.specs2CE3      % Test
     val specs2It          = "org.specs2"        %% "specs2-core"                   % V.specs2         % IntegrationTest
     val specs2CEIt        = "com.codecommit"    %% "cats-effect-testing-specs2"    % V.specs2CE       % IntegrationTest
     val testcontainersIt  = "com.dimafeng"      %% "testcontainers-scala-core"     % V.testcontainers % IntegrationTest
