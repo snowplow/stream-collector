@@ -49,7 +49,7 @@ class Service[F[_]: Sync](
   appInfo: AppInfo
 ) extends IService[F] {
 
-  val pixelStream = Stream.iterable[F, Byte](CollectorService.pixel)
+  val pixelStream = Stream.iterable[F, Byte](Service.pixel)
 
   private val collector = s"${appInfo.name}:${appInfo.version}"
 
@@ -65,15 +65,15 @@ class Service[F[_]: Sync](
   ): F[Response[F]] =
     for {
       body <- body
-      hostname    = extractHostname(request)
-      userAgent   = extractHeader(request, "User-Agent")
-      refererUri  = extractHeader(request, "Referer")
-      spAnonymous = extractHeader(request, "SP-Anonymous")
-      ip          = extractIp(request, spAnonymous)
-      queryString = Some(request.queryString)
-      cookie      = extractCookie(request)
-      nuidOpt     = networkUserId(request, cookie, spAnonymous)
-      nuid        = nuidOpt.getOrElse(UUID.randomUUID().toString)
+      hostname                  = extractHostname(request)
+      userAgent                 = extractHeader(request, "User-Agent")
+      refererUri                = extractHeader(request, "Referer")
+      spAnonymous               = extractHeader(request, "SP-Anonymous")
+      ip                        = extractIp(request, spAnonymous)
+      queryString               = Some(request.queryString)
+      cookie                    = extractCookie(request)
+      nuidOpt                   = networkUserId(request, cookie, spAnonymous)
+      nuid                      = nuidOpt.getOrElse(UUID.randomUUID().toString)
       (ipAddress, partitionKey) = ipAndPartitionKey(ip, config.streams.useIpAddressAsPartitionKey)
       event = buildEvent(
         queryString,
@@ -127,7 +127,7 @@ class Service[F[_]: Sync](
     req.headers.get(CIString(headerName)).map(_.head.value)
 
   def extractCookie(req: Request[F]): Option[RequestCookie] =
-    config.cookieConfig.flatMap(c => req.cookies.find(_.name == c.name))
+    req.cookies.find(_.name == config.cookie.name)
 
   def extractHostname(req: Request[F]): Option[String] =
     req.uri.authority.map(_.host.renderString) // Hostname is extracted like this in Akka-Http as well
@@ -349,7 +349,7 @@ class Service[F[_]: Sync](
     spAnonymous: Option[String]
   ): Option[String] =
     spAnonymous match {
-      case Some(_) => Some(CollectorService.spAnonymousNuid)
+      case Some(_) => Some(Service.spAnonymousNuid)
       case None    => request.uri.query.params.get("nuid").orElse(requestCookie.map(_.content))
     }
 }

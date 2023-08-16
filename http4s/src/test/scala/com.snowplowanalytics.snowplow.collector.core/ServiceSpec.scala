@@ -93,7 +93,7 @@ class ServiceSpec extends Specification {
           headers = Headers(
             Header.Raw(ci"SP-Anonymous", "*")
           )
-        ).addCookie(TestUtils.testConf.cookie.name, nuid)
+        ).addCookie(TestUtils.testConfig.cookie.name, nuid)
         val r = service
           .cookie(
             body          = IO.pure(Some("b")),
@@ -117,7 +117,7 @@ class ServiceSpec extends Specification {
         val nuid                             = "test-nuid"
         val req = Request[IO](
           method = Method.POST
-        ).addCookie(TestUtils.testConf.cookie.name, nuid)
+        ).addCookie(TestUtils.testConfig.cookie.name, nuid)
         val r = service
           .cookie(
             body          = IO.pure(Some("b")),
@@ -221,7 +221,7 @@ class ServiceSpec extends Specification {
             query     = Query.unsafeFromString("a=b"),
             authority = Some(Uri.Authority(host = Uri.RegName("example.com")))
           )
-        ).withAttribute(Request.Keys.ConnectionInfo, testConnection).addCookie(TestUtils.testConf.cookie.name, nuid)
+        ).withAttribute(Request.Keys.ConnectionInfo, testConnection).addCookie(TestUtils.testConfig.cookie.name, nuid)
         val r = service
           .cookie(
             body          = IO.pure(Some("b")),
