@@ -5,7 +5,7 @@ import java.nio.file.Path
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-import scala.concurrent.duration.{DurationLong, FiniteDuration}
+import scala.concurrent.duration.FiniteDuration
 
 import cats.implicits._
 import cats.data.EitherT
@@ -64,7 +64,7 @@ object Run {
         config.interface,
         config.port
       )
-      _ <- withGracefulShutdown(610.seconds)(httpServer)
+      _ <- withGracefulShutdown(config.shutdownTimeout)(httpServer)
     } yield ()
 
     resources.surround(Async[F].never[ExitCode])

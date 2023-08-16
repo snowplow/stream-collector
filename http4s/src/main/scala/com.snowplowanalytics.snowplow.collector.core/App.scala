@@ -10,7 +10,7 @@ import io.circe.Decoder
 
 import com.snowplowanalytics.snowplow.collector.core.model.Sinks
 
-abstract class App[SinkConfig <: Config.Sink : Decoder](appInfo: AppInfo)
+abstract class App[SinkConfig <: Config.Sink: Decoder](appInfo: AppInfo)
     extends CommandIOApp(
       name    = App.helpCommand(appInfo),
       header  = "Snowplow application that collects tracking events",

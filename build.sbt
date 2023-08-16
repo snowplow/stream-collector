@@ -142,7 +142,7 @@ lazy val http4s = project
       Dependencies.Libraries.decline,
       Dependencies.Libraries.circeGeneric,
       Dependencies.Libraries.circeConfig,
-      Dependencies.Libraries.specs2
+      Dependencies.Libraries.specs2CE3
     )
   )
 

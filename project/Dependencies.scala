@@ -57,6 +57,7 @@ object Dependencies {
     // Scala (test only)
     val specs2         = "4.11.0"
     val specs2CE       = "0.4.1"
+    val specs2CE3      = "1.5.0"
     val testcontainers = "0.40.10"
     val catsRetry      = "2.1.0"
     val http4sIT       = "0.21.33"
@@ -106,6 +107,7 @@ object Dependencies {
 
     // Scala (test only)
     val specs2            = "org.specs2"        %% "specs2-core"                   % V.specs2         % Test
+    val specs2CE3         = "org.typelevel"     %% "cats-effect-testing-specs2"    % V.specs2CE3      % Test
     val specs2It          = "org.specs2"        %% "specs2-core"                   % V.specs2         % IntegrationTest
     val specs2CEIt        = "com.codecommit"    %% "cats-effect-testing-specs2"    % V.specs2CE       % IntegrationTest
     val testcontainersIt  = "com.dimafeng"      %% "testcontainers-scala-core"     % V.testcontainers % IntegrationTest

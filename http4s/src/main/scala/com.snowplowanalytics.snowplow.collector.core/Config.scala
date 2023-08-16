@@ -25,7 +25,8 @@ case class Config[+SinkConfig](
   monitoring: Config.Monitoring,
   ssl: Config.SSL,
   enableDefaultRedirect: Boolean,
-  redirectDomains: Set[String]
+  redirectDomains: Set[String],
+  shutdownTimeout: FiniteDuration
 )
 
 object Config {

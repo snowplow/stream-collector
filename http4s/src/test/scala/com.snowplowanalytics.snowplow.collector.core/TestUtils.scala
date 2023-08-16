@@ -101,6 +101,7 @@ object TestUtils {
       443
     ),
     enableDefaultRedirect = false,
-    redirectDomains       = Set.empty[String]
+    redirectDomains       = Set.empty[String],
+    shutdownTimeout       = 5.minutes
   )
 }
