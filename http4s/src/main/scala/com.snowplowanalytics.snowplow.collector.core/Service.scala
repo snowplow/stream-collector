@@ -1,4 +1,4 @@
-package com.snowplowanalytics.snowplow.collectors.scalastream
+package com.snowplowanalytics.snowplow.collector.core
 
 import java.util.UUID
 
@@ -21,9 +21,9 @@ import org.typelevel.ci._
 
 import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
 
-import com.snowplowanalytics.snowplow.collectors.scalastream.model._
+import com.snowplowanalytics.snowplow.collector.core.model._
 
-trait Service[F[_]] {
+trait IService[F[_]] {
   def preflightResponse(req: Request[F]): F[Response[F]]
   def cookie(
     body: F[Option[String]],
@@ -36,26 +36,24 @@ trait Service[F[_]] {
   def determinePath(vendor: String, version: String): String
 }
 
-object CollectorService {
+object Service {
   // Contains an invisible pixel to return for `/i` requests.
   val pixel = Base64.decodeBase64("R0lGODlhAQABAPAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==")
 
   val spAnonymousNuid = "00000000-0000-0000-0000-000000000000"
 }
 
-class CollectorService[F[_]: Sync](
-  config: CollectorConfig,
-  sinks: CollectorSinks[F],
-  appName: String,
-  appVersion: String
-) extends Service[F] {
+class Service[F[_]: Sync](
+  config: Config[Any],
+  sinks: Sinks[F],
+  appInfo: AppInfo
+) extends IService[F] {
 
-  val pixelStream = Stream.iterable[F, Byte](CollectorService.pixel)
+  val pixelStream = Stream.iterable[F, Byte](Service.pixel)
 
-  // TODO: Add sink type as well
-  private val collector = s"$appName-$appVersion"
+  private val collector = s"${appInfo.name}:${appInfo.version}"
 
-  private val splitBatch: SplitBatch = SplitBatch(appName, appVersion)
+  private val splitBatch: SplitBatch = SplitBatch(appInfo)
 
   override def cookie(
     body: F[Option[String]],
@@ -67,17 +65,16 @@ class CollectorService[F[_]: Sync](
   ): F[Response[F]] =
     for {
       body <- body
-      hostname    = extractHostname(request)
-      userAgent   = extractHeader(request, "User-Agent")
-      refererUri  = extractHeader(request, "Referer")
-      spAnonymous = extractHeader(request, "SP-Anonymous")
-      ip          = extractIp(request, spAnonymous)
-      queryString = Some(request.queryString)
-      cookie      = extractCookie(request)
-      nuidOpt     = networkUserId(request, cookie, spAnonymous)
-      nuid        = nuidOpt.getOrElse(UUID.randomUUID().toString)
-      // TODO: Get ipAsPartitionKey from config
-      (ipAddress, partitionKey) = ipAndPartitionKey(ip, ipAsPartitionKey = false)
+      hostname                  = extractHostname(request)
+      userAgent                 = extractHeader(request, "User-Agent")
+      refererUri                = extractHeader(request, "Referer")
+      spAnonymous               = extractHeader(request, "SP-Anonymous")
+      ip                        = extractIp(request, spAnonymous)
+      queryString               = Some(request.queryString)
+      cookie                    = extractCookie(request)
+      nuidOpt                   = networkUserId(request, cookie, spAnonymous)
+      nuid                      = nuidOpt.getOrElse(UUID.randomUUID().toString)
+      (ipAddress, partitionKey) = ipAndPartitionKey(ip, config.streams.useIpAddressAsPartitionKey)
       event = buildEvent(
         queryString,
         body,
@@ -93,7 +90,7 @@ class CollectorService[F[_]: Sync](
       now <- Clock[F].realTime
       setCookie = cookieHeader(
         headers       = request.headers,
-        cookieConfig  = config.cookieConfig,
+        cookieConfig  = config.cookie,
         networkUserId = nuid,
         doNotTrack    = doNotTrack,
         spAnonymous   = spAnonymous,
@@ -130,7 +127,7 @@ class CollectorService[F[_]: Sync](
     req.headers.get(CIString(headerName)).map(_.head.value)
 
   def extractCookie(req: Request[F]): Option[RequestCookie] =
-    config.cookieConfig.flatMap(c => req.cookies.find(_.name == c.name))
+    req.cookies.find(_.name == config.cookie.name)
 
   def extractHostname(req: Request[F]): Option[String] =
     req.uri.authority.map(_.host.renderString) // Hostname is extracted like this in Akka-Http as well
@@ -237,32 +234,28 @@ class CollectorService[F[_]: Sync](
     */
   def cookieHeader(
     headers: Headers,
-    cookieConfig: Option[CookieConfig],
+    cookieConfig: Config.Cookie,
     networkUserId: String,
     doNotTrack: Boolean,
     spAnonymous: Option[String],
     now: FiniteDuration
   ): Option[`Set-Cookie`] =
-    if (doNotTrack) {
-      None
-    } else {
-      spAnonymous match {
-        case Some(_) => None
-        case None =>
-          cookieConfig.map { config =>
-            val responseCookie = ResponseCookie(
-              name     = config.name,
-              content  = networkUserId,
-              expires  = Some(HttpDate.unsafeFromEpochSecond((now + config.expiration).toSeconds)),
-              domain   = cookieDomain(headers, config.domains, config.fallbackDomain),
-              path     = Some("/"),
-              sameSite = config.sameSite,
-              secure   = config.secure,
-              httpOnly = config.httpOnly
-            )
-            `Set-Cookie`(responseCookie)
-          }
-      }
+    (doNotTrack, cookieConfig.enabled, spAnonymous) match {
+      case (true, _, _)    => None
+      case (_, false, _)   => None
+      case (_, _, Some(_)) => None
+      case _ =>
+        val responseCookie = ResponseCookie(
+          name     = cookieConfig.name,
+          content  = networkUserId,
+          expires  = Some(HttpDate.unsafeFromEpochSecond((now + cookieConfig.expiration).toSeconds)),
+          domain   = cookieDomain(headers, cookieConfig.domains, cookieConfig.fallbackDomain),
+          path     = Some("/"),
+          sameSite = cookieConfig.sameSite,
+          secure   = cookieConfig.secure,
+          httpOnly = cookieConfig.httpOnly
+        )
+        Some(`Set-Cookie`(responseCookie))
     }
 
   /**
@@ -356,7 +349,7 @@ class CollectorService[F[_]: Sync](
     spAnonymous: Option[String]
   ): Option[String] =
     spAnonymous match {
-      case Some(_) => Some(CollectorService.spAnonymousNuid)
+      case Some(_) => Some(Service.spAnonymousNuid)
       case None    => request.uri.query.params.get("nuid").orElse(requestCookie.map(_.content))
     }
 }
