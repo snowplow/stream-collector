@@ -1,16 +1,20 @@
-package com.snowplowanalytics.snowplow.collectors.scalastream
+package com.snowplowanalytics.snowplow.collector.core
 
 import scala.collection.mutable.ListBuffer
+
+import org.specs2.mutable.Specification
+
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
+
 import org.http4s.implicits._
 import org.http4s._
 import org.http4s.headers._
 import org.http4s.Status._
-import fs2.{Stream, text}
-import org.specs2.mutable.Specification
 
-class CollectorRoutesSpec extends Specification {
+import fs2.{Stream, text}
+
+class RoutesSpec extends Specification {
 
   case class CookieParams(
     body: IO[Option[String]],
@@ -21,7 +25,7 @@ class CollectorRoutesSpec extends Specification {
     contentType: Option[String]
   )
 
-  class TestService() extends Service[IO] {
+  class TestService() extends IService[IO] {
 
     private val cookieCalls: ListBuffer[CookieParams] = ListBuffer()
 
@@ -54,9 +58,9 @@ class CollectorRoutesSpec extends Specification {
   }
 
   def createTestServices = {
-    val collectorService = new TestService()
-    val routes           = new CollectorRoutes[IO](collectorService).value
-    (collectorService, routes)
+    val service = new TestService()
+    val routes  = new Routes(service).value
+    (service, routes)
   }
 
   "The collector route" should {

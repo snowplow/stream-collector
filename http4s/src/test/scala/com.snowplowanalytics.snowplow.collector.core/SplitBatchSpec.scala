@@ -1,4 +1,4 @@
-package com.snowplowanalytics.snowplow.collectors.scalastream
+package com.snowplowanalytics.snowplow.collector.core
 
 import org.apache.thrift.TDeserializer
 
@@ -8,14 +8,17 @@ import io.circe.syntax._
 
 import com.snowplowanalytics.iglu.core.circe.implicits._
 import com.snowplowanalytics.iglu.core.SelfDescribingData
+
 import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
+
 import com.snowplowanalytics.snowplow.badrows._
-import com.snowplowanalytics.snowplow.collectors.scalastream.model.SplitBatchResult
+
+import com.snowplowanalytics.snowplow.collector.core.model.SplitBatchResult
 
 import org.specs2.mutable.Specification
 
 class SplitBatchSpec extends Specification {
-  val splitBatch: SplitBatch = SplitBatch("app", "version")
+  val splitBatch: SplitBatch = SplitBatch(TestUtils.appInfo)
 
   "SplitBatch.split" should {
     "Batch a list of strings based on size" in {
@@ -70,7 +73,7 @@ class SplitBatchSpec extends Specification {
       sizeViolation.failure.actualSizeBytes must_== 1019
       sizeViolation.failure.expectation must_== "oversized collector payload: GET requests cannot be split"
       sizeViolation.payload.event must_== "CollectorP"
-      sizeViolation.processor shouldEqual Processor("app", "version")
+      sizeViolation.processor shouldEqual Processor(TestUtils.appName, TestUtils.appVersion)
       actual.good must_== Nil
     }
 
@@ -89,7 +92,7 @@ class SplitBatchSpec extends Specification {
         .failure
         .expectation must_== "oversized collector payload: cannot split POST requests which are not json expected json value got 'ssssss...' (line 1, column 1)"
       sizeViolation.payload.event must_== "CollectorP"
-      sizeViolation.processor shouldEqual Processor("app", "version")
+      sizeViolation.processor shouldEqual Processor(TestUtils.appName, TestUtils.appVersion)
     }
 
     "Reject an oversized POST CollectorPayload which would be oversized even without its body" in {
@@ -118,7 +121,7 @@ class SplitBatchSpec extends Specification {
       sizeViolation
         .payload
         .event must_== "CollectorPayload(schema:null, ipAddress:null, timestamp:0, encoding:null, collector:null, path:ppppp"
-      sizeViolation.processor shouldEqual Processor("app", "version")
+      sizeViolation.processor shouldEqual Processor(TestUtils.appName, TestUtils.appVersion)
     }
 
     "Split a CollectorPayload with three large events and four very large events" in {
