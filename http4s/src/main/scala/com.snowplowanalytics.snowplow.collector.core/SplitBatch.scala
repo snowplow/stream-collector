@@ -1,4 +1,4 @@
-package com.snowplowanalytics.snowplow.collectors.scalastream
+package com.snowplowanalytics.snowplow.collector.core
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets.UTF_8
@@ -14,10 +14,10 @@ import com.snowplowanalytics.iglu.core._
 import com.snowplowanalytics.iglu.core.circe.CirceIgluCodecs._
 import com.snowplowanalytics.snowplow.badrows._
 import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
-import com.snowplowanalytics.snowplow.collectors.scalastream.model._
+import com.snowplowanalytics.snowplow.collector.core.model._
 
 /** Object handling splitting an array of strings correctly */
-case class SplitBatch(appName: String, appVersion: String) {
+case class SplitBatch(appInfo: AppInfo) {
 
   // Serialize Thrift CollectorPayload objects
   val ThriftSerializer = new ThreadLocal[TSerializer] {
@@ -124,7 +124,7 @@ case class SplitBatch(appName: String, appVersion: String) {
   ): Array[Byte] =
     BadRow
       .SizeViolation(
-        Processor(appName, appVersion),
+        Processor(appInfo.name, appInfo.version),
         Failure.SizeViolation(Instant.now(), maxSize, size, s"oversized collector payload: $msg"),
         Payload.RawPayload(event.toString().take(maxSize / 10))
       )

@@ -1,4 +1,4 @@
-package com.snowplowanalytics.snowplow.collectors.scalastream
+package com.snowplowanalytics.snowplow.collector.core
 
 trait Sink[F[_]] {
 
