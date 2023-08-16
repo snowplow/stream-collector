@@ -266,6 +266,9 @@ collector {
       maxCycles = 3
     }
   }
+
+  # When the shutdown gets interrupted, the app continues to serve requests for this duration
+  shutdownTimeout = 5 minutes
 }
 
 # Akka has a variety of possible configuration options defined at
