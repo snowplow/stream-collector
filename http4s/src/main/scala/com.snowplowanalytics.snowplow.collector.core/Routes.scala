@@ -7,7 +7,7 @@ import org.http4s.dsl.Http4sDsl
 import org.http4s.implicits._
 import com.comcast.ip4s.Dns
 
-class Routes[F[_]: Sync](service: IService[F]) extends Http4sDsl[F] {
+class Routes[F[_]: Sync](enableDefaultRedirect: Boolean, service: IService[F]) extends Http4sDsl[F] {
 
   implicit val dns: Dns[F] = Dns.forSync[F]
 
@@ -55,5 +55,14 @@ class Routes[F[_]: Sync](service: IService[F]) extends Http4sDsl[F] {
       )
   }
 
-  val value: HttpApp[F] = (healthRoutes <+> corsRoute <+> cookieRoutes).orNotFound
+  def rejectRedirect = HttpRoutes.of[F] {
+    case _ -> Root / "r" / _ =>
+      NotFound("redirects disabled")
+  }
+
+  val value: HttpApp[F] = {
+    val routes = healthRoutes <+> corsRoute <+> cookieRoutes
+    val res    = if (enableDefaultRedirect) routes else rejectRedirect <+> routes
+    res.orNotFound
+  }
 }

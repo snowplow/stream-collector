@@ -65,6 +65,7 @@ class Service[F[_]: Sync](
   ): F[Response[F]] =
     for {
       body <- body
+      redirect                  = path.startsWith("/r/")
       hostname                  = extractHostname(request)
       userAgent                 = extractHeader(request, "User-Agent")
       refererUri                = extractHeader(request, "Referer")
@@ -104,7 +105,12 @@ class Service[F[_]: Sync](
       ).flatten
       responseHeaders = Headers(headerList)
       _ <- sinkEvent(event, partitionKey)
-      resp = buildHttpResponse(responseHeaders, pixelExpected)
+      resp = buildHttpResponse(
+        queryParams   = request.uri.query.params,
+        headers       = responseHeaders,
+        redirect      = redirect,
+        pixelExpected = pixelExpected
+      )
     } yield resp
 
   override def determinePath(vendor: String, version: String): String = {
@@ -170,11 +176,19 @@ class Service[F[_]: Sync](
     e
   }
 
-  // TODO: Handle necessary cases to build http response in here
   def buildHttpResponse(
+    queryParams: Map[String, String],
     headers: Headers,
+    redirect: Boolean,
     pixelExpected: Boolean
   ): Response[F] =
+    if (redirect)
+      buildRedirectHttpResponse(queryParams, headers)
+    else
+      buildUsualHttpResponse(pixelExpected, headers)
+
+  /** Builds the appropriate http response when not dealing with click redirects. */
+  def buildUsualHttpResponse(pixelExpected: Boolean, headers: Headers): Response[F] =
     pixelExpected match {
       case true =>
         Response[F](
@@ -189,6 +203,32 @@ class Service[F[_]: Sync](
           body    = Stream.emit("ok").through(fs2.text.utf8.encode)
         )
     }
+
+  /** Builds the appropriate http response when dealing with click redirects. */
+  def buildRedirectHttpResponse(queryParams: Map[String, String], headers: Headers): Response[F] = {
+    val targetUri = for {
+      target <- queryParams.get("u")
+      uri    <- Uri.fromString(target).toOption
+      if redirectTargetAllowed(uri)
+    } yield uri
+
+    targetUri match {
+      case Some(t) =>
+        Response[F](
+          status  = Found,
+          headers = headers.put(Location(t))
+        )
+      case _ =>
+        Response[F](
+          status  = BadRequest,
+          headers = headers
+        )
+    }
+  }
+
+  private def redirectTargetAllowed(target: Uri): Boolean =
+    if (config.redirectDomains.isEmpty) true
+    else config.redirectDomains.contains(target.host.map(_.renderString).getOrElse(""))
 
   // TODO: Since Remote-Address and Raw-Request-URI is akka-specific headers,
   // they aren't included in here. It might be good to search for counterparts in Http4s.
