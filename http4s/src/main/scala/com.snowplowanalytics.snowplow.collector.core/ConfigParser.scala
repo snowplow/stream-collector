@@ -67,7 +67,7 @@ object ConfigParser {
   }
 
   private def loadAll(config: TypesafeConfig): TypesafeConfig =
-    namespaced(ConfigFactory.load(namespaced(config.withFallback(namespaced(ConfigFactory.load())))))
+    namespaced(config.withFallback(namespaced(ConfigFactory.load())))
 
   private def namespaced(config: TypesafeConfig): TypesafeConfig = {
     val namespace = "collector"
