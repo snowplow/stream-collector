@@ -102,6 +102,6 @@ object TestUtils {
     ),
     enableDefaultRedirect = false,
     redirectDomains       = Set.empty[String],
-    shutdownTimeout       = 5.minutes
+    preTerminationPeriod  = 5.minutes
   )
 }

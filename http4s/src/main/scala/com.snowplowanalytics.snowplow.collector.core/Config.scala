@@ -26,7 +26,7 @@ case class Config[+SinkConfig](
   ssl: Config.SSL,
   enableDefaultRedirect: Boolean,
   redirectDomains: Set[String],
-  shutdownTimeout: FiniteDuration
+  preTerminationPeriod: FiniteDuration
 )
 
 object Config {
