@@ -64,7 +64,7 @@ object Run {
         config.interface,
         config.port
       )
-      _ <- withGracefulShutdown(config.shutdownTimeout)(httpServer)
+      _ <- withGracefulShutdown(config.preTerminationPeriod)(httpServer)
     } yield ()
 
     resources.surround(Async[F].never[ExitCode])
