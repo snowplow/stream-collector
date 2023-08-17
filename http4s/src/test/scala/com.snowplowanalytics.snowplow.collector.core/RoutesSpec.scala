@@ -57,15 +57,15 @@ class RoutesSpec extends Specification {
     override def determinePath(vendor: String, version: String): String = "/p1/p2"
   }
 
-  def createTestServices = {
+  def createTestServices(enabledDefaultRedirect: Boolean = true) = {
     val service = new TestService()
-    val routes  = new Routes(service).value
+    val routes  = new Routes(enabledDefaultRedirect, service).value
     (service, routes)
   }
 
   "The collector route" should {
     "respond to the health route with an ok response" in {
-      val (_, routes) = createTestServices
+      val (_, routes) = createTestServices()
       val request     = Request[IO](method = Method.GET, uri = uri"/health")
       val response    = routes.run(request).unsafeRunSync()
 
@@ -74,7 +74,7 @@ class RoutesSpec extends Specification {
     }
 
     "respond to the cors route with a preflight response" in {
-      val (_, routes) = createTestServices
+      val (_, routes) = createTestServices()
       def test(uri: Uri) = {
         val request  = Request[IO](method = Method.OPTIONS, uri = uri)
         val response = routes.run(request).unsafeRunSync()
@@ -86,7 +86,7 @@ class RoutesSpec extends Specification {
     }
 
     "respond to the post cookie route with the cookie response" in {
-      val (collectorService, routes) = createTestServices
+      val (collectorService, routes) = createTestServices()
 
       val request = Request[IO](method = Method.POST, uri = uri"/p3/p4")
         .withEntity("testBody")
@@ -106,7 +106,7 @@ class RoutesSpec extends Specification {
 
     "respond to the get or head cookie route with the cookie response" in {
       def test(method: Method) = {
-        val (collectorService, routes) = createTestServices
+        val (collectorService, routes) = createTestServices()
 
         val request  = Request[IO](method = method, uri = uri"/p3/p4").withEntity("testBody")
         val response = routes.run(request).unsafeRunSync()
@@ -128,7 +128,7 @@ class RoutesSpec extends Specification {
 
     "respond to the get or head pixel route with the cookie response" in {
       def test(method: Method, uri: String) = {
-        val (collectorService, routes) = createTestServices
+        val (collectorService, routes) = createTestServices()
 
         val request  = Request[IO](method = method, uri = Uri.unsafeFromString(uri)).withEntity("testBody")
         val response = routes.run(request).unsafeRunSync()
@@ -148,6 +148,36 @@ class RoutesSpec extends Specification {
       test(Method.HEAD, "/i")
       test(Method.GET, "/ice.png")
       test(Method.HEAD, "/ice.png")
+    }
+
+    "allow redirect routes when redirects enabled" in {
+      def test(method: Method) = {
+        val (_, routes) = createTestServices()
+
+        val request  = Request[IO](method = method, uri = uri"/r/abc")
+        val response = routes.run(request).unsafeRunSync()
+
+        response.status must beEqualTo(Status.Ok)
+        response.bodyText.compile.string.unsafeRunSync() must beEqualTo("cookie")
+      }
+
+      test(Method.GET)
+      test(Method.POST)
+    }
+
+    "disallow redirect routes when redirects disabled" in {
+      def test(method: Method) = {
+        val (_, routes) = createTestServices(enabledDefaultRedirect = false)
+
+        val request  = Request[IO](method = method, uri = uri"/r/abc")
+        val response = routes.run(request).unsafeRunSync()
+
+        response.status must beEqualTo(Status.NotFound)
+        response.bodyText.compile.string.unsafeRunSync() must beEqualTo("redirects disabled")
+      }
+
+      test(Method.GET)
+      test(Method.POST)
     }
   }
 
