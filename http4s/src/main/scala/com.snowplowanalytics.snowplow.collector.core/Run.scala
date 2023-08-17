@@ -62,7 +62,8 @@ object Run {
       httpServer = HttpServer.build[F](
         new Routes[F](config.enableDefaultRedirect, collectorService).value,
         config.interface,
-        config.port
+        if (config.ssl.enable) config.ssl.port else config.port,
+        config.ssl.enable
       )
       _ <- withGracefulShutdown(config.preTerminationPeriod)(httpServer)
     } yield ()
