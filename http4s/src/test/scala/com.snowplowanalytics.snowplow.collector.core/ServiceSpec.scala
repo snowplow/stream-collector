@@ -48,11 +48,11 @@ class ServiceSpec extends Specification {
     secure = false
   )
 
-  def probeService(): ProbeService = {
+  def probeService(config: Config[Any] = TestUtils.testConfig): ProbeService = {
     val good = new TestSink
     val bad  = new TestSink
     val service = new Service(
-      config  = TestUtils.testConfig,
+      config  = config,
       sinks   = Sinks(good, bad),
       appInfo = TestUtils.appInfo
     )
@@ -365,6 +365,35 @@ class ServiceSpec extends Specification {
           Header.Raw(ci"Access-Control-Allow-Origin", "http://origin.com")
         )
       }
+
+      "redirect if path starts with '/r/'" in {
+        val testConf = TestUtils
+          .testConfig
+          .copy(
+            redirectDomains = Set("snowplow.acme.com", "example.com")
+          )
+        val testPath                         = "/r/example?u=https://snowplow.acme.com/12"
+        val ProbeService(service, good, bad) = probeService(config = testConf)
+        val req = Request[IO](
+          method = Method.GET,
+          uri    = Uri.unsafeFromString(testPath)
+        )
+        val r = service
+          .cookie(
+            body          = IO.pure(Some("b")),
+            path          = testPath,
+            request       = req,
+            pixelExpected = false,
+            doNotTrack    = false,
+            contentType   = None
+          )
+          .unsafeRunSync()
+
+        r.status mustEqual Status.Found
+        r.headers.get[Location] must beSome(Location(Uri.unsafeFromString("https://snowplow.acme.com/12")))
+        good.storedRawEvents must have size 1
+        bad.storedRawEvents must have size 0
+      }
     }
 
     "preflightResponse" in {
@@ -451,17 +480,123 @@ class ServiceSpec extends Specification {
     }
 
     "buildHttpResponse" in {
+      "rely on buildRedirectHttpResponse if redirect is true" in {
+        val testConfig = TestUtils
+          .testConfig
+          .copy(
+            redirectDomains = Set("example1.com", "example2.com")
+          )
+        val ProbeService(service, _, _) = probeService(config = testConfig)
+        val res = service.buildHttpResponse(
+          queryParams   = Map("u" -> "https://example1.com/12"),
+          headers       = testHeaders,
+          redirect      = true,
+          pixelExpected = true
+        )
+        res.status shouldEqual Status.Found
+        res.headers shouldEqual testHeaders.put(Location(Uri.unsafeFromString("https://example1.com/12")))
+      }
       "send back a gif if pixelExpected is true" in {
-        val res = service.buildHttpResponse(testHeaders, pixelExpected = true)
+        val res = service.buildHttpResponse(
+          queryParams   = Map.empty,
+          headers       = testHeaders,
+          redirect      = false,
+          pixelExpected = true
+        )
         res.status shouldEqual Status.Ok
         res.headers shouldEqual testHeaders.put(`Content-Type`(MediaType.image.gif))
         res.body.compile.toList.unsafeRunSync().toArray shouldEqual Service.pixel
       }
       "send back ok otherwise" in {
-        val res = service.buildHttpResponse(testHeaders, pixelExpected = false)
+        val res = service.buildHttpResponse(
+          queryParams   = Map.empty,
+          headers       = testHeaders,
+          redirect      = false,
+          pixelExpected = false
+        )
         res.status shouldEqual Status.Ok
         res.headers shouldEqual testHeaders
         res.bodyText.compile.toList.unsafeRunSync() shouldEqual List("ok")
+      }
+    }
+
+    "buildUsualHttpResponse" in {
+      "send back a gif if pixelExpected is true" in {
+        val res = service.buildUsualHttpResponse(
+          headers       = testHeaders,
+          pixelExpected = true
+        )
+        res.status shouldEqual Status.Ok
+        res.headers shouldEqual testHeaders.put(`Content-Type`(MediaType.image.gif))
+        res.body.compile.toList.unsafeRunSync().toArray shouldEqual Service.pixel
+      }
+      "send back ok otherwise" in {
+        val res = service.buildUsualHttpResponse(
+          headers       = testHeaders,
+          pixelExpected = false
+        )
+        res.status shouldEqual Status.Ok
+        res.headers shouldEqual testHeaders
+        res.bodyText.compile.toList.unsafeRunSync() shouldEqual List("ok")
+      }
+    }
+
+    "buildRedirectHttpResponse" in {
+      "give back a 302 if redirecting and there is a u query param" in {
+        val testConfig = TestUtils
+          .testConfig
+          .copy(
+            redirectDomains = Set("example1.com", "example2.com")
+          )
+        val ProbeService(service, _, _) = probeService(config = testConfig)
+        val res = service.buildRedirectHttpResponse(
+          queryParams = Map("u" -> "https://example1.com/12"),
+          headers     = testHeaders
+        )
+        res.status shouldEqual Status.Found
+        res.headers shouldEqual testHeaders.put(Location(Uri.unsafeFromString("https://example1.com/12")))
+      }
+      "give back a 400 if redirecting and there are no u query params" in {
+        val testConfig = TestUtils
+          .testConfig
+          .copy(
+            redirectDomains = Set("example1.com", "example2.com")
+          )
+        val ProbeService(service, _, _) = probeService(config = testConfig)
+        val res = service.buildRedirectHttpResponse(
+          queryParams = Map.empty,
+          headers     = testHeaders
+        )
+        res.status shouldEqual Status.BadRequest
+        res.headers shouldEqual testHeaders
+      }
+      "give back a 400 if redirecting to a disallowed domain" in {
+        val testConfig = TestUtils
+          .testConfig
+          .copy(
+            redirectDomains = Set("example1.com", "example2.com")
+          )
+        val ProbeService(service, _, _) = probeService(config = testConfig)
+        val res = service.buildRedirectHttpResponse(
+          queryParams = Map("u" -> "https://invalidexample1.com/12"),
+          headers     = testHeaders
+        )
+        res.status shouldEqual Status.BadRequest
+        res.headers shouldEqual testHeaders
+      }
+      "give back a 302 if redirecting to an unknown domain, with no restrictions on domains" in {
+        val testConfig = TestUtils
+          .testConfig
+          .copy(
+            redirectDomains = Set.empty
+          )
+        val ProbeService(service, _, _) = probeService(config = testConfig)
+        val res = service.buildRedirectHttpResponse(
+          queryParams = Map("u" -> "https://unknown.example.com/12"),
+          headers     = testHeaders
+        )
+        res.status shouldEqual Status.Found
+        res.headers shouldEqual testHeaders.put(Location(Uri.unsafeFromString("https://unknown.example.com/12")))
       }
     }
 

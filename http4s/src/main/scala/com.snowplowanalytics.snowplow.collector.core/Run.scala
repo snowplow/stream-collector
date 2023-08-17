@@ -60,7 +60,7 @@ object Run {
         appInfo
       )
       httpServer = HttpServer.build[F](
-        new Routes[F](collectorService).value,
+        new Routes[F](config.enableDefaultRedirect, collectorService).value,
         config.interface,
         config.port
       )
