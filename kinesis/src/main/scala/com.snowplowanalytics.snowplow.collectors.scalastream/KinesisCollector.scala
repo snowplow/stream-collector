@@ -8,57 +8,41 @@
   */
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
+import cats.effect.{IO, Resource}
+import com.snowplowanalytics.snowplow.collector.core.model.Sinks
+import com.snowplowanalytics.snowplow.collector.core.{App, Config}
+import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.{KinesisSink, KinesisSinkConfig}
+import org.slf4j.LoggerFactory
+
 import java.util.concurrent.ScheduledThreadPoolExecutor
-import cats.syntax.either._
-import com.snowplowanalytics.snowplow.collectors.scalastream.generated.BuildInfo
-import com.snowplowanalytics.snowplow.collectors.scalastream.model._
-import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink
-import com.snowplowanalytics.snowplow.collectors.scalastream.telemetry.TelemetryAkkaService
 
-object KinesisCollector extends Collector {
-  def appName      = BuildInfo.shortName
-  def appVersion   = BuildInfo.version
-  def scalaVersion = BuildInfo.scalaVersion
+object KinesisCollector extends App[KinesisSinkConfig](BuildInfo) {
 
-  def main(args: Array[String]): Unit = {
-    val (collectorConf, akkaConf) = parseConfig(args)
-    val telemetry                 = TelemetryAkkaService.initWithCollector(collectorConf, BuildInfo.moduleName, appVersion)
-    val sinks: Either[Throwable, CollectorSinks] = for {
-      kc <- collectorConf.streams.sink match {
-        case kc: Kinesis => kc.asRight
-        case _           => new IllegalArgumentException("Configured sink is not Kinesis").asLeft
-      }
-      es         = buildExecutorService(kc)
-      goodStream = collectorConf.streams.good
-      badStream  = collectorConf.streams.bad
-      bufferConf = collectorConf.streams.buffer
-      sqsGood    = kc.sqsGoodBuffer
-      sqsBad     = kc.sqsBadBuffer
-      good <- KinesisSink.createAndInitialize(
-        kc.maxBytes,
-        kc,
-        bufferConf,
-        goodStream,
-        sqsGood,
-        es
+  private lazy val log = LoggerFactory.getLogger(getClass)
+
+  override def mkSinks(config: Config.Streams[KinesisSinkConfig]): Resource[IO, Sinks[IO]] = {
+    val threadPoolExecutor = buildExecutorService(config.sink)
+    for {
+      good <- KinesisSink.create[IO](
+        kinesisMaxBytes = config.sink.maxBytes,
+        kinesisConfig   = config.sink,
+        bufferConfig    = config.buffer,
+        streamName      = config.good,
+        sqsBufferName   = config.sink.sqsGoodBuffer,
+        threadPoolExecutor
       )
-      bad <- KinesisSink.createAndInitialize(
-        kc.maxBytes,
-        kc,
-        bufferConf,
-        badStream,
-        sqsBad,
-        es
+      bad <- KinesisSink.create[IO](
+        kinesisMaxBytes = config.sink.maxBytes,
+        kinesisConfig   = config.sink,
+        bufferConfig    = config.buffer,
+        streamName      = config.bad,
+        sqsBufferName   = config.sink.sqsBadBuffer,
+        threadPoolExecutor
       )
-    } yield CollectorSinks(good, bad)
-
-    sinks match {
-      case Right(s) => run(collectorConf, akkaConf, s, telemetry)
-      case Left(e)  => throw e
-    }
+    } yield Sinks(good, bad)
   }
 
-  def buildExecutorService(kc: Kinesis): ScheduledThreadPoolExecutor = {
+  def buildExecutorService(kc: KinesisSinkConfig): ScheduledThreadPoolExecutor = {
     log.info("Creating thread pool of size " + kc.threadPoolSize)
     new ScheduledThreadPoolExecutor(kc.threadPoolSize)
   }

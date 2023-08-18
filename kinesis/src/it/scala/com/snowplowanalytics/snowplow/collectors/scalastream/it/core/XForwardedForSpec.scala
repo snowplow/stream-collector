@@ -8,37 +8,29 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream.it.core
 
-import java.net.InetAddress
+import cats.data.NonEmptyList
+import cats.effect.IO
+import cats.effect.testing.specs2.CatsEffect
+import com.comcast.ip4s.IpAddress
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.{EventGenerator, Http}
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.Kinesis
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers._
+import org.http4s.headers.`X-Forwarded-For`
+import org.specs2.mutable.Specification
 
 import scala.concurrent.duration._
 
-import cats.data.NonEmptyList
-
-import cats.effect.IO
-
-import cats.effect.testing.specs2.CatsIO
-
-import org.specs2.mutable.Specification
-
-import org.http4s.headers.`X-Forwarded-For`
-
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.Http
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.EventGenerator
-
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers._
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.Kinesis
-
-class XForwardedForSpec extends Specification with Localstack with CatsIO {
+class XForwardedForSpec extends Specification with Localstack with CatsEffect {
 
   override protected val Timeout = 5.minutes
 
   "collector" should {
     "put X-Forwarded-For header in the collector payload" in {
       val testName = "X-Forwarded-For"
-      val streamGood = s"${testName}-raw"
-      val streamBad = s"${testName}-bad-1"
+      val streamGood = s"$testName-raw"
+      val streamBad = s"$testName-bad-1"
 
-      val ip = InetAddress.getByName("123.123.123.123")
+      val ip = IpAddress.fromString("123.123.123.123")
 
       Collector.container(
         "kinesis/src/it/resources/collector.hocon",
@@ -47,7 +39,7 @@ class XForwardedForSpec extends Specification with Localstack with CatsIO {
         streamBad
       ).use { collector =>
         val request = EventGenerator.mkTp2Event(collector.host, collector.port)
-          .withHeaders(`X-Forwarded-For`(NonEmptyList.one(Some(ip))))
+          .withHeaders(`X-Forwarded-For`(NonEmptyList.one(ip)))
 
         for {
           _ <- Http.status(request)

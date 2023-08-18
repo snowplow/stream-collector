@@ -9,38 +9,39 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 package sinks
 
-import java.nio.ByteBuffer
-import java.util.concurrent.ScheduledExecutorService
-import java.util.UUID
-
-import scala.collection.JavaConverters._
-import scala.collection.mutable.ListBuffer
-import scala.concurrent.{ExecutionContextExecutorService, Future}
-import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
-
+import cats.effect.{Resource, Sync}
+import cats.implicits.catsSyntaxMonadErrorRethrow
 import cats.syntax.either._
-
 import com.amazonaws.auth._
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
-import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClientBuilder}
 import com.amazonaws.services.kinesis.model._
-import com.amazonaws.services.sqs.{AmazonSQS, AmazonSQSClientBuilder}
+import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClientBuilder}
 import com.amazonaws.services.sqs.model.{MessageAttributeValue, SendMessageBatchRequest, SendMessageBatchRequestEntry}
+import com.amazonaws.services.sqs.{AmazonSQS, AmazonSQSClientBuilder}
+import com.snowplowanalytics.snowplow.collector.core.{Config, Sink}
+import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink._
+import org.slf4j.LoggerFactory
 
-import com.snowplowanalytics.snowplow.collectors.scalastream.model._
-import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink.SqsClientAndName
+import java.nio.ByteBuffer
+import java.util.UUID
+import java.util.concurrent.ScheduledExecutorService
+import scala.collection.JavaConverters._
+import scala.collection.mutable.ListBuffer
+import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContextExecutorService, Future}
+import scala.util.{Failure, Success, Try}
 
-class KinesisSink private (
+class KinesisSink[F[_]: Sync] private (
   val maxBytes: Int,
   client: AmazonKinesis,
-  kinesisConfig: Kinesis,
-  bufferConfig: BufferConfig,
+  kinesisConfig: KinesisSinkConfig,
+  bufferConfig: Config.Buffer,
   streamName: String,
   executorService: ScheduledExecutorService,
   maybeSqs: Option[SqsClientAndName]
-) extends Sink {
-  import KinesisSink._
+) extends Sink[F] {
+
+  private lazy val log = LoggerFactory.getLogger(getClass)
 
   maybeSqs match {
     case Some(sqs) =>
@@ -67,10 +68,10 @@ class KinesisSink private (
 
   @volatile private var kinesisHealthy: Boolean = false
   @volatile private var sqsHealthy: Boolean     = false
-  override def isHealthy: Boolean               = kinesisHealthy || sqsHealthy
+  override def isHealthy: F[Boolean]            = Sync[F].pure(kinesisHealthy || sqsHealthy)
 
-  override def storeRawEvents(events: List[Array[Byte]], key: String): Unit =
-    events.foreach(e => EventStorage.store(e, key))
+  override def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit] =
+    Sync[F].delay(events.foreach(e => EventStorage.store(e, key)))
 
   object EventStorage {
     private val storedEvents              = ListBuffer.empty[Events]
@@ -440,14 +441,38 @@ object KinesisSink {
     * Exists so that no threads can get a reference to the KinesisSink
     * during its construction.
     */
-  def createAndInitialize(
+  def create[F[_]: Sync](
     kinesisMaxBytes: Int,
-    kinesisConfig: Kinesis,
-    bufferConfig: BufferConfig,
+    kinesisConfig: KinesisSinkConfig,
+    bufferConfig: Config.Buffer,
     streamName: String,
     sqsBufferName: Option[String],
     executorService: ScheduledExecutorService
-  ): Either[Throwable, KinesisSink] = {
+  ): Resource[F, KinesisSink[F]] = {
+    val acquire =
+      Sync[F]
+        .delay(
+          createAndInitialize(kinesisMaxBytes, kinesisConfig, bufferConfig, streamName, sqsBufferName, executorService)
+        )
+        .rethrow
+    val release = (sink: KinesisSink[F]) => Sync[F].delay(sink.shutdown())
+
+    Resource.make(acquire)(release)
+  }
+
+  /**
+    * Create a KinesisSink and schedule a task to flush its EventStorage.
+    * Exists so that no threads can get a reference to the KinesisSink
+    * during its construction.
+    */
+  private def createAndInitialize[F[_]: Sync](
+    kinesisMaxBytes: Int,
+    kinesisConfig: KinesisSinkConfig,
+    bufferConfig: Config.Buffer,
+    streamName: String,
+    sqsBufferName: Option[String],
+    executorService: ScheduledExecutorService
+  ): Either[Throwable, KinesisSink[F]] = {
     val clients = for {
       provider         <- getProvider(kinesisConfig.aws)
       kinesisClient    <- createKinesisClient(provider, kinesisConfig.endpoint, kinesisConfig.region)
@@ -476,7 +501,7 @@ object KinesisSink {
   }
 
   /** Create an aws credentials provider through env variables and iam. */
-  private def getProvider(awsConfig: AWSConfig): Either[Throwable, AWSCredentialsProvider] = {
+  private def getProvider(awsConfig: KinesisSinkConfig.AWSConfig): Either[Throwable, AWSCredentialsProvider] = {
     def isDefault(key: String): Boolean = key == "default"
     def isIam(key: String): Boolean     = key == "iam"
     def isEnv(key: String): Boolean     = key == "env"
