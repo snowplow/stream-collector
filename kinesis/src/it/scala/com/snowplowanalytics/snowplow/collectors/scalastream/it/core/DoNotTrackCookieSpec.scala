@@ -14,22 +14,17 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream.it.core
 
-import scala.concurrent.duration._
-import scala.collection.JavaConverters._
-
 import cats.effect.IO
-
-import cats.effect.testing.specs2.CatsIO
-
+import cats.effect.testing.specs2.CatsEffect
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.{EventGenerator, Http}
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.Kinesis
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers._
 import org.specs2.mutable.Specification
 
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.Http
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.EventGenerator
+import scala.collection.JavaConverters._
+import scala.concurrent.duration._
 
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers._
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.Kinesis
-
-class DoNotTrackCookieSpec extends Specification with Localstack with CatsIO {
+class DoNotTrackCookieSpec extends Specification with Localstack with CatsEffect {
 
   override protected val Timeout = 5.minutes
 
