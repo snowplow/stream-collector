@@ -1,78 +1,64 @@
-/**
- * Copyright (c) 2013-present Snowplow Analytics Ltd.
- * All rights reserved.
+/*
+ * Copyright (c) 2023-2023 Snowplow Analytics Ltd. All rights reserved.
  *
- * This program is licensed to you under the Snowplow Community License Version 1.0,
- * and you may not use this file except in compliance with the Snowplow Community License Version 1.0.
- * You may obtain a copy of the Snowplow Community License Version 1.0 at https://docs.snowplow.io/community-license-1.0
+ * This program is licensed to you under the Apache License Version 2.0, and
+ * you may not use this file except in compliance with the Apache License
+ * Version 2.0.  You may obtain a copy of the Apache License Version 2.0 at
+ * http://www.apache.org/licenses/LICENSE-2.0.
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the Apache License Version 2.0 is distributed on an "AS
+ * IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+ * implied.  See the Apache License Version 2.0 for the specific language
+ * governing permissions and limitations there under.
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream.it.core
 
+import cats.effect.IO
+import cats.effect.testing.specs2.CatsEffect
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.{EventGenerator, Http}
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers._
+import org.http4s.{Header, SameSite}
+import org.specs2.mutable.Specification
+import org.typelevel.ci.CIStringSyntax
+
 import scala.concurrent.duration._
 
-import cats.effect.testing.specs2.CatsIO
-
-import org.http4s.{Header, SameSite}
-
-import org.specs2.mutable.Specification
-
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.Http
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.EventGenerator
-
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers._
-
-class CookieSpec extends Specification with Localstack with CatsIO {
+class CookieSpec extends Specification with Localstack with CatsEffect {
 
   override protected val Timeout = 5.minutes
 
   "collector" should {
-
     "set cookie attributes according to configuration" in {
-
       "name, expiration, secure true, httpOnly true, SameSite" in {
         val testName = "cookie-attributes-1"
-        val streamGood = s"${testName}-raw"
-        val streamBad = s"${testName}-bad-1"
-
-        val name = "greatName"
-        val expiration = 42 days
-        val secure = true
-        val httpOnly = true
-        val sameSite = SameSite.Strict
+        val streamGood = s"$testName-raw"
+        val streamBad = s"$testName-bad-1"
 
         Collector.container(
-          "kinesis/src/it/resources/collector.hocon",
+          "kinesis/src/it/resources/collector-cookie-attributes-1.hocon",
           testName,
           streamGood,
-          streamBad,
-          additionalConfig = Some(
-            mkConfig(
-              name = name,
-              expiration = expiration,
-              secure = secure,
-              httpOnly = httpOnly,
-              sameSite = sameSite.toString()
-            )
-          )
+          streamBad
         ).use { collector =>
           val request = EventGenerator.mkTp2Event(collector.host, collector.port)
 
           for {
             resp <- Http.response(request)
-            now <- ioTimer.clock.realTime(SECONDS)
+            now <- IO.realTime
           } yield {
             resp.cookies match {
               case List(cookie) =>
-                cookie.name must beEqualTo(name)
+                cookie.name must beEqualTo("greatName")
                 cookie.expires match {
                   case Some(expiry) =>
-                    expiry.epochSecond should beCloseTo(now + expiration.toSeconds, 10)
+                    expiry.epochSecond should beCloseTo((now + 42.days).toSeconds, 10)
                   case None =>
                     ko(s"Cookie [$cookie] doesn't contain the expiry date")
                 }
                 cookie.secure should beTrue
                 cookie.httpOnly should beTrue
-                cookie.sameSite should beEqualTo(sameSite)
+                cookie.sameSite should beSome(SameSite.Strict)
               case _ => ko(s"There is not 1 cookie but ${resp.cookies.size}")
             }
           }
@@ -81,23 +67,14 @@ class CookieSpec extends Specification with Localstack with CatsIO {
 
       "secure false, httpOnly false" in {
         val testName = "cookie-attributes-2"
-        val streamGood = s"${testName}-raw"
-        val streamBad = s"${testName}-bad-1"
-
-        val httpOnly = false
-        val secure = false
+        val streamGood = s"$testName-raw"
+        val streamBad = s"$testName-bad-1"
 
         Collector.container(
-          "kinesis/src/it/resources/collector.hocon",
+          "kinesis/src/it/resources/collector-cookie-attributes-2.hocon",
           testName,
           streamGood,
-          streamBad,
-          additionalConfig = Some(
-            mkConfig(
-              secure = secure,
-              httpOnly = httpOnly
-            )
-          )
+          streamBad
         ).use { collector =>
           val request = EventGenerator.mkTp2Event(collector.host, collector.port)
 
@@ -106,7 +83,7 @@ class CookieSpec extends Specification with Localstack with CatsIO {
           } yield {
             resp.cookies match {
               case List(cookie) =>
-                cookie.secure should beFalse
+                cookie.secure should beTrue 
                 cookie.httpOnly should beFalse
               case _ => ko(s"There is not 1 cookie but ${resp.cookies.size}")
             }
@@ -117,18 +94,17 @@ class CookieSpec extends Specification with Localstack with CatsIO {
 
     "not set cookie if the request sets SP-Anonymous header" in {
       val testName = "cookie-anonymous"
-      val streamGood = s"${testName}-raw"
-      val streamBad = s"${testName}-bad-1"
+      val streamGood = s"$testName-raw"
+      val streamBad = s"$testName-bad-1"
 
       Collector.container(
-        "kinesis/src/it/resources/collector.hocon",
+        "kinesis/src/it/resources/collector-cookie-anonymous.hocon",
         testName,
         streamGood,
-        streamBad,
-        additionalConfig = Some(mkConfig())
+        streamBad
       ).use { collector =>
         val request = EventGenerator.mkTp2Event(collector.host, collector.port)
-          .withHeaders(Header("SP-Anonymous", "*"))
+          .withHeaders(Header.Raw(ci"SP-Anonymous", "*"))
 
         for {
           resp <- Http.response(request)
@@ -140,18 +116,17 @@ class CookieSpec extends Specification with Localstack with CatsIO {
 
     "not set the domain property of the cookie if collector.cookie.domains and collector.cookie.fallbackDomain are empty" in {
       val testName = "cookie-no-domain"
-      val streamGood = s"${testName}-raw"
-      val streamBad = s"${testName}-bad-1"
+      val streamGood = s"$testName-raw"
+      val streamBad = s"$testName-bad-1"
 
       Collector.container(
-        "kinesis/src/it/resources/collector.hocon",
+        "kinesis/src/it/resources/collector-cookie-no-domain.hocon",
         testName,
         streamGood,
-        streamBad,
-        additionalConfig = Some(mkConfig())
+        streamBad
       ).use { collector =>
         val request = EventGenerator.mkTp2Event(collector.host, collector.port)
-          .withHeaders(Header("Origin", "http://my.domain"))
+          .withHeaders(Header.Raw(ci"Origin", "http://my.domain"))
 
         for {
           resp <- Http.response(request)
@@ -163,32 +138,24 @@ class CookieSpec extends Specification with Localstack with CatsIO {
 
     "set the domain property of the cookie to the first domain of collector.cookie.domains that matches Origin, even with fallbackDomain enabled" in {
       val testName = "cookie-domain"
-      val streamGood = s"${testName}-raw"
-      val streamBad = s"${testName}-bad-1"
-
-      val domain = "foo.bar"
-      val subDomain = s"sub.$domain"
-      val fallbackDomain = "fallback.domain"
+      val streamGood = s"$testName-raw"
+      val streamBad = s"$testName-bad-1"
 
       Collector.container(
-        "kinesis/src/it/resources/collector.hocon",
+        "kinesis/src/it/resources/collector-cookie-domain.hocon",
         testName,
         streamGood,
-        streamBad,
-        additionalConfig = Some(mkConfig(
-          domains = Some(List(domain, subDomain)),
-          fallbackDomain = Some(fallbackDomain)
-        ))
+        streamBad
       ).use { collector =>
         val request = EventGenerator.mkTp2Event(collector.host, collector.port)
-          .withHeaders(Header("Origin", s"http://$subDomain"))
+          .withHeaders(Header.Raw(ci"Origin", "http://sub.foo.bar"))
 
         for {
           resp <- Http.response(request)
         } yield {
           resp.cookies match {
             case List(cookie) =>
-              cookie.domain should beSome(domain)
+              cookie.domain should beSome("foo.bar")
             case _ => ko(s"There is not 1 cookie but ${resp.cookies.size}")
           }
         }
@@ -197,60 +164,25 @@ class CookieSpec extends Specification with Localstack with CatsIO {
 
     "set the domain property of the cookie to collector.cookie.fallbackDomain if there is no Origin header in the request or if it contains no host that is in collector.cookie.domains" in {
       val testName = "cookie-fallback"
-      val streamGood = s"${testName}-raw"
-      val streamBad = s"${testName}-bad-1"
-
-      val domain = "foo.bar"
-      val fallbackDomain = "fallback.domain"
+      val streamGood = s"$testName-raw"
+      val streamBad = s"$testName-bad-1"
 
       Collector.container(
-        "kinesis/src/it/resources/collector.hocon",
+        "kinesis/src/it/resources/collector-cookie-fallback.hocon",
         testName,
         streamGood,
-        streamBad,
-        additionalConfig = Some(mkConfig(
-          domains = Some(List(domain)),
-          fallbackDomain = Some(fallbackDomain)
-        ))
+        streamBad
       ).use { collector =>
         val request1 = EventGenerator.mkTp2Event(collector.host, collector.port)
-          .withHeaders(Header("Origin", s"http://other.domain"))
+          .withHeaders(Header.Raw(ci"Origin", s"http://other.domain"))
         val request2 = EventGenerator.mkTp2Event(collector.host, collector.port)
 
         for {
           responses <- Http.responses(List(request1, request2))
         } yield {
-          responses.flatMap(r => r.cookies.map( c => c.domain must beSome(fallbackDomain)))
+          responses.flatMap(r => r.cookies.map( c => c.domain must beSome("fallback.domain")))
         }
       }
     }
-  }
-
-  private def mkConfig(
-    enabled: Boolean = true,
-    name: String = "sp",
-    expiration: FiniteDuration = 365 days,
-    domains: Option[List[String]] = None,
-    fallbackDomain: Option[String] = None,
-    secure: Boolean = false,
-    httpOnly: Boolean = false,
-    sameSite: String = "None"
-  ): String = {
-    s"""
-      {
-        "collector": {
-          "cookie": {
-            "enabled": $enabled,
-            "name": "$name",
-            "expiration": "${expiration.toString()}",
-            ${domains.fold("")(l => s""""domains": [${l.map(d => s""""$d"""").mkString(",")} ],""")}
-            ${fallbackDomain.fold("")(d => s""""fallbackDomain": "$d",""")}
-            "secure": $secure,
-            "httpOnly": $httpOnly,
-            "sameSite": "$sameSite"
-          }
-        }
-      }
-    """
   }
 }

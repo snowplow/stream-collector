@@ -8,22 +8,18 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream.it.core
 
-import scala.concurrent.duration._
-import scala.collection.JavaConverters._
-
 import cats.effect.IO
-
-import cats.effect.testing.specs2.CatsIO
-
+import cats.effect.testing.specs2.CatsEffect
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.{EventGenerator, Http}
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.Kinesis
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers._
+import org.specs2.execute.PendingUntilFixed
 import org.specs2.mutable.Specification
 
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.Http
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.EventGenerator
+import scala.collection.JavaConverters._
+import scala.concurrent.duration._
 
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers._
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.Kinesis
-
-class DoNotTrackCookieSpec extends Specification with Localstack with CatsIO {
+class DoNotTrackCookieSpec extends Specification with Localstack with CatsEffect with PendingUntilFixed {
 
   override protected val Timeout = 5.minutes
 
@@ -32,16 +28,17 @@ class DoNotTrackCookieSpec extends Specification with Localstack with CatsIO {
     val cookieValue = "bar"
 
     "ignore events that have a cookie whose name and value match doNotTrackCookie config if enabled" in {
+      import cats.effect.unsafe.implicits.global
+      
       val testName = "doNotTrackCookie-enabled"
-      val streamGood = s"${testName}-raw"
-      val streamBad = s"${testName}-bad-1"
+      val streamGood = s"$testName-raw"
+      val streamBad = s"$testName-bad-1"
 
       Collector.container(
-        "kinesis/src/it/resources/collector.hocon",
+        "kinesis/src/it/resources/collector-doNotTrackCookie-enabled.hocon",
         testName,
         streamGood,
-        streamBad,
-        additionalConfig = Some(mkConfig(true, cookieName, cookieValue))
+        streamBad
       ).use { collector =>
         val requests = List(
           EventGenerator.mkTp2Event(collector.host, collector.port).addCookie(cookieName, cookieName),
@@ -61,20 +58,19 @@ class DoNotTrackCookieSpec extends Specification with Localstack with CatsIO {
           headers must haveSize(2)
           expected.forall(cookie => headers.exists(_.contains(cookie))) must beTrue
         }
-      }
-    }
-
-    "track events that have a cookie whose name and value match doNotTrackCookie config if disabled" in {
+      }.unsafeRunSync()
+    }.pendingUntilFixed("Remove when 'do not track cookie' feature is implemented")
+    
+    "track events that have a cookie whose name and value match doNotTrackCookie config if disabled" in { 
       val testName = "doNotTrackCookie-disabled"
-      val streamGood = s"${testName}-raw"
-      val streamBad = s"${testName}-bad-1"
+      val streamGood = s"$testName-raw"
+      val streamBad = s"$testName-bad-1"
 
       Collector.container(
-        "kinesis/src/it/resources/collector.hocon",
+        "kinesis/src/it/resources/collector-doNotTrackCookie-disabled.hocon",
         testName,
         streamGood,
-        streamBad,
-        additionalConfig = Some(mkConfig(false, cookieName, cookieValue))
+        streamBad
       ).use { collector =>
         val request = EventGenerator.mkTp2Event(collector.host, collector.port).addCookie(cookieName, cookieValue)
 
@@ -96,17 +92,4 @@ class DoNotTrackCookieSpec extends Specification with Localstack with CatsIO {
       }
     }
   }
-
-  private def mkConfig(enabled: Boolean, cookieName: String, cookieValue: String): String =
-    s"""
-      {
-        "collector": {
-          "doNotTrackCookie": {
-            "enabled": $enabled,
-            "name" : "$cookieName",
-            "value": "$cookieValue"
-          }
-        }
-      }
-      """
 }

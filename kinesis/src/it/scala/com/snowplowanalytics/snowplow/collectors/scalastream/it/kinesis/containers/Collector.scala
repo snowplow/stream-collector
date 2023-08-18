@@ -8,17 +8,13 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers
 
+import cats.effect.{IO, Resource}
+import com.dimafeng.testcontainers.GenericContainer
+import com.snowplowanalytics.snowplow.collectors.scalastream.BuildInfo
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.CollectorContainer
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.utils._
 import org.testcontainers.containers.BindMode
 import org.testcontainers.containers.wait.strategy.Wait
-
-import com.dimafeng.testcontainers.GenericContainer
-
-import cats.effect.{IO, Resource}
-
-import com.snowplowanalytics.snowplow.collectors.scalastream.generated.ProjectMetadata
-
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.utils._
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.CollectorContainer
 
 object Collector {
 
@@ -34,7 +30,7 @@ object Collector {
     additionalConfig: Option[String] = None
   ): Resource[IO, CollectorContainer] = {
     val container = GenericContainer(
-      dockerImage = s"snowplow/scala-stream-collector-kinesis:${ProjectMetadata.dockerTag}",
+      dockerImage = BuildInfo.dockerAlias,
       env = Map(
         "AWS_ACCESS_KEY_ID" -> "whatever",
         "AWS_SECRET_ACCESS_KEY" -> "whatever",
@@ -44,7 +40,8 @@ object Collector {
         "REGION" -> Localstack.region,
         "KINESIS_ENDPOINT" -> Localstack.privateEndpoint,
         "MAX_BYTES" -> maxBytes.toString,
-        "JDK_JAVA_OPTIONS" -> "-Dorg.slf4j.simpleLogger.log.com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink=warn"
+        "JDK_JAVA_OPTIONS" -> "-Dorg.slf4j.simpleLogger.log.com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink=warn",
+        "HTTP4S_BACKEND" -> "BLAZE"
       ) ++ configParameters(additionalConfig),
       exposedPorts = Seq(port),
       fileSystemBind = Seq(
@@ -58,7 +55,7 @@ object Collector {
         "--config",
         "/snowplow/config/collector.hocon"
       ),
-      waitStrategy = Wait.forLogMessage(s".*REST interface bound to.*", 1)
+      waitStrategy = Wait.forLogMessage(s".*Service bound to address.*", 1)
     )
     container.container.withNetwork(Localstack.network)
 

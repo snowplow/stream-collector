@@ -150,16 +150,18 @@ lazy val http4s = project
   .configs(IntegrationTest)
 
 lazy val kinesisSettings =
-  allSettings ++ buildInfoSettings ++ Defaults.itSettings ++ scalifiedSettings ++ Seq(
+  allSettings ++ buildInfoSettings ++ http4sBuildInfoSettings ++ Defaults.itSettings ++ scalifiedSettings ++ Seq(
     moduleName := "snowplow-stream-collector-kinesis",
+    buildInfoPackage := s"com.snowplowanalytics.snowplow.collectors.scalastream",
     Docker / packageName := "scala-stream-collector-kinesis",
     libraryDependencies ++= Seq(
+      Dependencies.Libraries.catsRetry,
       Dependencies.Libraries.kinesis,
       Dependencies.Libraries.sts,
       Dependencies.Libraries.sqs,
       // integration tests dependencies
-      Dependencies.Libraries.LegacyIT.specs2,
-      Dependencies.Libraries.LegacyIT.specs2CE
+      Dependencies.Libraries.IT.specs2,
+      Dependencies.Libraries.IT.specs2CE,
     ),
     IntegrationTest / test := (IntegrationTest / test).dependsOn(Docker / publishLocal).value,
     IntegrationTest / testOnly := (IntegrationTest / testOnly).dependsOn(Docker / publishLocal).evaluated
@@ -168,7 +170,7 @@ lazy val kinesisSettings =
 lazy val kinesis = project
   .settings(kinesisSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDockerPlugin, BuildInfoPlugin)
-  .dependsOn(core % "test->test;compile->compile;it->it")
+  .dependsOn(http4s % "test->test;compile->compile;it->it")
   .configs(IntegrationTest)
 
 lazy val kinesisDistroless = project
@@ -176,7 +178,7 @@ lazy val kinesisDistroless = project
   .settings(sourceDirectory := (kinesis / sourceDirectory).value)
   .settings(kinesisSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDistrolessDockerPlugin, BuildInfoPlugin)
-  .dependsOn(core % "test->test;compile->compile;it->it")
+  .dependsOn(http4s % "test->test;compile->compile;it->it")
   .configs(IntegrationTest)
 
 lazy val sqsSettings =

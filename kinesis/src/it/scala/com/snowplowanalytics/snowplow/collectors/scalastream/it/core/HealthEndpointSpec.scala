@@ -8,29 +8,25 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream.it.core
 
-import scala.concurrent.duration._
-
 import cats.effect.IO
-
-import cats.effect.testing.specs2.CatsIO
-
+import cats.effect.testing.specs2.CatsEffect
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.Http
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.Kinesis
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers._
+import org.http4s.{Method, Request, Uri}
 import org.specs2.mutable.Specification
 
-import org.http4s.{Request, Method, Uri}
+import scala.concurrent.duration._
 
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers._
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.Kinesis
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.Http
-
-class HealthEndpointSpec extends Specification with Localstack with CatsIO {
+class HealthEndpointSpec extends Specification with Localstack with CatsEffect {
   
   override protected val Timeout = 5.minutes
 
   "collector" should {
     "respond with 200 to /health endpoint after it has started" in {
       val testName = "health-endpoint"
-      val streamGood = s"${testName}-raw"
-      val streamBad = s"${testName}-bad-1"
+      val streamGood = s"$testName-raw"
+      val streamBad = s"$testName-bad-1"
       Collector.container(
         "kinesis/src/it/resources/collector.hocon",
         testName,

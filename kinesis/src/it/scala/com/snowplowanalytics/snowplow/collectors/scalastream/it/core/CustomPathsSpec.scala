@@ -8,56 +8,36 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream.it.core
 
-import scala.concurrent.duration._
-
 import cats.effect.IO
-
-import cats.effect.testing.specs2.CatsIO
-
+import cats.effect.testing.specs2.CatsEffect
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.Http
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.Kinesis
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers._
+import org.http4s.{Method, Request, Uri}
 import org.specs2.mutable.Specification
 
-import org.http4s.{Request, Method, Uri}
+import scala.concurrent.duration._
 
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers._
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.Kinesis
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.Http
-
-class CustomPathsSpec extends Specification with Localstack with CatsIO {
+class CustomPathsSpec extends Specification with Localstack with CatsEffect {
 
   override protected val Timeout = 5.minutes
 
   "collector" should {
     "map custom paths" in {
       val testName = "custom-paths"
-      val streamGood = s"${testName}-raw"
-      val streamBad = s"${testName}-bad-1"
+      val streamGood = s"$testName-raw"
+      val streamBad = s"$testName-bad-1"
 
       val originalPaths = List(
         "/acme/track",
         "/acme/redirect",
         "/acme/iglu"
       )
-      val targetPaths = List(
-        "/com.snowplowanalytics.snowplow/tp2",
-        "/r/tp2",
-        "/com.snowplowanalytics.iglu/v1"
-      )
-      val customPaths = originalPaths.zip(targetPaths)
-      val config = s"""
-      {
-        "collector": {
-          "paths": {
-            ${customPaths.map { case (k, v) => s""""$k": "$v""""}.mkString(",\n")}
-          }
-        }
-      }"""
-
       Collector.container(
-        "kinesis/src/it/resources/collector.hocon",
+        "kinesis/src/it/resources/collector-custom-paths.hocon",
         testName,
         streamGood,
-        streamBad,
-        additionalConfig = Some(config)
+        streamBad
       ).use { collector =>
         val requests = originalPaths.map { p =>
           val uri = Uri.unsafeFromString(s"http://${collector.host}:${collector.port}$p")
@@ -70,7 +50,11 @@ class CustomPathsSpec extends Specification with Localstack with CatsIO {
           collectorOutput <- Kinesis.readOutput(streamGood, streamBad)
           outputPaths = collectorOutput.good.map(cp => cp.getPath())
         } yield {
-          outputPaths must beEqualTo(targetPaths)
+          outputPaths must beEqualTo(List(
+            "/com.snowplowanalytics.snowplow/tp2",
+            "/r/tp2",
+            "/com.snowplowanalytics.iglu/v1"
+          ))
         }
       }
     }
