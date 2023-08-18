@@ -10,24 +10,18 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis
 
-import scala.concurrent.duration._
-
 import cats.effect.IO
-
-import cats.effect.testing.specs2.CatsIO
-
-import org.http4s.{Request, Method, Uri, Status}
-
-import org.specs2.mutable.Specification
-
-import org.testcontainers.containers.GenericContainer
-
+import cats.effect.testing.specs2.CatsEffect
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers._
 import com.snowplowanalytics.snowplow.collectors.scalastream.it.utils._
 import com.snowplowanalytics.snowplow.collectors.scalastream.it.{EventGenerator, Http}
+import org.http4s.{Method, Request, Status, Uri}
+import org.specs2.mutable.Specification
+import org.testcontainers.containers.GenericContainer
 
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers._
+import scala.concurrent.duration._
 
-class KinesisCollectorSpec extends Specification with Localstack with CatsIO {
+class KinesisCollectorSpec extends Specification with Localstack with CatsEffect {
 
   override protected val Timeout = 5.minutes
 
@@ -39,10 +33,10 @@ class KinesisCollectorSpec extends Specification with Localstack with CatsIO {
       Collector.container(
         "examples/config.kinesis.minimal.hocon",
         testName,
-        s"${testName}-raw",
-        s"${testName}-bad-1"
+        s"$testName-raw",
+        s"$testName-bad-1"
       ).use { collector =>
-        IO(collector.container.getLogs() must contain(("REST interface bound to")))
+        IO(collector.container.getLogs() must contain(("Service bound to address")))
       }
     }
 
@@ -50,8 +44,8 @@ class KinesisCollectorSpec extends Specification with Localstack with CatsIO {
       val testName = "count"
       val nbGood = 1000
       val nbBad = 10
-      val streamGood = s"${testName}-raw"
-      val streamBad = s"${testName}-bad-1"
+      val streamGood = s"$testName-raw"
+      val streamBad = s"$testName-bad-1"
 
       Collector.container(
         "kinesis/src/it/resources/collector.hocon",
@@ -85,8 +79,8 @@ class KinesisCollectorSpec extends Specification with Localstack with CatsIO {
       Collector.container(
         "kinesis/src/it/resources/collector.hocon",
         testName,
-        s"${testName}-raw",
-        s"${testName}-bad-1"
+        s"$testName-raw",
+        s"$testName-bad-1"
       ).use { collector =>
         val container = collector.container
         for {
@@ -95,7 +89,7 @@ class KinesisCollectorSpec extends Specification with Localstack with CatsIO {
           _ <- waitWhile[GenericContainer[_]](container, _.isRunning, stopTimeout)
         } yield {
           container.isRunning() must beFalse
-          container.getLogs() must contain("Server terminated")
+          container.getLogs() must contain("Closing NIO1 channel")
         }
       }
     }
@@ -104,8 +98,8 @@ class KinesisCollectorSpec extends Specification with Localstack with CatsIO {
       val testName = "sink-health"
       val nbGood = 10
       val nbBad = 10
-      val streamGood = s"${testName}-raw"
-      val streamBad = s"${testName}-bad-1"
+      val streamGood = s"$testName-raw"
+      val streamBad = s"$testName-bad-1"
 
       Collector.container(
         "kinesis/src/it/resources/collector.hocon",

@@ -1,0 +1,27 @@
+collector {
+  interface = "0.0.0.0"
+  port = ${PORT}
+
+  streams {
+    good = ${STREAM_GOOD}
+    bad = ${STREAM_BAD}
+
+    sink {
+      region = ${REGION}
+      customEndpoint = ${KINESIS_ENDPOINT}
+
+      aws {
+        accessKey = env
+        secretKey = env
+      }
+
+      maxBytes = ${MAX_BYTES}
+    }
+  }
+
+  "paths": {
+    "/acme/track":    "/com.snowplowanalytics.snowplow/tp2",
+    "/acme/redirect": "/r/tp2",
+    "/acme/iglu":     "/com.snowplowanalytics.iglu/v1"
+   }
+}
