@@ -1,0 +1,30 @@
+collector {
+  interface = "0.0.0.0"
+  port = ${PORT}
+
+  streams {
+    good = ${STREAM_GOOD}
+    bad = ${STREAM_BAD}
+
+    sink {
+      region = ${REGION}
+      customEndpoint = ${KINESIS_ENDPOINT}
+
+      aws {
+        accessKey = env
+        secretKey = env
+      }
+
+      maxBytes = ${MAX_BYTES}
+    }
+  }
+
+  "cookie": {
+    "enabled": true,
+    "name": "greatName",
+    "expiration": "42 days",
+    "secure": true,
+    "httpOnly": true,
+    "sameSite": "Strict"
+  }
+}
