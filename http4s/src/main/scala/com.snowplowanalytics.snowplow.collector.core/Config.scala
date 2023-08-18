@@ -149,4 +149,5 @@ object Config {
     implicit val ssl              = deriveDecoder[SSL]
     deriveDecoder[Config[SinkConfig]]
   }
+
 }
