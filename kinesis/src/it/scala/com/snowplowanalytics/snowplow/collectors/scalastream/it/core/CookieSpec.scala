@@ -14,20 +14,17 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream.it.core
 
+import cats.effect.IO
+import cats.effect.testing.specs2.CatsEffect
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.{EventGenerator, Http}
+import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers._
+import org.http4s.{Header, SameSite}
+import org.specs2.mutable.Specification
+import org.typelevel.ci.CIStringSyntax
+
 import scala.concurrent.duration._
 
-import cats.effect.testing.specs2.CatsIO
-
-import org.http4s.{Header, SameSite}
-
-import org.specs2.mutable.Specification
-
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.Http
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.EventGenerator
-
-import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers._
-
-class CookieSpec extends Specification with Localstack with CatsIO {
+class CookieSpec extends Specification with Localstack with CatsEffect {
 
   override protected val Timeout = 5.minutes
 
@@ -65,14 +62,14 @@ class CookieSpec extends Specification with Localstack with CatsIO {
 
           for {
             resp <- Http.response(request)
-            now <- ioTimer.clock.realTime(SECONDS)
+            now <- IO.realTime
           } yield {
             resp.cookies match {
               case List(cookie) =>
                 cookie.name must beEqualTo(name)
                 cookie.expires match {
                   case Some(expiry) =>
-                    expiry.epochSecond should beCloseTo(now + expiration.toSeconds, 10)
+                    expiry.epochSecond should beCloseTo((now + expiration).toSeconds, 10)
                   case None =>
                     ko(s"Cookie [$cookie] doesn't contain the expiry date")
                 }
@@ -134,7 +131,7 @@ class CookieSpec extends Specification with Localstack with CatsIO {
         additionalConfig = Some(mkConfig())
       ).use { collector =>
         val request = EventGenerator.mkTp2Event(collector.host, collector.port)
-          .withHeaders(Header("SP-Anonymous", "*"))
+          .withHeaders(Header.Raw(ci"SP-Anonymous", "*"))
 
         for {
           resp <- Http.response(request)
@@ -157,7 +154,7 @@ class CookieSpec extends Specification with Localstack with CatsIO {
         additionalConfig = Some(mkConfig())
       ).use { collector =>
         val request = EventGenerator.mkTp2Event(collector.host, collector.port)
-          .withHeaders(Header("Origin", "http://my.domain"))
+          .withHeaders(Header.Raw(ci"Origin", "http://my.domain"))
 
         for {
           resp <- Http.response(request)
@@ -187,7 +184,7 @@ class CookieSpec extends Specification with Localstack with CatsIO {
         ))
       ).use { collector =>
         val request = EventGenerator.mkTp2Event(collector.host, collector.port)
-          .withHeaders(Header("Origin", s"http://$subDomain"))
+          .withHeaders(Header.Raw(ci"Origin", s"http://$subDomain"))
 
         for {
           resp <- Http.response(request)
@@ -220,7 +217,7 @@ class CookieSpec extends Specification with Localstack with CatsIO {
         ))
       ).use { collector =>
         val request1 = EventGenerator.mkTp2Event(collector.host, collector.port)
-          .withHeaders(Header("Origin", s"http://other.domain"))
+          .withHeaders(Header.Raw(ci"Origin", s"http://other.domain"))
         val request2 = EventGenerator.mkTp2Event(collector.host, collector.port)
 
         for {
