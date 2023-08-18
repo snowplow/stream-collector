@@ -25,6 +25,7 @@ object Dependencies {
   object V {
     // Java
     val awsSdk       = "1.12.327"
+    val aws2         = "2.20.132"
     val pubsub       = "1.119.1"
     val kafka        = "2.2.1"
     val mskAuth      = "1.1.1"
@@ -56,7 +57,7 @@ object Dependencies {
     val circeConfig      = "0.10.0"
     val fs2PubSub        = "0.22.0"
     val catsRetry        = "3.1.0"
-
+    val catsEffect       = "3.5.1"
     // Scala (test only)
     val specs2         = "4.11.0"
     val specs2CE       = "1.5.0"
@@ -76,6 +77,8 @@ object Dependencies {
     val kinesis        = "com.amazonaws"                    % "aws-java-sdk-kinesis"    % V.awsSdk
     val sqs            = "com.amazonaws"                    % "aws-java-sdk-sqs"        % V.awsSdk
     val sts            = "com.amazonaws"                    % "aws-java-sdk-sts"        % V.awsSdk % Runtime // Enables web token authentication https://github.com/snowplow/stream-collector/issues/169
+    val aws2sqs        = "software.amazon.awssdk"           % "sqs"                     % V.aws2
+    val aws2sts        = "software.amazon.awssdk"           % "sts"                     % V.aws2 % Runtime
     val pubsub         = "com.google.cloud"                 % "google-cloud-pubsub"     % V.pubsub
     val kafkaClients   = "org.apache.kafka"                 % "kafka-clients"           % V.kafka
     val mskAuth        = "software.amazon.msk"              % "aws-msk-iam-auth"        % V.mskAuth % Runtime // Enables AWS MSK IAM authentication https://github.com/snowplow/stream-collector/pull/214
@@ -101,6 +104,7 @@ object Dependencies {
     val pureconfig       = "com.github.pureconfig" %% "pureconfig"                        % V.pureconfig
     val akkaHttpMetrics  = "fr.davit"              %% "akka-http-metrics-datadog"         % V.akkaHttpMetrics
     val log4cats         = "org.typelevel"         %% "log4cats-slf4j"                    % V.log4cats
+    val catsEffectStd    = "org.typelevel"         %% "cats-effect-std"                   % V.catsEffect
 
     // http4s
     val http4sDsl    = "org.http4s"       %% "http4s-dsl"             % V.http4s
