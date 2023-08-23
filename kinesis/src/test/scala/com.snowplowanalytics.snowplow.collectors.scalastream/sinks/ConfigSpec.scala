@@ -100,13 +100,13 @@ object ConfigSpec {
       bad                        = "bad",
       useIpAddressAsPartitionKey = false,
       buffer = Config.Buffer(
-        byteLimit = 3145728,
+        byteLimit   = 3145728,
         recordLimit = 500,
-        timeLimit = 5000
+        timeLimit   = 5000
       ),
       sink = KinesisSinkConfig(
-        maxBytes = 1000000,
-        region = "eu-central-1",
+        maxBytes       = 1000000,
+        region         = "eu-central-1",
         threadPoolSize = 10,
         aws = KinesisSinkConfig.AWSConfig(
           accessKey = "iam",
@@ -117,10 +117,10 @@ object ConfigSpec {
           maxBackoff = 1500,
           maxRetries = 3
         ),
-        sqsBadBuffer = None,
-        sqsGoodBuffer = None,
-        sqsMaxBytes = 192000,
-        customEndpoint = None,
+        sqsBadBuffer         = None,
+        sqsGoodBuffer        = None,
+        sqsMaxBytes          = 192000,
+        customEndpoint       = None,
         startupCheckInterval = 1.second
       )
     )

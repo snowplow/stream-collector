@@ -15,16 +15,16 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import cats.effect.{IO, Resource}
-import com.snowplowanalytics.snowplow.collector.core.{App, Config}
 import com.snowplowanalytics.snowplow.collector.core.model.Sinks
+import com.snowplowanalytics.snowplow.collector.core.{App, Config}
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.{KinesisSink, KinesisSinkConfig}
 
 object KinesisCollector extends App[KinesisSinkConfig](BuildInfo) {
 
   override def mkSinks(config: Config.Streams[KinesisSinkConfig]): Resource[IO, Sinks[IO]] =
     for {
-      good <- KinesisSink.create[IO](config.sink, config.good)
-      bad  <- KinesisSink.create[IO](config.sink, config.bad)
+      good <- KinesisSink.create[IO](config.sink, config.buffer, config.good)
+      bad  <- KinesisSink.create[IO](config.sink, config.buffer, config.bad)
     } yield Sinks(good, bad)
 
 }
