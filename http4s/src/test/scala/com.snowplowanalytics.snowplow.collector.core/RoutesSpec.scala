@@ -54,7 +54,7 @@ class RoutesSpec extends Specification {
         Response(status = Ok, body = Stream.emit("cookie").through(text.utf8.encode))
       }
 
-    override def determinePath(vendor: String, version: String): String = "/p1/p2"
+    override def determinePath(vendor: String, version: String): String = s"/$vendor/$version"
 
     override def sinksHealthy: IO[Boolean] = IO.pure(true)
   }
@@ -97,7 +97,7 @@ class RoutesSpec extends Specification {
 
       val List(cookieParams) = collectorService.getCookieCalls
       cookieParams.body.unsafeRunSync() shouldEqual Some("testBody")
-      cookieParams.path shouldEqual "/p1/p2"
+      cookieParams.path shouldEqual "/p3/p4"
       cookieParams.pixelExpected shouldEqual false
       cookieParams.doNotTrack shouldEqual false
       cookieParams.contentType shouldEqual Some("application/json")
@@ -115,7 +115,7 @@ class RoutesSpec extends Specification {
 
         val List(cookieParams) = collectorService.getCookieCalls
         cookieParams.body.unsafeRunSync() shouldEqual None
-        cookieParams.path shouldEqual "/p1/p2"
+        cookieParams.path shouldEqual "/p3/p4"
         cookieParams.pixelExpected shouldEqual true
         cookieParams.doNotTrack shouldEqual false
         cookieParams.contentType shouldEqual None
@@ -150,6 +150,63 @@ class RoutesSpec extends Specification {
       test(Method.HEAD, "/i")
       test(Method.GET, "/ice.png")
       test(Method.HEAD, "/ice.png")
+    }
+
+    "respond to the iglu webhook with the cookie response" in {
+      def test(method: Method, uri: Uri, contentType: Option[`Content-Type`], body: Option[String]) = {
+        val (collectorService, routes) = createTestServices()
+
+        val request  = Request[IO](method, uri).withEntity(body.getOrElse("")).withContentTypeOption(contentType)
+        val response = routes.run(request).unsafeRunSync()
+
+        val List(cookieParams) = collectorService.getCookieCalls
+        cookieParams.body.unsafeRunSync() shouldEqual body
+        cookieParams.path shouldEqual uri.path.renderString
+        method match {
+          case Method.POST =>
+            for {
+              actual   <- cookieParams.contentType
+              expected <- contentType
+            } yield `Content-Type`.parse(actual) must beRight(expected)
+          case Method.GET =>
+            cookieParams.pixelExpected shouldEqual true
+            cookieParams.contentType shouldEqual None
+        }
+        cookieParams.doNotTrack shouldEqual false
+        response.status must beEqualTo(Status.Ok)
+        response.bodyText.compile.string.unsafeRunSync() must beEqualTo("cookie")
+      }
+
+      val jsonBody = """{ "network": "twitter", "action": "retweet" }"""
+      val sdjBody  = s"""{
+                       |   "schema":"iglu:com.snowplowanalytics.snowplow/social_interaction/jsonschema/1-0-0",
+                       |   "data": $jsonBody
+                       |}""".stripMargin
+
+      test(
+        Method.POST,
+        uri"/com.snowplowanalytics.iglu/v1",
+        Some(`Content-Type`(MediaType.application.json): `Content-Type`),
+        Some(sdjBody)
+      )
+      test(
+        Method.POST,
+        uri"/com.snowplowanalytics.iglu/v1?schema=iglu%3Acom.snowplowanalytics.snowplow%2Fsocial_interaction%2Fjsonschema%2F1-0-0",
+        Some(`Content-Type`(MediaType.application.json).withCharset(Charset.`UTF-8`)),
+        Some(jsonBody)
+      )
+      test(
+        Method.POST,
+        uri"/com.snowplowanalytics.iglu/v1?schema=iglu%3Acom.snowplowanalytics.snowplow%2Fsocial_interaction%2Fjsonschema%2F1-0-0",
+        Some(`Content-Type`(MediaType.application.`x-www-form-urlencoded`)),
+        Some("network=twitter&action=retweet")
+      )
+      test(
+        Method.GET,
+        uri"""/com.snowplowanalytics.iglu/v1?schema=iglu%3Acom.snowplowanalytics.snowplow%2Fsocial_interaction%2Fjsonschema%2F1-0-0&aid=mobile-attribution&p=mob&network=twitter&action=retweet""",
+        None,
+        None
+      )
     }
 
     "allow redirect routes when redirects enabled" in {
