@@ -31,8 +31,8 @@ class HealthEndpointSpec extends Specification with Localstack with CatsEffect {
   "collector" should {
     "respond with 200 to /health endpoint after it has started" in {
       val testName = "health-endpoint"
-      val streamGood = s"${testName}-raw"
-      val streamBad = s"${testName}-bad-1"
+      val streamGood = s"$testName-raw"
+      val streamBad = s"$testName-bad-1"
       Collector.container(
         "kinesis/src/it/resources/collector.hocon",
         testName,
