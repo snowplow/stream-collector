@@ -37,8 +37,8 @@ class KinesisCollectorSpec extends Specification with Localstack with CatsEffect
       Collector.container(
         "examples/config.kinesis.minimal.hocon",
         testName,
-        s"${testName}-raw",
-        s"${testName}-bad-1"
+        s"$testName-raw",
+        s"$testName-bad-1"
       ).use { collector =>
         IO(collector.container.getLogs() must contain(("Service bound to address")))
       }
@@ -48,8 +48,8 @@ class KinesisCollectorSpec extends Specification with Localstack with CatsEffect
       val testName = "count"
       val nbGood = 1000
       val nbBad = 10
-      val streamGood = s"${testName}-raw"
-      val streamBad = s"${testName}-bad-1"
+      val streamGood = s"$testName-raw"
+      val streamBad = s"$testName-bad-1"
 
       Collector.container(
         "kinesis/src/it/resources/collector.hocon",
@@ -83,8 +83,8 @@ class KinesisCollectorSpec extends Specification with Localstack with CatsEffect
       Collector.container(
         "kinesis/src/it/resources/collector.hocon",
         testName,
-        s"${testName}-raw",
-        s"${testName}-bad-1"
+        s"$testName-raw",
+        s"$testName-bad-1"
       ).use { collector =>
         val container = collector.container
         for {
@@ -102,8 +102,8 @@ class KinesisCollectorSpec extends Specification with Localstack with CatsEffect
       val testName = "sink-health"
       val nbGood = 10
       val nbBad = 10
-      val streamGood = s"${testName}-raw"
-      val streamBad = s"${testName}-bad-1"
+      val streamGood = s"$testName-raw"
+      val streamBad = s"$testName-bad-1"
 
       Collector.container(
         "kinesis/src/it/resources/collector.hocon",
