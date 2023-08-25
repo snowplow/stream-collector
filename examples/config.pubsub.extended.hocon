@@ -251,6 +251,11 @@ collector {
       period = "10 seconds"
       # Optional, override the default metric prefix
       # "prefix": "snowplow.collector"
+
+      # Any key-value pairs to be tagged on every StatsD metric
+      "tags": {
+        "app": collector
+      }
    }
 
   # Configures how long the colletor should pause after receiving a sigterm before starting the graceful shutdown.

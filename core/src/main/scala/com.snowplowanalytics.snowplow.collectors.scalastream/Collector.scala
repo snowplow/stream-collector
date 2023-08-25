@@ -136,7 +136,9 @@ trait Collector {
     )
 
     lazy val metricRegistry: Option[HttpMetricsRegistry] = collectorConf.monitoring.metrics.statsd match {
-      case StatsdConfig(true, hostname, port, period, prefix) =>
+      case StatsdConfig(true, hostname, port, period, prefix, tags) =>
+        val constantTags = tags.map { case (k: String, v: String) => s"${k}:${v}" }
+
         Some(
           DatadogRegistry(
             client = new NonBlockingStatsDClientBuilder()
@@ -145,6 +147,7 @@ trait Collector {
               .enableAggregation(true)
               .aggregationFlushInterval(period.toMillis.toInt)
               .enableTelemetry(false)
+              .constantTags(constantTags.toArray: _*)
               .build(),
             DatadogSettings
               .default
