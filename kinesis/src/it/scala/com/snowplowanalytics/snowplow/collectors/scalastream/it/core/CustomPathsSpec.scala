@@ -31,35 +31,19 @@ class CustomPathsSpec extends Specification with Localstack with CatsEffect {
   "collector" should {
     "map custom paths" in {
       val testName = "custom-paths"
-      val streamGood = s"${testName}-raw"
-      val streamBad = s"${testName}-bad-1"
+      val streamGood = s"$testName-raw"
+      val streamBad = s"$testName-bad-1"
 
       val originalPaths = List(
         "/acme/track",
         "/acme/redirect",
         "/acme/iglu"
       )
-      val targetPaths = List(
-        "/com.snowplowanalytics.snowplow/tp2",
-        "/r/tp2",
-        "/com.snowplowanalytics.iglu/v1"
-      )
-      val customPaths = originalPaths.zip(targetPaths)
-      val config = s"""
-      {
-        "collector": {
-          "paths": {
-            ${customPaths.map { case (k, v) => s""""$k": "$v""""}.mkString(",\n")}
-          }
-        }
-      }"""
-
       Collector.container(
-        "kinesis/src/it/resources/collector.hocon",
+        "kinesis/src/it/resources/collector-custom-paths.hocon",
         testName,
         streamGood,
-        streamBad,
-        additionalConfig = Some(config)
+        streamBad
       ).use { collector =>
         val requests = originalPaths.map { p =>
           val uri = Uri.unsafeFromString(s"http://${collector.host}:${collector.port}$p")
@@ -72,7 +56,11 @@ class CustomPathsSpec extends Specification with Localstack with CatsEffect {
           collectorOutput <- Kinesis.readOutput(streamGood, streamBad)
           outputPaths = collectorOutput.good.map(cp => cp.getPath())
         } yield {
-          outputPaths must beEqualTo(targetPaths)
+          outputPaths must beEqualTo(List(
+            "/com.snowplowanalytics.snowplow/tp2",
+            "/r/tp2",
+            "/com.snowplowanalytics.iglu/v1"
+          ))
         }
       }
     }

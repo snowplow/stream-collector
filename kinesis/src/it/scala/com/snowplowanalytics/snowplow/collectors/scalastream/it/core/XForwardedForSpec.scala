@@ -33,8 +33,8 @@ class XForwardedForSpec extends Specification with Localstack with CatsEffect {
   "collector" should {
     "put X-Forwarded-For header in the collector payload" in {
       val testName = "X-Forwarded-For"
-      val streamGood = s"${testName}-raw"
-      val streamBad = s"${testName}-bad-1"
+      val streamGood = s"$testName-raw"
+      val streamBad = s"$testName-bad-1"
 
       val ip = IpAddress.fromString("123.123.123.123")
 
