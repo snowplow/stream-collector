@@ -174,8 +174,9 @@ package model {
     enabled: Boolean,
     hostname: String,
     port: Int,
-    period: FiniteDuration = 1.minute,
-    prefix: String         = "snowplow.collector"
+    period: FiniteDuration    = 1.minute,
+    prefix: String            = "snowplow.collector",
+    tags: Map[String, String] = Map("app" -> "collector")
   )
   final case class MetricsConfig(statsd: StatsdConfig)
   final case class MonitoringConfig(metrics: MetricsConfig)
