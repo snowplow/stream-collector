@@ -9,48 +9,32 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import java.util.concurrent.ScheduledThreadPoolExecutor
-import cats.syntax.either._
-import com.snowplowanalytics.snowplow.collectors.scalastream.generated.BuildInfo
-import com.snowplowanalytics.snowplow.collectors.scalastream.model._
-import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.SqsSink
-import com.snowplowanalytics.snowplow.collectors.scalastream.telemetry.TelemetryAkkaService
 
-object SqsCollector extends Collector {
-  def appName      = BuildInfo.shortName
-  def appVersion   = BuildInfo.version
-  def scalaVersion = BuildInfo.scalaVersion
+import cats.effect.{IO, Resource}
 
-  def main(args: Array[String]): Unit = {
-    val (collectorConf, akkaConf) = parseConfig(args)
-    val telemetry                 = TelemetryAkkaService.initWithCollector(collectorConf, BuildInfo.moduleName, appVersion)
-    val sinks: Either[Throwable, CollectorSinks] = for {
-      sqs <- collectorConf.streams.sink match {
-        case sqs: Sqs => sqs.asRight
-        case sink     => new IllegalArgumentException(s"Configured sink $sink is not SQS.").asLeft
-      }
-      es         = new ScheduledThreadPoolExecutor(sqs.threadPoolSize)
-      goodQueue  = collectorConf.streams.good
-      badQueue   = collectorConf.streams.bad
-      bufferConf = collectorConf.streams.buffer
-      good <- SqsSink.createAndInitialize(
-        sqs.maxBytes,
-        sqs,
-        bufferConf,
-        goodQueue,
-        es
+import com.snowplowanalytics.snowplow.collector.core.model.Sinks
+import com.snowplowanalytics.snowplow.collector.core.{App, Config}
+import com.snowplowanalytics.snowplow.collectors.scalastream.sinks._
+
+object SqsCollector extends App[SqsSinkConfig](BuildInfo) {
+
+  override def mkSinks(config: Config.Streams[SqsSinkConfig]): Resource[IO, Sinks[IO]] = {
+    val threadPoolExecutor = new ScheduledThreadPoolExecutor(config.sink.threadPoolSize)
+    for {
+      good <- SqsSink.create[IO](
+        config.sink.maxBytes,
+        config.sink,
+        config.buffer,
+        config.good,
+        threadPoolExecutor
       )
-      bad <- SqsSink.createAndInitialize(
-        sqs.maxBytes,
-        sqs,
-        bufferConf,
-        badQueue,
-        es
+      bad <- SqsSink.create[IO](
+        config.sink.maxBytes,
+        config.sink,
+        config.buffer,
+        config.bad,
+        threadPoolExecutor
       )
-    } yield CollectorSinks(good, bad)
-
-    sinks match {
-      case Right(s) => run(collectorConf, akkaConf, s, telemetry)
-      case Left(e)  => throw e
-    }
+    } yield Sinks(good, bad)
   }
 }

@@ -8,6 +8,11 @@
   */
 package com.snowplowanalytics.snowplow.collectors.scalastream.sinks
 
+import cats.effect.{Resource, Sync}
+import cats.implicits.catsSyntaxMonadErrorRethrow
+
+import org.slf4j.LoggerFactory
+
 import java.nio.ByteBuffer
 import java.util.UUID
 import java.util.concurrent.ScheduledExecutorService
@@ -20,28 +25,22 @@ import scala.collection.JavaConverters._
 
 import cats.syntax.either._
 
-import com.amazonaws.auth.{
-  AWSCredentialsProvider,
-  AWSStaticCredentialsProvider,
-  BasicAWSCredentials,
-  DefaultAWSCredentialsProviderChain,
-  EnvironmentVariableCredentialsProvider,
-  InstanceProfileCredentialsProvider
-}
 import com.amazonaws.services.sqs.{AmazonSQS, AmazonSQSClientBuilder}
 import com.amazonaws.services.sqs.model.{MessageAttributeValue, SendMessageBatchRequest, SendMessageBatchRequestEntry}
 
-import com.snowplowanalytics.snowplow.collectors.scalastream.model._
+import com.snowplowanalytics.snowplow.collector.core.{Config, Sink}
 
-class SqsSink private (
+class SqsSink[F[_]: Sync] private (
   val maxBytes: Int,
   client: AmazonSQS,
-  sqsConfig: Sqs,
-  bufferConfig: BufferConfig,
+  sqsConfig: SqsSinkConfig,
+  bufferConfig: Config.Buffer,
   queueName: String,
   executorService: ScheduledExecutorService
-) extends Sink {
+) extends Sink[F] {
   import SqsSink._
+
+  private lazy val log = LoggerFactory.getLogger(getClass())
 
   private val ByteThreshold: Long   = bufferConfig.byteLimit
   private val RecordThreshold: Long = bufferConfig.recordLimit
@@ -58,10 +57,10 @@ class SqsSink private (
     concurrent.ExecutionContext.fromExecutorService(executorService)
 
   @volatile private var sqsHealthy: Boolean = false
-  override def isHealthy: Boolean           = sqsHealthy
+  override def isHealthy: F[Boolean]        = Sync[F].pure(sqsHealthy)
 
-  override def storeRawEvents(events: List[Array[Byte]], key: String): Unit =
-    events.foreach(e => EventStorage.store(e, key))
+  override def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit] =
+    Sync[F].delay(events.foreach(e => EventStorage.store(e, key)))
 
   object EventStorage {
     private val storedEvents              = ListBuffer.empty[Events]
@@ -277,22 +276,39 @@ object SqsSink {
   // Details about why messages failed to be written to SQS.
   final case class BatchResultErrorInfo(code: String, message: String)
 
+  def create[F[_]: Sync](
+    maxBytes: Int,
+    sqsConfig: SqsSinkConfig,
+    bufferConfig: Config.Buffer,
+    queueName: String,
+    executorService: ScheduledExecutorService
+  ): Resource[F, SqsSink[F]] = {
+    val acquire =
+      Sync[F]
+        .delay(
+          createAndInitialize(maxBytes, sqsConfig, bufferConfig, queueName, executorService)
+        )
+        .rethrow
+    val release = (sink: SqsSink[F]) => Sync[F].delay(sink.shutdown())
+
+    Resource.make(acquire)(release)
+  }
+
   /**
     * Create an SqsSink and schedule a task to flush its EventStorage.
     * Exists so that no threads can get a reference to the SqsSink
     * during its construction.
     */
-  def createAndInitialize(
+  def createAndInitialize[F[_]: Sync](
     maxBytes: Int,
-    sqsConfig: Sqs,
-    bufferConfig: BufferConfig,
+    sqsConfig: SqsSinkConfig,
+    bufferConfig: Config.Buffer,
     queueName: String,
     executorService: ScheduledExecutorService
-  ): Either[Throwable, SqsSink] = {
-    val client = for {
-      provider <- getProvider(sqsConfig.aws)
-      client   <- createSqsClient(provider, sqsConfig.region)
-    } yield client
+  ): Either[Throwable, SqsSink[F]] = {
+    val client = Either.catchNonFatal(
+      AmazonSQSClientBuilder.standard().withRegion(sqsConfig.region).build
+    )
 
     client.map { c =>
       val sqsSink = new SqsSink(maxBytes, c, sqsConfig, bufferConfig, queueName, executorService)
@@ -301,35 +317,4 @@ object SqsSink {
       sqsSink
     }
   }
-
-  /** Create an aws credentials provider through env variables and iam. */
-  private def getProvider(awsConfig: AWSConfig): Either[Throwable, AWSCredentialsProvider] = {
-    def isDefault(key: String): Boolean = key == "default"
-    def isIam(key: String): Boolean     = key == "iam"
-    def isEnv(key: String): Boolean     = key == "env"
-
-    ((awsConfig.accessKey, awsConfig.secretKey) match {
-      case (a, s) if isDefault(a) && isDefault(s) =>
-        new DefaultAWSCredentialsProviderChain().asRight
-      case (a, s) if isDefault(a) || isDefault(s) =>
-        "accessKey and secretKey must both be set to 'default' or neither".asLeft
-      case (a, s) if isIam(a) && isIam(s) =>
-        InstanceProfileCredentialsProvider.getInstance().asRight
-      case (a, s) if isIam(a) && isIam(s) =>
-        "accessKey and secretKey must both be set to 'iam' or neither".asLeft
-      case (a, s) if isEnv(a) && isEnv(s) =>
-        new EnvironmentVariableCredentialsProvider().asRight
-      case (a, s) if isEnv(a) || isEnv(s) =>
-        "accessKey and secretKey must both be set to 'env' or neither".asLeft
-      case _ =>
-        new AWSStaticCredentialsProvider(
-          new BasicAWSCredentials(awsConfig.accessKey, awsConfig.secretKey)
-        ).asRight
-    }).leftMap(new IllegalArgumentException(_))
-  }
-
-  private def createSqsClient(provider: AWSCredentialsProvider, region: String): Either[Throwable, AmazonSQS] =
-    Either.catchNonFatal(
-      AmazonSQSClientBuilder.standard().withRegion(region).withCredentials(provider).build
-    )
 }

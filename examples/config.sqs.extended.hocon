@@ -178,19 +178,6 @@ collector {
       # Thread pool size for Kinesis and SQS API requests
       threadPoolSize = 10
 
-
-      # The following are used to authenticate for the Amazon Kinesis and SQS sinks.
-      # If both are set to 'default', the default provider chain is used
-      # (see http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/auth/DefaultAWSCredentialsProviderChain.html)
-      # If both are set to 'iam', use AWS IAM Roles to provision credentials.
-      # If both are set to 'env', use environment variables AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
-      aws {
-        accessKey = iam
-        accessKey = ${?COLLECTOR_STREAMS_SINK_AWS_ACCESS_KEY}
-        secretKey = iam
-        secretKey = ${?COLLECTOR_STREAMS_SINK_AWS_SECRET_KEY}
-      }
-
       # Optional
       backoffPolicy {
         # Minimum backoff period in milliseconds
