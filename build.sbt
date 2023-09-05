@@ -182,10 +182,12 @@ lazy val kinesisDistroless = project
   .configs(IntegrationTest)
 
 lazy val sqsSettings =
-  allSettings ++ buildInfoSettings ++ Seq(
+  allSettings ++ buildInfoSettings ++ http4sBuildInfoSettings ++ Seq(
     moduleName := "snowplow-stream-collector-sqs",
+    buildInfoPackage := s"com.snowplowanalytics.snowplow.collectors.scalastream",
     Docker / packageName := "scala-stream-collector-sqs",
     libraryDependencies ++= Seq(
+      Dependencies.Libraries.catsRetry,
       Dependencies.Libraries.sqs,
       Dependencies.Libraries.sts,
     )
@@ -194,14 +196,14 @@ lazy val sqsSettings =
 lazy val sqs = project
   .settings(sqsSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDockerPlugin, BuildInfoPlugin)
-  .dependsOn(core % "test->test;compile->compile")
+  .dependsOn(http4s % "test->test;compile->compile")
 
 lazy val sqsDistroless = project
   .in(file("distroless/sqs"))
   .settings(sourceDirectory := (sqs / sourceDirectory).value)
   .settings(sqsSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDistrolessDockerPlugin, BuildInfoPlugin)
-  .dependsOn(core % "test->test;compile->compile")
+  .dependsOn(http4s % "test->test;compile->compile")
 
 lazy val pubsubSettings =
   allSettings ++ buildInfoSettings ++ http4sBuildInfoSettings ++ Defaults.itSettings ++ scalifiedSettings ++ Seq(
