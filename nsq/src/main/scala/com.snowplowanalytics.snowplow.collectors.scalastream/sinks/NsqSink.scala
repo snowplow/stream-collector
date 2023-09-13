@@ -9,17 +9,31 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 package sinks
 
+import java.util.concurrent.TimeoutException
+
 import scala.collection.JavaConverters._
 
+import cats.effect.{Resource, Sync}
+import cats.implicits._
+
 import com.snowplowanalytics.client.nsq.NSQProducer
-import com.snowplowanalytics.snowplow.collectors.scalastream.model._
+import com.snowplowanalytics.snowplow.collector.core.{Sink}
+import com.snowplowanalytics.client.nsq.exceptions.NSQException
 
 /**
   * NSQ Sink for the Scala Stream Collector
   * @param nsqConfig Configuration for Nsq
   * @param topicName Nsq topic name
   */
-class NsqSink(val maxBytes: Int, nsqConfig: Nsq, topicName: String) extends Sink {
+class NsqSink[F[_]: Sync] private (
+  val maxBytes: Int,
+  nsqConfig: NsqSinkConfig,
+  topicName: String
+) extends Sink[F] {
+
+  @volatile private var healthStatus = true
+
+  override def isHealthy: F[Boolean] = Sync[F].pure(healthStatus)
 
   private val producer = new NSQProducer().addAddress(nsqConfig.host, nsqConfig.port).start()
 
@@ -28,9 +42,27 @@ class NsqSink(val maxBytes: Int, nsqConfig: Nsq, topicName: String) extends Sink
     * @param events The list of events to send
     * @param key The partition key (unused)
     */
-  override def storeRawEvents(events: List[Array[Byte]], key: String): Unit =
-    producer.produceMulti(topicName, events.asJava)
+  override def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit] =
+    Sync[F].blocking(producer.produceMulti(topicName, events.asJava)).onError {
+      case _: NSQException | _: TimeoutException =>
+        Sync[F].delay(healthStatus = false)
+    } *> Sync[F].delay(healthStatus = true)
 
-  override def shutdown(): Unit =
+  def shutdown(): Unit =
     producer.shutdown()
+}
+
+object NsqSink {
+
+  def create[F[_]: Sync](
+    nsqConfig: NsqSinkConfig,
+    topicName: String
+  ): Resource[F, NsqSink[F]] =
+    Resource.make(
+      Sync[F].delay(
+        // MaxBytes is never used but is required by the sink interface definition,
+        // So just pass any int val in.
+        new NsqSink(0, nsqConfig, topicName)
+      )
+    )(sink => Sync[F].delay(sink.shutdown()))
 }
