@@ -50,6 +50,7 @@ object Dependencies {
     val circeConfig      = "0.10.0"
     val fs2PubSub        = "0.22.0"
     val catsRetry        = "3.1.0"
+    val nettyAll         = "4.1.95.Final" // to fix nsq dependency
 
     // Scala (test only)
     val specs2         = "4.11.0"
@@ -67,6 +68,7 @@ object Dependencies {
   object Libraries {
     // Java
     val jackson        = "com.fasterxml.jackson.core"       % "jackson-databind"        % V.jackson // nsq only
+    val nettyAll       = "io.netty"                         % "netty-all"               % V.nettyAll //nsq only
     val thrift         = "org.apache.thrift"                % "libthrift"               % V.thrift
     val kinesis        = "com.amazonaws"                    % "aws-java-sdk-kinesis"    % V.awsSdk
     val sqs            = "com.amazonaws"                    % "aws-java-sdk-sqs"        % V.awsSdk

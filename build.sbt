@@ -258,12 +258,14 @@ lazy val kafkaDistroless = project
   .dependsOn(core % "test->test;compile->compile")
 
 lazy val nsqSettings =
-  allSettings ++ buildInfoSettings ++ Seq(
+  allSettings ++ buildInfoSettings ++ http4sBuildInfoSettings ++ Seq(
     moduleName := "snowplow-stream-collector-nsq",
     Docker / packageName := "scala-stream-collector-nsq",
+    buildInfoPackage := s"com.snowplowanalytics.snowplow.collectors.scalastream",
     libraryDependencies ++= Seq(
       Dependencies.Libraries.nsqClient,
       Dependencies.Libraries.jackson,
+      Dependencies.Libraries.nettyAll,
       Dependencies.Libraries.log4j
     )
   )
@@ -271,14 +273,14 @@ lazy val nsqSettings =
 lazy val nsq = project
   .settings(nsqSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDockerPlugin, BuildInfoPlugin)
-  .dependsOn(core % "test->test;compile->compile")
+  .dependsOn(http4s % "test->test;compile->compile")
 
 lazy val nsqDistroless = project
   .in(file("distroless/nsq"))
   .settings(sourceDirectory := (nsq / sourceDirectory).value)
   .settings(nsqSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDistrolessDockerPlugin, BuildInfoPlugin)
-  .dependsOn(core % "test->test;compile->compile")
+  .dependsOn(http4s % "test->test;compile->compile")
 
 lazy val stdoutSettings =
   allSettings ++ buildInfoSettings ++ http4sBuildInfoSettings ++ Seq(
