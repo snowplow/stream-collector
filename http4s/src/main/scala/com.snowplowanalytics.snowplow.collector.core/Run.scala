@@ -30,7 +30,7 @@ object Run {
   def fromCli[F[_]: Async: Tracking, SinkConfig: Decoder](
     appInfo: AppInfo,
     mkSinks: Config.Streams[SinkConfig] => Resource[F, Sinks[F]],
-    telemetryInfo: Config[SinkConfig] => Telemetry.TelemetryInfo
+    telemetryInfo: Config[SinkConfig]   => Telemetry.TelemetryInfo
   ): Opts[F[ExitCode]] = {
     val configPath = Opts.option[Path]("config", "Path to HOCON configuration (optional)", "c", "config.hocon").orNone
     configPath.map(fromPath[F, SinkConfig](appInfo, mkSinks, telemetryInfo, _))
@@ -39,7 +39,7 @@ object Run {
   private def fromPath[F[_]: Async: Tracking, SinkConfig: Decoder](
     appInfo: AppInfo,
     mkSinks: Config.Streams[SinkConfig] => Resource[F, Sinks[F]],
-    telemetryInfo: Config[SinkConfig] => Telemetry.TelemetryInfo,
+    telemetryInfo: Config[SinkConfig]   => Telemetry.TelemetryInfo,
     path: Option[Path]
   ): F[ExitCode] = {
     val eitherT = for {
