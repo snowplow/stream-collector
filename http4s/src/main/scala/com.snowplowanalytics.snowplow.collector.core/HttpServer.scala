@@ -36,8 +36,8 @@ object HttpServer {
     secure: Boolean
   ): Resource[F, Server] =
     sys.env.get("HTTP4S_BACKEND").map(_.toUpperCase()) match {
-      case Some("EMBER") | None => buildEmberServer[F](app, interface, port, secure)
-      case Some("BLAZE") => buildBlazeServer[F](app, port, secure)
+      case Some("BLAZE") | None => buildBlazeServer[F](app, port, secure)
+      case Some("EMBER") => buildEmberServer[F](app, interface, port, secure)
       case Some("NETTY") => buildNettyServer[F](app, port, secure)
       case Some(other)   => throw new IllegalArgumentException(s"Unrecognized http4s backend $other")
     }
