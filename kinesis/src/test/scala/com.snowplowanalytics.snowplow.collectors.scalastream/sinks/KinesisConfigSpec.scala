@@ -111,6 +111,10 @@ object KinesisConfigSpec {
     enableDefaultRedirect = false,
     redirectDomains       = Set.empty,
     preTerminationPeriod  = 10.seconds,
+    networking = Config.Networking(
+      maxConnections = 1024,
+      idleTimeout    = 610.seconds
+    ),
     streams = Config.Streams(
       good                       = "good",
       bad                        = "bad",

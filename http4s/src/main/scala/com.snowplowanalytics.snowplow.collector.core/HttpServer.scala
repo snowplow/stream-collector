@@ -8,8 +8,6 @@ import io.netty.handler.ssl._
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-import scala.concurrent.duration.DurationLong
-
 import com.comcast.ip4s.{IpAddress, Port}
 
 import cats.implicits._
@@ -33,12 +31,13 @@ object HttpServer {
     app: HttpApp[F],
     interface: String,
     port: Int,
-    secure: Boolean
+    secure: Boolean,
+    networking: Config.Networking
   ): Resource[F, Server] =
     sys.env.get("HTTP4S_BACKEND").map(_.toUpperCase()) match {
-      case Some("BLAZE") | None => buildBlazeServer[F](app, port, secure)
-      case Some("EMBER") => buildEmberServer[F](app, interface, port, secure)
-      case Some("NETTY") => buildNettyServer[F](app, port, secure)
+      case Some("BLAZE") | None => buildBlazeServer[F](app, port, secure, networking)
+      case Some("EMBER") => buildEmberServer[F](app, interface, port, secure, networking)
+      case Some("NETTY") => buildNettyServer[F](app, port, secure, networking)
       case Some(other)   => throw new IllegalArgumentException(s"Unrecognized http4s backend $other")
     }
 
@@ -46,7 +45,8 @@ object HttpServer {
     app: HttpApp[F],
     interface: String,
     port: Int,
-    secure: Boolean
+    secure: Boolean,
+    networking: Config.Networking
   ) = {
     implicit val network = Network.forAsync[F]
     Resource.eval(Logger[F].info("Building ember server")) >>
@@ -55,7 +55,8 @@ object HttpServer {
         .withHost(IpAddress.fromString(interface).get)
         .withPort(Port.fromInt(port).get)
         .withHttpApp(app)
-        .withIdleTimeout(610.seconds)
+        .withIdleTimeout(networking.idleTimeout)
+        .withMaxConnections(networking.maxConnections)
         .cond(secure, _.withTLS(TLSContext.Builder.forAsync.fromSSLContext(SSLContext.getDefault)))
         .build
   }
@@ -63,26 +64,29 @@ object HttpServer {
   private def buildBlazeServer[F[_]: Async](
     app: HttpApp[F],
     port: Int,
-    secure: Boolean
+    secure: Boolean,
+    networking: Config.Networking
   ): Resource[F, Server] =
     Resource.eval(Logger[F].info("Building blaze server")) >>
       BlazeServerBuilder[F]
         .bindSocketAddress(new InetSocketAddress(port))
         .withHttpApp(app)
-        .withIdleTimeout(610.seconds)
+        .withIdleTimeout(networking.idleTimeout)
+        .withMaxConnections(networking.maxConnections)
         .cond(secure, _.withSslContext(SSLContext.getDefault))
         .resource
 
   private def buildNettyServer[F[_]: Async](
     app: HttpApp[F],
     port: Int,
-    secure: Boolean
+    secure: Boolean,
+    networking: Config.Networking
   ) =
     Resource.eval(Logger[F].info("Building netty server")) >>
       NettyServerBuilder[F]
         .bindLocal(port)
         .withHttpApp(app)
-        .withIdleTimeout(610.seconds)
+        .withIdleTimeout(networking.idleTimeout)
         .cond(
           secure,
           _.withSslContext(
