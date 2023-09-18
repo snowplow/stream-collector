@@ -74,7 +74,8 @@ object Run {
         new Routes[F](config.enableDefaultRedirect, collectorService).value,
         config.interface,
         if (config.ssl.enable) config.ssl.port else config.port,
-        config.ssl.enable
+        config.ssl.enable,
+        config.networking
       )
       _          <- withGracefulShutdown(config.preTerminationPeriod)(httpServer)
       httpClient <- BlazeClientBuilder[F].resource
