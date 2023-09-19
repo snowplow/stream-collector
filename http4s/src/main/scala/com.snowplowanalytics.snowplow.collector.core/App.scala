@@ -8,6 +8,8 @@ import com.monovore.decline.Opts
 
 import io.circe.Decoder
 
+import com.snowplowanalytics.snowplow.scalatracker.emitters.http4s.ceTracking
+
 import com.snowplowanalytics.snowplow.collector.core.model.Sinks
 
 abstract class App[SinkConfig <: Config.Sink: Decoder](appInfo: AppInfo)
@@ -19,7 +21,9 @@ abstract class App[SinkConfig <: Config.Sink: Decoder](appInfo: AppInfo)
 
   def mkSinks(config: Config.Streams[SinkConfig]): Resource[IO, Sinks[IO]]
 
-  final def main: Opts[IO[ExitCode]] = Run.fromCli[IO, SinkConfig](appInfo, mkSinks)
+  def telemetryInfo(config: Config[SinkConfig]): Telemetry.TelemetryInfo
+
+  final def main: Opts[IO[ExitCode]] = Run.fromCli[IO, SinkConfig](appInfo, mkSinks, telemetryInfo)
 }
 
 object App {

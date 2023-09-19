@@ -9,11 +9,9 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import java.util.concurrent.ScheduledThreadPoolExecutor
-
 import cats.effect.{IO, Resource}
-
 import com.snowplowanalytics.snowplow.collector.core.model.Sinks
-import com.snowplowanalytics.snowplow.collector.core.{App, Config}
+import com.snowplowanalytics.snowplow.collector.core.{App, Config, Telemetry}
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks._
 
 object SqsCollector extends App[SqsSinkConfig](BuildInfo) {
@@ -37,4 +35,10 @@ object SqsCollector extends App[SqsSinkConfig](BuildInfo) {
       )
     } yield Sinks(good, bad)
   }
+
+  override def telemetryInfo(config: Config[SqsSinkConfig]): Telemetry.TelemetryInfo =
+    Telemetry.TelemetryInfo(
+      region = Some(config.streams.sink.region),
+      cloud  = Some("AWS")
+    )
 }
