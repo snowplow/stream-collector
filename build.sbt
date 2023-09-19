@@ -27,17 +27,17 @@ lazy val commonDependencies = Seq(
   Dependencies.Libraries.badRows,
   Dependencies.Libraries.collectorPayload,
   Dependencies.Libraries.pureconfig,
-  Dependencies.Libraries.trackerCore,
-  Dependencies.Libraries.trackerEmitterId,
+  Dependencies.Libraries.Legacy.trackerCore,
+  Dependencies.Libraries.Legacy.trackerEmitterId,
   // Unit tests
   Dependencies.Libraries.akkaTestkit,
   Dependencies.Libraries.akkaHttpTestkit,
   Dependencies.Libraries.akkaStreamTestkit,
   Dependencies.Libraries.specs2,
   // Integration tests
-  Dependencies.Libraries.LegacyIT.testcontainers,
-  Dependencies.Libraries.LegacyIT.http4sClient,
-  Dependencies.Libraries.LegacyIT.catsRetry
+  Dependencies.Libraries.Legacy.testcontainers,
+  Dependencies.Libraries.Legacy.http4sClient,
+  Dependencies.Libraries.Legacy.catsRetry
 )
 
 lazy val commonExclusions = Seq(
@@ -95,7 +95,7 @@ lazy val dynVerSettings = Seq(
 )
 
 lazy val http4sBuildInfoSettings = Seq(
-  buildInfoKeys := Seq[BuildInfoKey](name, dockerAlias, version),
+  buildInfoKeys := Seq[BuildInfoKey](name, moduleName, dockerAlias, version),
   buildInfoOptions += BuildInfoOption.Traits("com.snowplowanalytics.snowplow.collector.core.AppInfo")
 )
 
@@ -128,6 +128,7 @@ lazy val http4s = project
       Dependencies.Libraries.http4sEmber,
       Dependencies.Libraries.http4sBlaze,
       Dependencies.Libraries.http4sNetty,
+      Dependencies.Libraries.http4sClient,
       Dependencies.Libraries.log4cats,
       Dependencies.Libraries.thrift,
       Dependencies.Libraries.badRows,
@@ -136,6 +137,8 @@ lazy val http4s = project
       Dependencies.Libraries.decline,
       Dependencies.Libraries.circeGeneric,
       Dependencies.Libraries.circeConfig,
+      Dependencies.Libraries.trackerCore,
+      Dependencies.Libraries.emitterHttps,
       Dependencies.Libraries.specs2,
       Dependencies.Libraries.specs2CE,
 

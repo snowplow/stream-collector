@@ -34,7 +34,7 @@ object Dependencies {
     val protobuf     = "3.21.7" // force this version to mitigate security vulnerabilities
     // Scala
     val collectorPayload = "0.0.0"
-    val tracker          = "1.0.1"
+    val tracker          = "2.0.0"
     val akkaHttp         = "10.2.7"
     val akka             = "2.6.16"
     val scopt            = "4.0.1"
@@ -56,10 +56,11 @@ object Dependencies {
     val specs2CE       = "1.5.0"
     val testcontainers = "0.40.10"
 
-    object LegacyIT {
+    object Legacy {
       val specs2CE  = "0.4.1"
       val catsRetry = "2.1.0"
       val http4s    = "0.21.33"
+      val tracker   = "1.0.1"
     }
   }
 
@@ -84,23 +85,24 @@ object Dependencies {
     val protobuf       = "com.google.protobuf"              % "protobuf-java"           % V.protobuf
 
     // Scala
-    val collectorPayload = "com.snowplowanalytics" % "collector-payload-1"                % V.collectorPayload
-    val badRows          = "com.snowplowanalytics" %% "snowplow-badrows"                  % V.badRows
-    val trackerCore      = "com.snowplowanalytics" %% "snowplow-scala-tracker-core"       % V.tracker
-    val trackerEmitterId = "com.snowplowanalytics" %% "snowplow-scala-tracker-emitter-id" % V.tracker
-    val scopt            = "com.github.scopt"      %% "scopt"                             % V.scopt
-    val akkaHttp         = "com.typesafe.akka"     %% "akka-http"                         % V.akkaHttp
-    val akkaStream       = "com.typesafe.akka"     %% "akka-stream"                       % V.akka
-    val akkaSlf4j        = "com.typesafe.akka"     %% "akka-slf4j"                        % V.akka
-    val pureconfig       = "com.github.pureconfig" %% "pureconfig"                        % V.pureconfig
-    val akkaHttpMetrics  = "fr.davit"              %% "akka-http-metrics-datadog"         % V.akkaHttpMetrics
-    val log4cats         = "org.typelevel"         %% "log4cats-slf4j"                    % V.log4cats
+    val collectorPayload  = "com.snowplowanalytics" % "collector-payload-1"                    % V.collectorPayload
+    val badRows           = "com.snowplowanalytics" %% "snowplow-badrows"                      % V.badRows
+    val trackerCore       = "com.snowplowanalytics" %% "snowplow-scala-tracker-core"           % V.tracker
+    val emitterHttps      = "com.snowplowanalytics" %% "snowplow-scala-tracker-emitter-http4s" % V.tracker
+    val scopt             = "com.github.scopt"      %% "scopt"                                 % V.scopt
+    val akkaHttp          = "com.typesafe.akka"     %% "akka-http"                             % V.akkaHttp
+    val akkaStream        = "com.typesafe.akka"     %% "akka-stream"                           % V.akka
+    val akkaSlf4j         = "com.typesafe.akka"     %% "akka-slf4j"                            % V.akka
+    val pureconfig        = "com.github.pureconfig" %% "pureconfig"                            % V.pureconfig
+    val akkaHttpMetrics   = "fr.davit"              %% "akka-http-metrics-datadog"             % V.akkaHttpMetrics
+    val log4cats          = "org.typelevel"         %% "log4cats-slf4j"                        % V.log4cats
 
     // http4s
     val http4sDsl    = "org.http4s"       %% "http4s-dsl"             % V.http4s
     val http4sEmber  = "org.http4s"       %% "http4s-ember-server"    % V.http4s
     val http4sBlaze  = "org.http4s"       %% "http4s-blaze-server"    % V.blaze
     val http4sNetty  = "org.http4s"       %% "http4s-netty-server"    % V.http4sNetty
+    val http4sClient = "org.http4s"       %% "http4s-blaze-client"    % V.blaze
     val decline      = "com.monovore"     %% "decline-effect"         % V.decline
     val circeGeneric = "io.circe"         %% "circe-generic"          % V.circe
     val circeConfig  = "io.circe"         %% "circe-config"           % V.circeConfig
@@ -111,7 +113,7 @@ object Dependencies {
 
     // Test common
     val specs2   = "org.specs2"    %% "specs2-core"                % V.specs2    % Test
-    val specs2CE = "org.typelevel" %% "cats-effect-testing-specs2" % V.specs2CE  % Test 
+    val specs2CE = "org.typelevel" %% "cats-effect-testing-specs2" % V.specs2CE  % Test
 
     // Test Akka
     val akkaTestkit = "com.typesafe.akka" %% "akka-testkit" % V.akka % Test
@@ -127,13 +129,14 @@ object Dependencies {
       val http4sClient = "org.http4s" %% "http4s-blaze-client" % V.blaze % IntegrationTest
     }
 
-    // Integration test legacy
-    object LegacyIT {
+    object Legacy {
       val testcontainers = "com.dimafeng" %% "testcontainers-scala-core" % V.testcontainers % IntegrationTest
       val specs2 = "org.specs2" %% "specs2-core" % V.specs2 % IntegrationTest
-      val specs2CE = "com.codecommit" %% "cats-effect-testing-specs2" % V.LegacyIT.specs2CE % IntegrationTest
-      val catsRetry = "com.github.cb372" %% "cats-retry" % V.LegacyIT.catsRetry % IntegrationTest
-      val http4sClient = "org.http4s" %% "http4s-blaze-client" % V.LegacyIT.http4s % IntegrationTest
+      val specs2CE = "com.codecommit" %% "cats-effect-testing-specs2" % V.Legacy.specs2CE % IntegrationTest
+      val catsRetry = "com.github.cb372" %% "cats-retry" % V.Legacy.catsRetry % IntegrationTest
+      val http4sClient = "org.http4s" %% "http4s-blaze-client" % V.Legacy.http4s % IntegrationTest
+      val trackerCore = "com.snowplowanalytics" %% "snowplow-scala-tracker-core" % V.Legacy.tracker
+      val trackerEmitterId = "com.snowplowanalytics" %% "snowplow-scala-tracker-emitter-id" % V.Legacy.tracker
     }
   }
 }
