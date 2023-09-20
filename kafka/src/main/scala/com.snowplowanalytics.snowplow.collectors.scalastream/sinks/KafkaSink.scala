@@ -9,48 +9,28 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 package sinks
 
+import cats.effect.{Resource, Sync}
+
+import org.slf4j.LoggerFactory
+
 import java.util.Properties
 
 import org.apache.kafka.clients.producer._
 
-import com.snowplowanalytics.snowplow.collectors.scalastream.model._
+import com.snowplowanalytics.snowplow.collector.core.{Config, Sink}
 
 /**
   * Kafka Sink for the Scala Stream Collector
   */
-class KafkaSink(
+class KafkaSink[F[_]: Sync](
   val maxBytes: Int,
-  kafkaConfig: Kafka,
-  bufferConfig: BufferConfig,
+  kafkaProducer: KafkaProducer[String, Array[Byte]],
   topicName: String
-) extends Sink {
+) extends Sink[F] {
 
-  private val kafkaProducer = createProducer
+  private lazy val log = LoggerFactory.getLogger(getClass())
 
-  /**
-    * Creates a new Kafka Producer with the given
-    * configuration options
-    *
-    * @return a new Kafka Producer
-    */
-  private def createProducer: KafkaProducer[String, Array[Byte]] = {
-
-    log.info(s"Create Kafka Producer to brokers: ${kafkaConfig.brokers}")
-
-    val props = new Properties()
-    props.setProperty("bootstrap.servers", kafkaConfig.brokers)
-    props.setProperty("acks", "all")
-    props.setProperty("retries", kafkaConfig.retries.toString)
-    props.setProperty("buffer.memory", bufferConfig.byteLimit.toString)
-    props.setProperty("linger.ms", bufferConfig.timeLimit.toString)
-    props.setProperty("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
-    props.setProperty("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer")
-
-    // Can't use `putAll` in JDK 11 because of https://github.com/scala/bug/issues/10418
-    kafkaConfig.producerConf.getOrElse(Map()).foreach { case (k, v) => props.setProperty(k, v) }
-
-    new KafkaProducer[String, Array[Byte]](props)
-  }
+  override def isHealthy: F[Boolean] = Sync[F].pure(true)
 
   /**
     * Store raw events to the topic
@@ -58,7 +38,7 @@ class KafkaSink(
     * @param events The list of events to send
     * @param key The partition key to use
     */
-  override def storeRawEvents(events: List[Array[Byte]], key: String): Unit = {
+  override def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit] = Sync[F].delay {
     log.debug(s"Writing ${events.size} Thrift records to Kafka topic $topicName at key $key")
     events.foreach { event =>
       kafkaProducer.send(
@@ -70,7 +50,47 @@ class KafkaSink(
       )
     }
   }
+}
 
-  override def shutdown(): Unit =
-    kafkaProducer.close()
+object KafkaSink {
+
+  def create[F[_]: Sync](
+    maxBytes: Int,
+    topicName: String,
+    kafkaConfig: KafkaSinkConfig,
+    bufferConfig: Config.Buffer
+  ): Resource[F, KafkaSink[F]] =
+    for {
+      kafkaProducer <- createProducer(kafkaConfig, bufferConfig)
+      kafkaSink = new KafkaSink(maxBytes, kafkaProducer, topicName)
+    } yield kafkaSink
+
+  /**
+    * Creates a new Kafka Producer with the given
+    * configuration options
+    *
+    * @return a new Kafka Producer
+    */
+  private def createProducer[F[_]: Sync](
+    kafkaConfig: KafkaSinkConfig,
+    bufferConfig: Config.Buffer
+  ): Resource[F, KafkaProducer[String, Array[Byte]]] = {
+    val acquire = Sync[F].delay {
+      val props = new Properties()
+      props.setProperty("bootstrap.servers", kafkaConfig.brokers)
+      props.setProperty("acks", "all")
+      props.setProperty("retries", kafkaConfig.retries.toString)
+      props.setProperty("buffer.memory", bufferConfig.byteLimit.toString)
+      props.setProperty("linger.ms", bufferConfig.timeLimit.toString)
+      props.setProperty("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
+      props.setProperty("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer")
+
+      // Can't use `putAll` in JDK 11 because of https://github.com/scala/bug/issues/10418
+      kafkaConfig.producerConf.getOrElse(Map()).foreach { case (k, v) => props.setProperty(k, v) }
+
+      new KafkaProducer[String, Array[Byte]](props)
+    }
+    val release = (p: KafkaProducer[String, Array[Byte]]) => Sync[F].delay(p.close())
+    Resource.make(acquire)(release)
+  }
 }

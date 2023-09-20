@@ -239,23 +239,36 @@ lazy val pubsubDistroless = project
   .configs(IntegrationTest)
 
 lazy val kafkaSettings =
-  allSettings ++ buildInfoSettings ++ Seq(
+  allSettings ++ buildInfoSettings ++ http4sBuildInfoSettings ++ Defaults.itSettings ++ Seq(
     moduleName := "snowplow-stream-collector-kafka",
+    buildInfoPackage := s"com.snowplowanalytics.snowplow.collectors.scalastream",
     Docker / packageName := "scala-stream-collector-kafka",
-    libraryDependencies ++= Seq(Dependencies.Libraries.kafkaClients, Dependencies.Libraries.mskAuth)
+    libraryDependencies ++= Seq(
+      Dependencies.Libraries.kafkaClients,
+      Dependencies.Libraries.mskAuth,
+      // integration tests dependencies
+      Dependencies.Libraries.IT.specs2,
+      Dependencies.Libraries.IT.specs2CE
+    ),
+    IntegrationTest / test := (IntegrationTest / test).dependsOn(Docker / publishLocal).value,
+    IntegrationTest / testOnly := (IntegrationTest / testOnly).dependsOn(Docker / publishLocal).evaluated
   )
 
 lazy val kafka = project
   .settings(kafkaSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDockerPlugin, BuildInfoPlugin)
-  .dependsOn(core % "test->test;compile->compile")
+  .dependsOn(http4s % "test->test;compile->compile;it->it")
+  .configs(IntegrationTest)
+
 
 lazy val kafkaDistroless = project
   .in(file("distroless/kafka"))
   .settings(sourceDirectory := (kafka / sourceDirectory).value)
   .settings(kafkaSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDistrolessDockerPlugin, BuildInfoPlugin)
-  .dependsOn(core % "test->test;compile->compile")
+  .dependsOn(http4s % "test->test;compile->compile;it->it")
+  .configs(IntegrationTest)
+
 
 lazy val nsqSettings =
   allSettings ++ buildInfoSettings ++ http4sBuildInfoSettings ++ Seq(

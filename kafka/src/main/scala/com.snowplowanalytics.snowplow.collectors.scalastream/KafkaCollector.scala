@@ -8,33 +8,29 @@
   */
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
-import com.snowplowanalytics.snowplow.collectors.scalastream.model._
-import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KafkaSink
-import com.snowplowanalytics.snowplow.collectors.scalastream.telemetry.TelemetryAkkaService
-import com.snowplowanalytics.snowplow.collectors.scalastream.generated.BuildInfo
+import cats.effect.{IO, Resource}
+import com.snowplowanalytics.snowplow.collector.core.model.Sinks
+import com.snowplowanalytics.snowplow.collector.core.{App, Config, Telemetry}
+import com.snowplowanalytics.snowplow.collectors.scalastream.sinks._
 
-object KafkaCollector extends Collector {
-  def appName      = BuildInfo.shortName
-  def appVersion   = BuildInfo.version
-  def scalaVersion = BuildInfo.scalaVersion
+object KafkaCollector extends App[KafkaSinkConfig](BuildInfo) {
 
-  def main(args: Array[String]): Unit = {
-    val (collectorConf, akkaConf) = parseConfig(args)
-    val telemetry                 = TelemetryAkkaService.initWithCollector(collectorConf, BuildInfo.moduleName, appVersion)
-    val sinks = {
-      val goodStream = collectorConf.streams.good
-      val badStream  = collectorConf.streams.bad
-      val bufferConf = collectorConf.streams.buffer
-      val (good, bad) = collectorConf.streams.sink match {
-        case kc: Kafka =>
-          (
-            new KafkaSink(kc.maxBytes, kc, bufferConf, goodStream),
-            new KafkaSink(kc.maxBytes, kc, bufferConf, badStream)
-          )
-        case _ => throw new IllegalArgumentException("Configured sink is not Kafka")
-      }
-      CollectorSinks(good, bad)
-    }
-    run(collectorConf, akkaConf, sinks, telemetry)
-  }
+  override def mkSinks(config: Config.Streams[KafkaSinkConfig]): Resource[IO, Sinks[IO]] =
+    for {
+      good <- KafkaSink.create[IO](
+        config.sink.maxBytes,
+        config.good,
+        config.sink,
+        config.buffer
+      )
+      bad <- KafkaSink.create[IO](
+        config.sink.maxBytes,
+        config.bad,
+        config.sink,
+        config.buffer
+      )
+    } yield Sinks(good, bad)
+
+  override def telemetryInfo(config: Config[KafkaSinkConfig]): Telemetry.TelemetryInfo =
+    Telemetry.TelemetryInfo(None, None)
 }

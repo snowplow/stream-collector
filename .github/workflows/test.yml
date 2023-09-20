@@ -20,3 +20,5 @@ jobs:
         run: sbt "project kinesisDistroless" IntegrationTest/test
       - name: Run integration tests PubSub
         run: sbt "project pubsubDistroless" IntegrationTest/test
+      - name: Run integration tests Kafka
+        run: sbt "project kafkaDistroless" IntegrationTest/test

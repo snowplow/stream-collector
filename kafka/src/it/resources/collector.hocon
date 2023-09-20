@@ -1,0 +1,14 @@
+collector {
+  interface = "0.0.0.0"
+  port = ${PORT}
+
+  streams {
+    good = ${TOPIC_GOOD}
+    bad = ${TOPIC_BAD}
+
+    sink {
+      brokers = ${BROKER}
+      maxBytes = ${MAX_BYTES}
+    }
+  }
+}
