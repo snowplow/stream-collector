@@ -55,14 +55,13 @@ class NsqSink[F[_]: Sync] private (
 object NsqSink {
 
   def create[F[_]: Sync](
+    maxBytes: Int,
     nsqConfig: NsqSinkConfig,
     topicName: String
   ): Resource[F, NsqSink[F]] =
     Resource.make(
       Sync[F].delay(
-        // MaxBytes is never used but is required by the sink interface definition,
-        // So just pass any int val in.
-        new NsqSink(0, nsqConfig, topicName)
+        new NsqSink(maxBytes, nsqConfig, topicName)
       )
     )(sink => Sync[F].delay(sink.shutdown()))
 }
