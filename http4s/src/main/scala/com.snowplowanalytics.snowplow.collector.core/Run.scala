@@ -25,12 +25,16 @@ import com.snowplowanalytics.snowplow.collector.core.model.Sinks
 
 object Run {
 
+  type MkSinks[F[_], SinkConfig] = Config.Streams[SinkConfig] => Resource[F, Sinks[F]]
+
+  type TelemetryInfo[SinkConfig] = Config[SinkConfig] => Telemetry.TelemetryInfo
+
   implicit private def logger[F[_]: Sync] = Slf4jLogger.getLogger[F]
 
   def fromCli[F[_]: Async: Tracking, SinkConfig: Decoder](
     appInfo: AppInfo,
-    mkSinks: Config.Streams[SinkConfig] => Resource[F, Sinks[F]],
-    telemetryInfo: Config[SinkConfig]   => Telemetry.TelemetryInfo
+    mkSinks: MkSinks[F, SinkConfig],
+    telemetryInfo: TelemetryInfo[SinkConfig]
   ): Opts[F[ExitCode]] = {
     val configPath = Opts.option[Path]("config", "Path to HOCON configuration (optional)", "c", "config.hocon").orNone
     configPath.map(fromPath[F, SinkConfig](appInfo, mkSinks, telemetryInfo, _))
@@ -38,13 +42,13 @@ object Run {
 
   private def fromPath[F[_]: Async: Tracking, SinkConfig: Decoder](
     appInfo: AppInfo,
-    mkSinks: Config.Streams[SinkConfig] => Resource[F, Sinks[F]],
-    telemetryInfo: Config[SinkConfig]   => Telemetry.TelemetryInfo,
+    mkSinks: MkSinks[F, SinkConfig],
+    telemetryInfo: TelemetryInfo[SinkConfig],
     path: Option[Path]
   ): F[ExitCode] = {
     val eitherT = for {
       config <- ConfigParser.fromPath[F, SinkConfig](path)
-      _      <- EitherT.right[ExitCode](fromConfig(appInfo, mkSinks, config, telemetryInfo))
+      _      <- EitherT.right[ExitCode](fromConfig(appInfo, mkSinks, telemetryInfo, config))
     } yield ExitCode.Success
 
     eitherT.merge.handleErrorWith { e =>
@@ -55,9 +59,9 @@ object Run {
 
   private def fromConfig[F[_]: Async: Tracking, SinkConfig](
     appInfo: AppInfo,
-    mkSinks: Config.Streams[SinkConfig] => Resource[F, Sinks[F]],
-    config: Config[SinkConfig],
-    telemetryInfo: Config[SinkConfig] => Telemetry.TelemetryInfo
+    mkSinks: MkSinks[F, SinkConfig],
+    telemetryInfo: TelemetryInfo[SinkConfig],
+    config: Config[SinkConfig]
   ): F[ExitCode] = {
     val resources = for {
       sinks <- mkSinks(config.streams)
