@@ -17,10 +17,12 @@ object NsqCollector extends App[NsqSinkConfig](BuildInfo) {
   override def mkSinks(config: Config.Streams[NsqSinkConfig]): Resource[IO, Sinks[IO]] =
     for {
       good <- NsqSink.create[IO](
+        config.sink.maxBytes,
         config.sink,
         config.good
       )
       bad <- NsqSink.create[IO](
+        config.sink.maxBytes,
         config.sink,
         config.bad
       )
