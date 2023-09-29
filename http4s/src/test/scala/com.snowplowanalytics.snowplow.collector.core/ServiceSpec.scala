@@ -2,6 +2,7 @@ package com.snowplowanalytics.snowplow.collector.core
 
 import scala.concurrent.duration._
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 
 import org.specs2.mutable.Specification
 
@@ -25,12 +26,19 @@ import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPa
 import com.snowplowanalytics.snowplow.collector.core.model._
 
 class ServiceSpec extends Specification {
-  case class ProbeService(service: Service[IO], good: TestSink, bad: TestSink)
+  case class ProbeService(service: Service[IO], good: TestSink, bad: TestSink, hostnameSet: Telemetry.HostnameSet[IO])
+
+  def telemetryHostnameSet = new Telemetry.HostnameSet[IO] {
+    val testHostnameSet                          = mutable.Set.empty[String]
+    override def add(hostname: String): IO[Unit] = IO(testHostnameSet.add(hostname)).void
+    override def getHashed: IO[Set[String]]      = IO(testHostnameSet.toSet)
+  }
 
   val service = new Service(
-    config  = TestUtils.testConfig,
-    sinks   = Sinks(new TestSink, new TestSink),
-    appInfo = TestUtils.appInfo
+    config      = TestUtils.testConfig,
+    sinks       = Sinks(new TestSink, new TestSink),
+    appInfo     = TestUtils.appInfo,
+    hostnameSet = telemetryHostnameSet
   )
   val event     = new CollectorPayload("iglu-schema", "ip", System.currentTimeMillis, "UTF-8", "collector")
   val uuidRegex = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}".r
@@ -43,20 +51,22 @@ class ServiceSpec extends Specification {
     `Access-Control-Allow-Credentials`()
   )
   val testConnection = Request.Connection(
-    local  = SocketAddress.fromStringIp("192.0.2.1:80").get,
-    remote = SocketAddress.fromStringIp("192.0.2.2:80").get,
+    local  = SocketAddress.fromStringIp("127.0.0.1:80").get,
+    remote = SocketAddress.fromStringIp("127.0.0.1:80").get,
     secure = false
   )
 
   def probeService(config: Config[Any] = TestUtils.testConfig): ProbeService = {
-    val good = new TestSink
-    val bad  = new TestSink
+    val good                                   = new TestSink
+    val bad                                    = new TestSink
+    val hostnameSet: Telemetry.HostnameSet[IO] = telemetryHostnameSet
     val service = new Service(
-      config  = config,
-      sinks   = Sinks(good, bad),
-      appInfo = TestUtils.appInfo
+      config      = config,
+      sinks       = Sinks(good, bad),
+      appInfo     = TestUtils.appInfo,
+      hostnameSet = hostnameSet
     )
-    ProbeService(service, good, bad)
+    ProbeService(service, good, bad, hostnameSet)
   }
 
   def emptyCollectorPayload: CollectorPayload =
@@ -86,8 +96,8 @@ class ServiceSpec extends Specification {
         r.headers.get(ci"Set-Cookie") must beNone
       }
       "not set a network_userid from cookie if SP-Anonymous is present" in {
-        val ProbeService(service, good, bad) = probeService()
-        val nuid                             = "test-nuid"
+        val ProbeService(service, good, bad, _) = probeService()
+        val nuid                                = "test-nuid"
         val req = Request[IO](
           method = Method.POST,
           headers = Headers(
@@ -113,8 +123,8 @@ class ServiceSpec extends Specification {
         e.networkUserId shouldEqual "00000000-0000-0000-0000-000000000000"
       }
       "network_userid from cookie should persist if SP-Anonymous is not present" in {
-        val ProbeService(service, good, bad) = probeService()
-        val nuid                             = "test-nuid"
+        val ProbeService(service, good, bad, _) = probeService()
+        val nuid                                = "test-nuid"
         val req = Request[IO](
           method = Method.POST
         ).addCookie(TestUtils.testConfig.cookie.name, nuid)
@@ -137,7 +147,7 @@ class ServiceSpec extends Specification {
         e.networkUserId shouldEqual "test-nuid"
       }
       "use the ip address from 'X-Forwarded-For' header if it exists" in {
-        val ProbeService(service, good, bad) = probeService()
+        val ProbeService(service, good, bad, _) = probeService()
         val req = Request[IO](
           method = Method.POST,
           headers = Headers(
@@ -163,7 +173,7 @@ class ServiceSpec extends Specification {
         e.ipAddress shouldEqual "192.0.2.4"
       }
       "use the ip address from remote address if 'X-Forwarded-For' header doesn't exist" in {
-        val ProbeService(service, good, bad) = probeService()
+        val ProbeService(service, good, bad, _) = probeService()
         val req = Request[IO](
           method = Method.POST
         ).withAttribute(Request.Keys.ConnectionInfo, testConnection)
@@ -183,10 +193,10 @@ class ServiceSpec extends Specification {
         bad.storedRawEvents must have size 0
         val e = emptyCollectorPayload
         deserializer.deserialize(e, good.storedRawEvents.head)
-        e.ipAddress shouldEqual "192.0.2.2"
+        e.ipAddress shouldEqual "127.0.0.1"
       }
       "set the ip address to 'unknown' if if SP-Anonymous is present" in {
-        val ProbeService(service, good, bad) = probeService()
+        val ProbeService(service, good, bad, _) = probeService()
         val req = Request[IO](
           method = Method.POST,
           headers = Headers(
@@ -212,14 +222,13 @@ class ServiceSpec extends Specification {
         e.ipAddress shouldEqual "unknown"
       }
       "respond with a 200 OK and a good row in good sink" in {
-        val ProbeService(service, good, bad) = probeService()
-        val nuid                             = "dfdb716e-ecf9-4d00-8b10-44edfbc8a108"
+        val ProbeService(service, good, bad, _) = probeService()
+        val nuid                                = "dfdb716e-ecf9-4d00-8b10-44edfbc8a108"
         val req = Request[IO](
           method  = Method.POST,
           headers = testHeaders,
           uri = Uri(
-            query     = Query.unsafeFromString("a=b"),
-            authority = Some(Uri.Authority(host = Uri.RegName("example.com")))
+            query = Query.unsafeFromString("a=b")
           )
         ).withAttribute(Request.Keys.ConnectionInfo, testConnection).addCookie(TestUtils.testConfig.cookie.name, nuid)
         val r = service
@@ -248,7 +257,7 @@ class ServiceSpec extends Specification {
         e.path shouldEqual "p"
         e.userAgent shouldEqual "testUserAgent"
         e.refererUri shouldEqual "example.com"
-        e.hostname shouldEqual "example.com"
+        e.hostname shouldEqual "localhost"
         e.networkUserId shouldEqual nuid
         e.headers shouldEqual List(
           "User-Agent: testUserAgent",
@@ -263,7 +272,7 @@ class ServiceSpec extends Specification {
       }
 
       "sink event with headers removed when spAnonymous set" in {
-        val ProbeService(service, good, bad) = probeService()
+        val ProbeService(service, good, bad, _) = probeService()
 
         val req = Request[IO](
           method  = Method.POST,
@@ -372,8 +381,8 @@ class ServiceSpec extends Specification {
           .copy(
             redirectDomains = Set("snowplow.acme.com", "example.com")
           )
-        val testPath                         = "/r/example?u=https://snowplow.acme.com/12"
-        val ProbeService(service, good, bad) = probeService(config = testConf)
+        val testPath                            = "/r/example?u=https://snowplow.acme.com/12"
+        val ProbeService(service, good, bad, _) = probeService(config = testConf)
         val req = Request[IO](
           method = Method.GET,
           uri    = Uri.unsafeFromString(testPath)
@@ -393,6 +402,58 @@ class ServiceSpec extends Specification {
         r.headers.get[Location] must beSome(Location(Uri.unsafeFromString("https://snowplow.acme.com/12")))
         good.storedRawEvents must have size 1
         bad.storedRawEvents must have size 0
+      }
+
+      "add hostname to telemetry hostname set" in {
+        val ProbeService(service, good, bad, hostnameSet) = probeService()
+        val req = Request[IO](
+          method = Method.POST
+        ).withAttribute(Request.Keys.ConnectionInfo, testConnection)
+        val r = service
+          .cookie(
+            body          = IO.pure(Some("b")),
+            path          = "p",
+            request       = req,
+            pixelExpected = false,
+            doNotTrack    = false,
+            contentType   = Some("image/gif")
+          )
+          .unsafeRunSync()
+
+        r.status mustEqual Status.Ok
+        good.storedRawEvents must have size 1
+        bad.storedRawEvents must have size 0
+
+        hostnameSet.getHashed.unsafeRunSync() must beEqualTo(Set("localhost"))
+
+        val e = emptyCollectorPayload
+        deserializer.deserialize(e, good.storedRawEvents.head)
+        e.hostname shouldEqual "localhost"
+      }
+
+      "don't add anything to telemetry hostname set if request doesn't have hostname" in {
+        val ProbeService(service, good, bad, hostnameSet) = probeService()
+        val req                                           = Request[IO](method = Method.POST)
+        val r = service
+          .cookie(
+            body          = IO.pure(Some("b")),
+            path          = "p",
+            request       = req,
+            pixelExpected = false,
+            doNotTrack    = false,
+            contentType   = Some("image/gif")
+          )
+          .unsafeRunSync()
+
+        r.status mustEqual Status.Ok
+        good.storedRawEvents must have size 1
+        bad.storedRawEvents must have size 0
+
+        hostnameSet.getHashed.unsafeRunSync() must beEqualTo(Set.empty)
+
+        val e = emptyCollectorPayload
+        deserializer.deserialize(e, good.storedRawEvents.head)
+        e.hostname shouldEqual null
       }
     }
 
@@ -471,7 +532,7 @@ class ServiceSpec extends Specification {
 
     "sinkEvent" in {
       "send back the produced events" in {
-        val ProbeService(s, good, bad) = probeService()
+        val ProbeService(s, good, bad, _) = probeService()
         s.sinkEvent(event, "key").unsafeRunSync()
         good.storedRawEvents must have size 1
         bad.storedRawEvents must have size 0
@@ -486,7 +547,7 @@ class ServiceSpec extends Specification {
           .copy(
             redirectDomains = Set("example1.com", "example2.com")
           )
-        val ProbeService(service, _, _) = probeService(config = testConfig)
+        val ProbeService(service, _, _, _) = probeService(config = testConfig)
         val res = service.buildHttpResponse(
           queryParams   = Map("u" -> "https://example1.com/12"),
           headers       = testHeaders,
@@ -548,7 +609,7 @@ class ServiceSpec extends Specification {
           .copy(
             redirectDomains = Set("example1.com", "example2.com")
           )
-        val ProbeService(service, _, _) = probeService(config = testConfig)
+        val ProbeService(service, _, _, _) = probeService(config = testConfig)
         val res = service.buildRedirectHttpResponse(
           queryParams = Map("u" -> "https://example1.com/12"),
           headers     = testHeaders
@@ -562,7 +623,7 @@ class ServiceSpec extends Specification {
           .copy(
             redirectDomains = Set("example1.com", "example2.com")
           )
-        val ProbeService(service, _, _) = probeService(config = testConfig)
+        val ProbeService(service, _, _, _) = probeService(config = testConfig)
         val res = service.buildRedirectHttpResponse(
           queryParams = Map.empty,
           headers     = testHeaders
@@ -576,7 +637,7 @@ class ServiceSpec extends Specification {
           .copy(
             redirectDomains = Set("example1.com", "example2.com")
           )
-        val ProbeService(service, _, _) = probeService(config = testConfig)
+        val ProbeService(service, _, _, _) = probeService(config = testConfig)
         val res = service.buildRedirectHttpResponse(
           queryParams = Map("u" -> "https://invalidexample1.com/12"),
           headers     = testHeaders
@@ -590,7 +651,7 @@ class ServiceSpec extends Specification {
           .copy(
             redirectDomains = Set.empty
           )
-        val ProbeService(service, _, _) = probeService(config = testConfig)
+        val ProbeService(service, _, _, _) = probeService(config = testConfig)
         val res = service.buildRedirectHttpResponse(
           queryParams = Map("u" -> "https://unknown.example.com/12"),
           headers     = testHeaders
@@ -1005,7 +1066,8 @@ class ServiceSpec extends Specification {
         val service = new Service(
           TestUtils.testConfig.copy(paths = Map.empty[String, String]),
           Sinks(new TestSink, new TestSink),
-          TestUtils.appInfo
+          TestUtils.appInfo,
+          telemetryHostnameSet
         )
         val expected1 = "/com.acme/track"
         val expected2 = "/com.acme/redirect"

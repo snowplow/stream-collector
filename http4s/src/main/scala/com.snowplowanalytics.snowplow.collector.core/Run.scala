@@ -64,11 +64,13 @@ object Run {
     config: Config[SinkConfig]
   ): F[ExitCode] = {
     val resources = for {
-      sinks <- mkSinks(config.streams)
+      sinks       <- mkSinks(config.streams)
+      hostnameSet <- Resource.eval(Telemetry.HostnameSet.init(config.telemetry))
       collectorService = new Service[F](
         config,
         Sinks(sinks.good, sinks.bad),
-        appInfo
+        appInfo,
+        hostnameSet
       )
       httpServer = HttpServer.build[F](
         new Routes[F](config.enableDefaultRedirect, collectorService).value,
@@ -78,20 +80,24 @@ object Run {
       )
       _          <- withGracefulShutdown(config.preTerminationPeriod)(httpServer)
       httpClient <- BlazeClientBuilder[F].resource
-    } yield httpClient
+    } yield (httpClient, hostnameSet)
 
-    resources.use { httpClient =>
-      Telemetry
-        .run(
-          config.telemetry,
-          httpClient,
-          appInfo,
-          telemetryInfo(config).region,
-          telemetryInfo(config).cloud
-        )
-        .compile
-        .drain
-        .flatMap(_ => Async[F].never[ExitCode])
+    resources.use {
+      case (httpClient, hostnameSet) =>
+        val appId = java.util.UUID.randomUUID.toString
+        Telemetry
+          .run(
+            config.telemetry,
+            httpClient,
+            appInfo,
+            appId,
+            telemetryInfo(config).region,
+            telemetryInfo(config).cloud,
+            hostnameSet
+          )
+          .compile
+          .drain
+          .flatMap(_ => Async[F].never[ExitCode])
     }
   }
 

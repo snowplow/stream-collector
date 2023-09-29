@@ -4,6 +4,8 @@ import java.util.UUID
 
 import org.apache.commons.codec.binary.Base64
 
+import com.comcast.ip4s.Dns
+
 import scala.concurrent.duration._
 import scala.collection.JavaConverters._
 
@@ -47,8 +49,11 @@ object Service {
 class Service[F[_]: Sync](
   config: Config[Any],
   sinks: Sinks[F],
-  appInfo: AppInfo
+  appInfo: AppInfo,
+  hostnameSet: Telemetry.HostnameSet[F]
 ) extends IService[F] {
+
+  implicit val dns: Dns[F] = Dns.forSync[F]
 
   val pixelStream = Stream.iterable[F, Byte](Service.pixel)
 
@@ -67,7 +72,6 @@ class Service[F[_]: Sync](
     for {
       body <- body
       redirect                  = path.startsWith("/r/")
-      hostname                  = extractHostname(request)
       userAgent                 = extractHeader(request, "User-Agent")
       refererUri                = extractHeader(request, "Referer")
       spAnonymous               = extractHeader(request, "SP-Anonymous")
@@ -77,6 +81,7 @@ class Service[F[_]: Sync](
       nuidOpt                   = networkUserId(request, cookie, spAnonymous)
       nuid                      = nuidOpt.getOrElse(UUID.randomUUID().toString)
       (ipAddress, partitionKey) = ipAndPartitionKey(ip, config.streams.useIpAddressAsPartitionKey)
+      hostname <- extractHostname(request)
       event = buildEvent(
         queryString,
         body,
@@ -105,6 +110,7 @@ class Service[F[_]: Sync](
         `Access-Control-Allow-Credentials`().toRaw1.some
       ).flatten
       responseHeaders = Headers(headerList)
+      _ <- hostname.map(hostnameSet.add).getOrElse(Sync[F].unit)
       _ <- sinkEvent(event, partitionKey)
       resp = buildHttpResponse(
         queryParams   = request.uri.query.params,
@@ -138,8 +144,8 @@ class Service[F[_]: Sync](
   def extractCookie(req: Request[F]): Option[RequestCookie] =
     req.cookies.find(_.name == config.cookie.name)
 
-  def extractHostname(req: Request[F]): Option[String] =
-    req.uri.authority.map(_.host.renderString) // Hostname is extracted like this in Akka-Http as well
+  def extractHostname(req: Request[F]): F[Option[String]] =
+    req.remoteHost.map(_.map(_.toString))
 
   def extractIp(req: Request[F], spAnonymous: Option[String]): Option[String] =
     spAnonymous match {
