@@ -12,6 +12,16 @@
             "uri": "http://iglucentral.com"
           }
         }
+      },
+      {
+        "name": "Iglu Central Test",
+        "priority": 0,
+        "vendorPrefixes": [ "com.snowplowanalytics.oss" ],
+        "connection": {
+          "http": {
+            "uri": "https://raw.githubusercontent.com/snowplow/iglu-central/oss_context_hostname"
+          }
+        }
       }
     ]
   }
