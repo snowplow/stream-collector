@@ -21,6 +21,8 @@ class Routes[F[_]: Sync](enableDefaultRedirect: Boolean, service: IService[F]) e
           ifTrue  = Ok("ok"),
           ifFalse = ServiceUnavailable("Service Unavailable")
         )
+    case GET -> Root / "robots.txt" =>
+      Ok("User-agent: *\nDisallow: /\n\nUser-agent: Googlebot\nDisallow: /\n\nUser-agent: AdsBot-Google\nDisallow: /")
   }
 
   private val corsRoute = HttpRoutes.of[F] {
