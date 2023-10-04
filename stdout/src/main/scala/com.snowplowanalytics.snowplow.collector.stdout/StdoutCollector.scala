@@ -13,6 +13,6 @@ object StdoutCollector extends App[SinkConfig](BuildInfo) {
     Resource.pure(Sinks(good, bad))
   }
 
-  override def telemetryInfo(config: Config[SinkConfig]): Telemetry.TelemetryInfo =
-    Telemetry.TelemetryInfo(None, None)
+  override def telemetryInfo(config: Config.Streams[SinkConfig]): IO[Telemetry.TelemetryInfo] =
+    IO(Telemetry.TelemetryInfo(None, None, None))
 }

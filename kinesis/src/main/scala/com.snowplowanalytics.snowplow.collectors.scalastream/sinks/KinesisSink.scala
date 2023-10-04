@@ -12,7 +12,6 @@ package sinks
 import cats.effect.{Resource, Sync}
 import cats.implicits.catsSyntaxMonadErrorRethrow
 import cats.syntax.either._
-import com.amazonaws.auth._
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
 import com.amazonaws.services.kinesis.model._
 import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClientBuilder}
@@ -372,10 +371,8 @@ class KinesisSink[F[_]: Sync] private (
         log.info(s"Starting background check for Kinesis stream $streamName")
         while (!kinesisHealthy) {
           Try {
-            val describeRequest = new DescribeStreamSummaryRequest()
-            describeRequest.setStreamName(streamName)
-            val describeResult = client.describeStreamSummary(describeRequest)
-            describeResult.getStreamDescriptionSummary().getStreamStatus()
+            val streamDescription = describeStream(client, streamName)
+            streamDescription.getStreamStatus()
           } match {
             case Success("ACTIVE") =>
               log.info(s"Stream $streamName ACTIVE")
@@ -461,6 +458,31 @@ object KinesisSink {
   }
 
   /**
+    * Creates a new Kinesis client.
+    * @param provider aws credentials provider
+    * @param endpoint kinesis endpoint where the stream resides
+    * @param region aws region where the stream resides
+    * @return the initialized AmazonKinesisClient
+    */
+  def createKinesisClient(
+    endpoint: String,
+    region: String
+  ): Either[Throwable, AmazonKinesis] =
+    Either.catchNonFatal(
+      AmazonKinesisClientBuilder
+        .standard()
+        .withEndpointConfiguration(new EndpointConfiguration(endpoint, region))
+        .build()
+    )
+
+  def describeStream(client: AmazonKinesis, streamName: String) = {
+    val describeRequest = new DescribeStreamSummaryRequest()
+    describeRequest.setStreamName(streamName)
+    val describeResult = client.describeStreamSummary(describeRequest)
+    describeResult.getStreamDescriptionSummary()
+  }
+
+  /**
     * Create a KinesisSink and schedule a task to flush its EventStorage.
     * Exists so that no threads can get a reference to the KinesisSink
     * during its construction.
@@ -474,9 +496,8 @@ object KinesisSink {
     executorService: ScheduledExecutorService
   ): Either[Throwable, KinesisSink[F]] = {
     val clients = for {
-      provider         <- getProvider(kinesisConfig.aws)
-      kinesisClient    <- createKinesisClient(provider, kinesisConfig.endpoint, kinesisConfig.region)
-      sqsClientAndName <- sqsBuffer(sqsBufferName, provider, kinesisConfig.region)
+      kinesisClient    <- createKinesisClient(kinesisConfig.endpoint, kinesisConfig.region)
+      sqsClientAndName <- sqsBuffer(sqsBufferName, kinesisConfig.region)
     } yield (kinesisClient, sqsClientAndName)
 
     clients.map {
@@ -500,66 +521,19 @@ object KinesisSink {
     }
   }
 
-  /** Create an aws credentials provider through env variables and iam. */
-  private def getProvider(awsConfig: KinesisSinkConfig.AWSConfig): Either[Throwable, AWSCredentialsProvider] = {
-    def isDefault(key: String): Boolean = key == "default"
-    def isIam(key: String): Boolean     = key == "iam"
-    def isEnv(key: String): Boolean     = key == "env"
-
-    ((awsConfig.accessKey, awsConfig.secretKey) match {
-      case (a, s) if isDefault(a) && isDefault(s) =>
-        new DefaultAWSCredentialsProviderChain().asRight
-      case (a, s) if isDefault(a) || isDefault(s) =>
-        "accessKey and secretKey must both be set to 'default' or neither".asLeft
-      case (a, s) if isIam(a) && isIam(s) =>
-        InstanceProfileCredentialsProvider.getInstance().asRight
-      case (a, s) if isIam(a) && isIam(s) =>
-        "accessKey and secretKey must both be set to 'iam' or neither".asLeft
-      case (a, s) if isEnv(a) && isEnv(s) =>
-        new EnvironmentVariableCredentialsProvider().asRight
-      case (a, s) if isEnv(a) || isEnv(s) =>
-        "accessKey and secretKey must both be set to 'env' or neither".asLeft
-      case _ =>
-        new AWSStaticCredentialsProvider(
-          new BasicAWSCredentials(awsConfig.accessKey, awsConfig.secretKey)
-        ).asRight
-    }).leftMap(new IllegalArgumentException(_))
-  }
-
-  /**
-    * Creates a new Kinesis client.
-    * @param provider aws credentials provider
-    * @param endpoint kinesis endpoint where the stream resides
-    * @param region aws region where the stream resides
-    * @return the initialized AmazonKinesisClient
-    */
-  private def createKinesisClient(
-    provider: AWSCredentialsProvider,
-    endpoint: String,
-    region: String
-  ): Either[Throwable, AmazonKinesis] =
-    Either.catchNonFatal(
-      AmazonKinesisClientBuilder
-        .standard()
-        .withCredentials(provider)
-        .withEndpointConfiguration(new EndpointConfiguration(endpoint, region))
-        .build()
-    )
-
   private def sqsBuffer(
     sqsBufferName: Option[String],
-    provider: AWSCredentialsProvider,
     region: String
   ): Either[Throwable, Option[SqsClientAndName]] =
     sqsBufferName match {
       case Some(name) =>
-        createSqsClient(provider, region).map(amazonSqs => Some(SqsClientAndName(amazonSqs, name)))
+        createSqsClient(region).map(amazonSqs => Some(SqsClientAndName(amazonSqs, name)))
       case None => None.asRight
     }
 
-  private def createSqsClient(provider: AWSCredentialsProvider, region: String): Either[Throwable, AmazonSQS] =
+  private def createSqsClient(region: String): Either[Throwable, AmazonSQS] =
     Either.catchNonFatal(
-      AmazonSQSClientBuilder.standard().withRegion(region).withCredentials(provider).build
+      AmazonSQSClientBuilder.standard().withRegion(region).build
     )
 
   /**

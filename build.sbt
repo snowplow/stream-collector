@@ -141,6 +141,7 @@ lazy val http4s = project
       Dependencies.Libraries.emitterHttps,
       Dependencies.Libraries.specs2,
       Dependencies.Libraries.specs2CE,
+      Dependencies.Libraries.ceTestkit,
 
       //Integration tests
       Dependencies.Libraries.IT.testcontainers,

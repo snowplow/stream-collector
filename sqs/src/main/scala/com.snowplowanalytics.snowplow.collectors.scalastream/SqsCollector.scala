@@ -36,9 +36,14 @@ object SqsCollector extends App[SqsSinkConfig](BuildInfo) {
     } yield Sinks(good, bad)
   }
 
-  override def telemetryInfo(config: Config[SqsSinkConfig]): Telemetry.TelemetryInfo =
-    Telemetry.TelemetryInfo(
-      region = Some(config.streams.sink.region),
-      cloud  = Some("AWS")
-    )
+  override def telemetryInfo(config: Config.Streams[SqsSinkConfig]): IO[Telemetry.TelemetryInfo] =
+    TelemetryUtils
+      .getAccountId(config)
+      .map(id =>
+        Telemetry.TelemetryInfo(
+          region                 = Some(config.sink.region),
+          cloud                  = Some("AWS"),
+          unhashedInstallationId = id
+        )
+      )
 }

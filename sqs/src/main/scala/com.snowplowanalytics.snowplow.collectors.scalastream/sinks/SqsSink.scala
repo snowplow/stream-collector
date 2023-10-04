@@ -294,6 +294,11 @@ object SqsSink {
     Resource.make(acquire)(release)
   }
 
+  def createSqsClient(region: String): Either[Throwable, AmazonSQS] =
+    Either.catchNonFatal(
+      AmazonSQSClientBuilder.standard().withRegion(region).build
+    )
+
   /**
     * Create an SqsSink and schedule a task to flush its EventStorage.
     * Exists so that no threads can get a reference to the SqsSink
@@ -305,16 +310,11 @@ object SqsSink {
     bufferConfig: Config.Buffer,
     queueName: String,
     executorService: ScheduledExecutorService
-  ): Either[Throwable, SqsSink[F]] = {
-    val client = Either.catchNonFatal(
-      AmazonSQSClientBuilder.standard().withRegion(sqsConfig.region).build
-    )
-
-    client.map { c =>
+  ): Either[Throwable, SqsSink[F]] =
+    createSqsClient(sqsConfig.region).map { c =>
       val sqsSink = new SqsSink(maxBytes, c, sqsConfig, bufferConfig, queueName, executorService)
       sqsSink.EventStorage.scheduleFlush()
       sqsSink.checkSqsHealth()
       sqsSink
     }
-  }
 }

@@ -31,6 +31,10 @@ object KafkaCollector extends App[KafkaSinkConfig](BuildInfo) {
       )
     } yield Sinks(good, bad)
 
-  override def telemetryInfo(config: Config[KafkaSinkConfig]): Telemetry.TelemetryInfo =
-    Telemetry.TelemetryInfo(None, None)
+  override def telemetryInfo(config: Config.Streams[KafkaSinkConfig]): IO[Telemetry.TelemetryInfo] =
+    TelemetryUtils.getAzureSubscriptionId.map {
+      case None     => Telemetry.TelemetryInfo(None, None, None)
+      case Some(id) => Telemetry.TelemetryInfo(None, Some("Azure"), Some(id))
+    }
+
 }
