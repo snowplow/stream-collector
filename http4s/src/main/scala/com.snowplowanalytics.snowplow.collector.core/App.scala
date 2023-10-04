@@ -21,7 +21,7 @@ abstract class App[SinkConfig <: Config.Sink: Decoder](appInfo: AppInfo)
 
   def mkSinks(config: Config.Streams[SinkConfig]): Resource[IO, Sinks[IO]]
 
-  def telemetryInfo(config: Config[SinkConfig]): Telemetry.TelemetryInfo
+  def telemetryInfo(config: Config.Streams[SinkConfig]): IO[Telemetry.TelemetryInfo]
 
   final def main: Opts[IO[ExitCode]] = Run.fromCli[IO, SinkConfig](appInfo, mkSinks, telemetryInfo)
 }
