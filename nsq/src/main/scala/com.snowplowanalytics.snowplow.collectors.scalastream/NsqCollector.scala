@@ -28,6 +28,6 @@ object NsqCollector extends App[NsqSinkConfig](BuildInfo) {
       )
     } yield Sinks(good, bad)
 
-  override def telemetryInfo(config: Config[NsqSinkConfig]): Telemetry.TelemetryInfo =
-    Telemetry.TelemetryInfo(None, None)
+  override def telemetryInfo(config: Config.Streams[NsqSinkConfig]): IO[Telemetry.TelemetryInfo] =
+    IO(Telemetry.TelemetryInfo(None, None, None))
 }

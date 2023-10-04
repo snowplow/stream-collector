@@ -56,6 +56,7 @@ object Dependencies {
     val specs2         = "4.11.0"
     val specs2CE       = "1.5.0"
     val testcontainers = "0.40.10"
+    val ceTestkit      = "3.4.5"
 
     object Legacy {
       val specs2CE  = "0.4.1"
@@ -114,8 +115,9 @@ object Dependencies {
     // Scala (test only)
 
     // Test common
-    val specs2   = "org.specs2"    %% "specs2-core"                % V.specs2    % Test
-    val specs2CE = "org.typelevel" %% "cats-effect-testing-specs2" % V.specs2CE  % Test
+    val specs2    = "org.specs2"     %% "specs2-core"                % V.specs2    % Test
+    val specs2CE  = "org.typelevel"  %% "cats-effect-testing-specs2" % V.specs2CE  % Test
+    val ceTestkit = "org.typelevel"  %% "cats-effect-testkit"        % V.ceTestkit % Test
 
     // Test Akka
     val akkaTestkit = "com.typesafe.akka" %% "akka-testkit" % V.akka % Test

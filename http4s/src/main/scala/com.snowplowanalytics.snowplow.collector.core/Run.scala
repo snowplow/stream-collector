@@ -27,14 +27,14 @@ object Run {
 
   type MkSinks[F[_], SinkConfig] = Config.Streams[SinkConfig] => Resource[F, Sinks[F]]
 
-  type TelemetryInfo[SinkConfig] = Config[SinkConfig] => Telemetry.TelemetryInfo
+  type TelemetryInfo[F[_], SinkConfig] = Config.Streams[SinkConfig] => F[Telemetry.TelemetryInfo]
 
   implicit private def logger[F[_]: Sync] = Slf4jLogger.getLogger[F]
 
   def fromCli[F[_]: Async: Tracking, SinkConfig: Decoder](
     appInfo: AppInfo,
     mkSinks: MkSinks[F, SinkConfig],
-    telemetryInfo: TelemetryInfo[SinkConfig]
+    telemetryInfo: TelemetryInfo[F, SinkConfig]
   ): Opts[F[ExitCode]] = {
     val configPath = Opts.option[Path]("config", "Path to HOCON configuration (optional)", "c", "config.hocon").orNone
     configPath.map(fromPath[F, SinkConfig](appInfo, mkSinks, telemetryInfo, _))
@@ -43,7 +43,7 @@ object Run {
   private def fromPath[F[_]: Async: Tracking, SinkConfig: Decoder](
     appInfo: AppInfo,
     mkSinks: MkSinks[F, SinkConfig],
-    telemetryInfo: TelemetryInfo[SinkConfig],
+    telemetryInfo: TelemetryInfo[F, SinkConfig],
     path: Option[Path]
   ): F[ExitCode] = {
     val eitherT = for {
@@ -60,7 +60,7 @@ object Run {
   private def fromConfig[F[_]: Async: Tracking, SinkConfig](
     appInfo: AppInfo,
     mkSinks: MkSinks[F, SinkConfig],
-    telemetryInfo: TelemetryInfo[SinkConfig],
+    telemetryInfo: TelemetryInfo[F, SinkConfig],
     config: Config[SinkConfig]
   ): F[ExitCode] = {
     val resources = for {
@@ -81,14 +81,9 @@ object Run {
     } yield httpClient
 
     resources.use { httpClient =>
+      val appId = java.util.UUID.randomUUID.toString
       Telemetry
-        .run(
-          config.telemetry,
-          httpClient,
-          appInfo,
-          telemetryInfo(config).region,
-          telemetryInfo(config).cloud
-        )
+        .run(config.telemetry, httpClient, appInfo, appId, telemetryInfo(config.streams))
         .compile
         .drain
         .flatMap(_ => Async[F].never[ExitCode])

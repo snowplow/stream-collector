@@ -11,7 +11,6 @@ final case class KinesisSinkConfig(
   maxBytes: Int,
   region: String,
   threadPoolSize: Int,
-  aws: KinesisSinkConfig.AWSConfig,
   backoffPolicy: KinesisSinkConfig.BackoffPolicy,
   customEndpoint: Option[String],
   sqsGoodBuffer: Option[String],

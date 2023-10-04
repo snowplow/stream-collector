@@ -9,9 +9,11 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import cats.effect.{IO, Resource}
+
 import com.snowplowanalytics.snowplow.collector.core.model.Sinks
 import com.snowplowanalytics.snowplow.collector.core.{App, Config, Telemetry}
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.{KinesisSink, KinesisSinkConfig}
+
 import org.slf4j.LoggerFactory
 
 import java.util.concurrent.ScheduledThreadPoolExecutor
@@ -42,11 +44,16 @@ object KinesisCollector extends App[KinesisSinkConfig](BuildInfo) {
     } yield Sinks(good, bad)
   }
 
-  override def telemetryInfo(config: Config[KinesisSinkConfig]): Telemetry.TelemetryInfo =
-    Telemetry.TelemetryInfo(
-      region = Some(config.streams.sink.region),
-      cloud  = Some("AWS")
-    )
+  override def telemetryInfo(config: Config.Streams[KinesisSinkConfig]): IO[Telemetry.TelemetryInfo] =
+    TelemetryUtils
+      .getAccountId(config)
+      .map(id =>
+        Telemetry.TelemetryInfo(
+          region                 = Some(config.sink.region),
+          cloud                  = Some("AWS"),
+          unhashedInstallationId = id
+        )
+      )
 
   def buildExecutorService(kc: KinesisSinkConfig): ScheduledThreadPoolExecutor = {
     log.info("Creating thread pool of size " + kc.threadPoolSize)

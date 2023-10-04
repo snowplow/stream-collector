@@ -124,10 +124,6 @@ object KinesisConfigSpec {
         maxBytes       = 1000000,
         region         = "eu-central-1",
         threadPoolSize = 10,
-        aws = KinesisSinkConfig.AWSConfig(
-          accessKey = "iam",
-          secretKey = "iam"
-        ),
         backoffPolicy = KinesisSinkConfig.BackoffPolicy(
           minBackoff = 500,
           maxBackoff = 1500,

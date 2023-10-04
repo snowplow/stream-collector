@@ -14,9 +14,12 @@ object PubSubCollector extends App[PubSubSinkConfig](BuildInfo) {
       bad  <- PubSubSink.create[IO](config.sink.maxBytes, config.sink, config.buffer, config.bad)
     } yield Sinks(good, bad)
 
-  override def telemetryInfo(config: Config[PubSubSinkConfig]): Telemetry.TelemetryInfo =
-    Telemetry.TelemetryInfo(
-      region = None,
-      cloud  = Some("GCP")
+  override def telemetryInfo(config: Config.Streams[PubSubSinkConfig]): IO[Telemetry.TelemetryInfo] =
+    IO(
+      Telemetry.TelemetryInfo(
+        region                 = None,
+        cloud                  = Some("GCP"),
+        unhashedInstallationId = Some(config.sink.googleProjectId)
+      )
     )
 }
