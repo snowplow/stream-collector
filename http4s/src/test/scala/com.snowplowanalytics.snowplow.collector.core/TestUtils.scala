@@ -75,15 +75,25 @@ object TestUtils {
     ),
     cors = CORS(60.minutes),
     streams = Streams(
-      "raw",
-      "bad-1",
-      false,
-      AnyRef,
-      Buffer(
-        3145728,
-        500,
-        5000
-      )
+      good = Sink(
+        name = "raw",
+        Buffer(
+          3145728,
+          500,
+          5000
+        ),
+        AnyRef
+      ),
+      bad = Sink(
+        name = "bad-1",
+        Buffer(
+          3145728,
+          500,
+          5000
+        ),
+        AnyRef
+      ),
+      useIpAddressAsPartitionKey = false
     ),
     monitoring = Monitoring(
       Metrics(

@@ -157,27 +157,14 @@ collector {
   }
 
   streams {
-    # Events which have successfully been collected will be stored in the good stream/topic
-    good = "good"
-
-    # Bad rows (https://docs.snowplowanalytics.com/docs/try-snowplow/recipes/recipe-understanding-bad-data/) will be stored in the bad stream/topic.
-    # The collector can currently produce two flavours of bad row:
-    #  - a size_violation if an event is larger that the Kinesis (1MB) or SQS (256KB) limits;
-    #  - a generic_error if a request's querystring cannot be parsed because of illegal characters
-    bad = "bad"
 
     # Whether to use the incoming event's ip as the partition key for the good stream/topic
     # Note: Nsq does not make use of partition key.
     useIpAddressAsPartitionKey = false
 
-    # Enable the chosen sink by uncommenting the appropriate configuration
-    sink {
-      # Choose between kinesis, sqs, google-pub-sub, kafka, nsq, or stdout.
-      # To use stdout, comment or remove everything in the "collector.streams.sink" section except
-      # "enabled" which should be set to "stdout".
-      enabled = nsq
-
-      # Or NSQ
+    # Events which have successfully been collected will be stored in the good stream/topic
+    good {
+      name = "good"
       ## Host name for nsqd
       host = "nsqHost"
       ## TCP port for nsqd, 4150 by default
@@ -188,6 +175,23 @@ collector {
       # Default: 1 MB
       maxBytes = 1000000
     }
+    
+    # Bad rows (https://docs.snowplowanalytics.com/docs/try-snowplow/recipes/recipe-understanding-bad-data/) will be stored in the bad stream/topic.
+    # The collector can currently produce two flavours of bad row:
+    #  - a size_violation if an event is larger that the Kinesis (1MB) or SQS (256KB) limits;
+    #  - a generic_error if a request's querystring cannot be parsed because of illegal characters
+    bad {
+      name = "bad"
+      ## Host name for nsqd
+      host = "nsqHost"
+      ## TCP port for nsqd, 4150 by default
+      port = 4150
+
+      # Optional. Maximum number of bytes that a single record can contain.
+      # If a record is bigger, a size violation bad row is emitted instead
+      # Default: 1 MB
+      maxBytes = 1000000
+    }    
   }
 
   # Telemetry sends heartbeat events to external pipeline.

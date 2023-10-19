@@ -10,14 +10,11 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 package sinks
 
 import java.util.concurrent.TimeoutException
-
 import scala.collection.JavaConverters._
-
 import cats.effect.{Resource, Sync}
 import cats.implicits._
-
 import com.snowplowanalytics.client.nsq.NSQProducer
-import com.snowplowanalytics.snowplow.collector.core.{Sink}
+import com.snowplowanalytics.snowplow.collector.core.{Config, Sink}
 import com.snowplowanalytics.client.nsq.exceptions.NSQException
 
 /**
@@ -55,13 +52,11 @@ class NsqSink[F[_]: Sync] private (
 object NsqSink {
 
   def create[F[_]: Sync](
-    maxBytes: Int,
-    nsqConfig: NsqSinkConfig,
-    topicName: String
+    nsqConfig: Config.Sink[NsqSinkConfig]
   ): Resource[F, NsqSink[F]] =
     Resource.make(
       Sync[F].delay(
-        new NsqSink(maxBytes, nsqConfig, topicName)
+        new NsqSink(nsqConfig.config.maxBytes, nsqConfig.config, nsqConfig.name)
       )
     )(sink => Sync[F].delay(sink.shutdown()))
 }

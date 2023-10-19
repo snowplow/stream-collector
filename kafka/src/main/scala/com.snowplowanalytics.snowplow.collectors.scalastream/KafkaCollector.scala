@@ -17,18 +17,8 @@ object KafkaCollector extends App[KafkaSinkConfig](BuildInfo) {
 
   override def mkSinks(config: Config.Streams[KafkaSinkConfig]): Resource[IO, Sinks[IO]] =
     for {
-      good <- KafkaSink.create[IO](
-        config.sink.maxBytes,
-        config.good,
-        config.sink,
-        config.buffer
-      )
-      bad <- KafkaSink.create[IO](
-        config.sink.maxBytes,
-        config.bad,
-        config.sink,
-        config.buffer
-      )
+      good <- KafkaSink.create[IO](config.good)
+      bad  <- KafkaSink.create[IO](config.bad)
     } yield Sinks(good, bad)
 
   override def telemetryInfo(config: Config.Streams[KafkaSinkConfig]): IO[Telemetry.TelemetryInfo] =

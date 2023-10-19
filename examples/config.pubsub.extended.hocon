@@ -157,27 +157,16 @@ collector {
   }
 
   streams {
-    # Events which have successfully been collected will be stored in the good stream/topic
-    good = "good"
-
-    # Bad rows (https://docs.snowplowanalytics.com/docs/try-snowplow/recipes/recipe-understanding-bad-data/) will be stored in the bad stream/topic.
-    # The collector can currently produce two flavours of bad row:
-    #  - a size_violation if an event is larger that the Kinesis (1MB) or SQS (256KB) limits;
-    #  - a generic_error if a request's querystring cannot be parsed because of illegal characters
-    bad = "bad"
 
     # Whether to use the incoming event's ip as the partition key for the good stream/topic
     # Note: Nsq does not make use of partition key.
     useIpAddressAsPartitionKey = false
 
-    # Enable the chosen sink by uncommenting the appropriate configuration
-    sink {
-      # Choose between kinesis, sqs, google-pub-sub, kafka, nsq, or stdout.
-      # To use stdout, comment or remove everything in the "collector.streams.sink" section except
-      # "enabled" which should be set to "stdout".
-      enabled = google-pub-sub
+    # Events which have successfully been collected will be stored in the good stream/topic
+    good {
 
-
+      name = "good"
+      
       googleProjectId = "google-project-id"
       ## Minimum, maximum and total backoff periods, in milliseconds
       ## and multiplier between two backoff
@@ -205,20 +194,68 @@ collector {
       # In case of failure of these retries, the events are added to a buffer
       # and every retryInterval collector retries to send them.
       retryInterval = 10 seconds
+      
+      
+      # Incoming events are stored in a buffer before being sent to Pubsub.
+      # The buffer is emptied whenever:
+      # - the number of stored records reaches record-limit or
+      # - the combined size of the stored records reaches byte-limit or
+      # - the time in milliseconds since the buffer was last emptied reaches time-limit
+      buffer {
+        byteLimit   = 100000
+        recordLimit = 40
+        timeLimit   = 1000
+      }
     }
+    
+    # Bad rows (https://docs.snowplowanalytics.com/docs/try-snowplow/recipes/recipe-understanding-bad-data/) will be stored in the bad stream/topic.
+    # The collector can currently produce two flavours of bad row:
+    #  - a size_violation if an event is larger that the Kinesis (1MB) or SQS (256KB) limits;
+    #  - a generic_error if a request's querystring cannot be parsed because of illegal characters    
+    bad {
 
+      name = "bad"
+      
+      googleProjectId = "google-project-id"
+      ## Minimum, maximum and total backoff periods, in milliseconds
+      ## and multiplier between two backoff
+      backoffPolicy {
+        minBackoff = 1000
+        maxBackoff = 1000
+        totalBackoff = 9223372036854
+        multiplier = 2
+        initialRpcTimeout = 10000
+        maxRpcTimeout = 10000
+        rpcTimeoutMultiplier = 2
+      }
 
-    # Incoming events are stored in a buffer before being sent to Kinesis/Kafka.
-    # Note: Buffering is not supported by NSQ.
-    # The buffer is emptied whenever:
-    # - the number of stored records reaches record-limit or
-    # - the combined size of the stored records reaches byte-limit or
-    # - the time in milliseconds since the buffer was last emptied reaches time-limit
-    buffer {
-      byteLimit   = 100000
-      recordLimit = 40
-      timeLimit   = 1000
-    }
+      # Optional. Maximum number of bytes that a single record can contain.
+      # If a record is bigger, a size violation bad row is emitted instead
+      # Default: 10 MB
+      maxBytes = 10000000
+
+      # Optional. When collector starts, it checks if PubSub topics exist with listTopics.
+      # This is the interval for the calls.
+      # /sink-health is made healthy as soon as requests are successful or records are successfully inserted.
+      startupCheckInterval = 1 second
+
+      # Optional. Collector uses built-in retry mechanism of PubSub API.
+      # In case of failure of these retries, the events are added to a buffer
+      # and every retryInterval collector retries to send them.
+      retryInterval = 10 seconds
+      
+      
+      # Incoming events are stored in a buffer before being sent to Pubsub.
+      # The buffer is emptied whenever:
+      # - the number of stored records reaches record-limit or
+      # - the combined size of the stored records reaches byte-limit or
+      # - the time in milliseconds since the buffer was last emptied reaches time-limit
+      buffer {
+        byteLimit   = 100000
+        recordLimit = 40
+        timeLimit   = 1000
+      }
+    }    
   }
 
   # Telemetry sends heartbeat events to external pipeline.

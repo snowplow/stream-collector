@@ -17,22 +17,10 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.sinks._
 object SqsCollector extends App[SqsSinkConfig](BuildInfo) {
 
   override def mkSinks(config: Config.Streams[SqsSinkConfig]): Resource[IO, Sinks[IO]] = {
-    val threadPoolExecutor = new ScheduledThreadPoolExecutor(config.sink.threadPoolSize)
+    val threadPoolExecutor = new ScheduledThreadPoolExecutor(config.good.config.threadPoolSize)
     for {
-      good <- SqsSink.create[IO](
-        config.sink.maxBytes,
-        config.sink,
-        config.buffer,
-        config.good,
-        threadPoolExecutor
-      )
-      bad <- SqsSink.create[IO](
-        config.sink.maxBytes,
-        config.sink,
-        config.buffer,
-        config.bad,
-        threadPoolExecutor
-      )
+      good <- SqsSink.create[IO](config.good, threadPoolExecutor)
+      bad  <- SqsSink.create[IO](config.bad, threadPoolExecutor)
     } yield Sinks(good, bad)
   }
 
@@ -41,7 +29,7 @@ object SqsCollector extends App[SqsSinkConfig](BuildInfo) {
       .getAccountId(config)
       .map(id =>
         Telemetry.TelemetryInfo(
-          region                 = Some(config.sink.region),
+          region                 = Some(config.good.config.region),
           cloud                  = Some("AWS"),
           unhashedInstallationId = id
         )

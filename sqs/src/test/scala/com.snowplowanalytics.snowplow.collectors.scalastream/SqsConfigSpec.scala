@@ -101,23 +101,42 @@ object SqsConfigSpec {
       idleTimeout    = 610.seconds
     ),
     streams = Config.Streams(
-      good                       = "good",
-      bad                        = "bad",
       useIpAddressAsPartitionKey = false,
-      buffer = Config.Buffer(
-        byteLimit   = 3145728,
-        recordLimit = 500,
-        timeLimit   = 5000
-      ),
-      sink = SqsSinkConfig(
-        maxBytes = 192000,
-        region   = "eu-central-1",
-        backoffPolicy = SqsSinkConfig.BackoffPolicyConfig(
-          minBackoff = 500,
-          maxBackoff = 1500,
-          maxRetries = 3
+      good = Config.Sink(
+        name = "good",
+        buffer = Config.Buffer(
+          byteLimit   = 3145728,
+          recordLimit = 500,
+          timeLimit   = 5000
         ),
-        threadPoolSize = 10
+        config = SqsSinkConfig(
+          maxBytes = 192000,
+          region   = "eu-central-1",
+          backoffPolicy = SqsSinkConfig.BackoffPolicyConfig(
+            minBackoff = 500,
+            maxBackoff = 1500,
+            maxRetries = 3
+          ),
+          threadPoolSize = 10
+        )
+      ),
+      bad = Config.Sink(
+        name = "bad",
+        buffer = Config.Buffer(
+          byteLimit   = 3145728,
+          recordLimit = 500,
+          timeLimit   = 5000
+        ),
+        config = SqsSinkConfig(
+          maxBytes = 192000,
+          region   = "eu-central-1",
+          backoffPolicy = SqsSinkConfig.BackoffPolicyConfig(
+            minBackoff = 500,
+            maxBackoff = 1500,
+            maxRetries = 3
+          ),
+          threadPoolSize = 10
+        )
       )
     ),
     telemetry = Config.Telemetry(

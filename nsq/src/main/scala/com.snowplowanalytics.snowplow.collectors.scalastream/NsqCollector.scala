@@ -16,16 +16,8 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.sinks._
 object NsqCollector extends App[NsqSinkConfig](BuildInfo) {
   override def mkSinks(config: Config.Streams[NsqSinkConfig]): Resource[IO, Sinks[IO]] =
     for {
-      good <- NsqSink.create[IO](
-        config.sink.maxBytes,
-        config.sink,
-        config.good
-      )
-      bad <- NsqSink.create[IO](
-        config.sink.maxBytes,
-        config.sink,
-        config.bad
-      )
+      good <- NsqSink.create[IO](config.good)
+      bad  <- NsqSink.create[IO](config.bad)
     } yield Sinks(good, bad)
 
   override def telemetryInfo(config: Config.Streams[NsqSinkConfig]): IO[Telemetry.TelemetryInfo] =

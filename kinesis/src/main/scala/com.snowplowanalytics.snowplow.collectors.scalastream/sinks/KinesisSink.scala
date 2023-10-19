@@ -439,17 +439,14 @@ object KinesisSink {
     * during its construction.
     */
   def create[F[_]: Sync](
-    kinesisMaxBytes: Int,
-    kinesisConfig: KinesisSinkConfig,
-    bufferConfig: Config.Buffer,
-    streamName: String,
+    sinkConfig: Config.Sink[KinesisSinkConfig],
     sqsBufferName: Option[String],
     executorService: ScheduledExecutorService
   ): Resource[F, KinesisSink[F]] = {
     val acquire =
       Sync[F]
         .delay(
-          createAndInitialize(kinesisMaxBytes, kinesisConfig, bufferConfig, streamName, sqsBufferName, executorService)
+          createAndInitialize(sinkConfig, sqsBufferName, executorService)
         )
         .rethrow
     val release = (sink: KinesisSink[F]) => Sync[F].delay(sink.shutdown())
@@ -488,29 +485,26 @@ object KinesisSink {
     * during its construction.
     */
   private def createAndInitialize[F[_]: Sync](
-    kinesisMaxBytes: Int,
-    kinesisConfig: KinesisSinkConfig,
-    bufferConfig: Config.Buffer,
-    streamName: String,
+    sinkConfig: Config.Sink[KinesisSinkConfig],
     sqsBufferName: Option[String],
     executorService: ScheduledExecutorService
   ): Either[Throwable, KinesisSink[F]] = {
     val clients = for {
-      kinesisClient    <- createKinesisClient(kinesisConfig.endpoint, kinesisConfig.region)
-      sqsClientAndName <- sqsBuffer(sqsBufferName, kinesisConfig.region)
+      kinesisClient    <- createKinesisClient(sinkConfig.config.endpoint, sinkConfig.config.region)
+      sqsClientAndName <- sqsBuffer(sqsBufferName, sinkConfig.config.region)
     } yield (kinesisClient, sqsClientAndName)
 
     clients.map {
       case (kinesisClient, sqsClientAndName) =>
         val maxBytes =
-          if (sqsClientAndName.isDefined) kinesisConfig.sqsMaxBytes else kinesisMaxBytes
+          if (sqsClientAndName.isDefined) sinkConfig.config.sqsMaxBytes else sinkConfig.config.maxBytes
         val ks =
           new KinesisSink(
             maxBytes,
             kinesisClient,
-            kinesisConfig,
-            bufferConfig,
-            streamName,
+            sinkConfig.config,
+            sinkConfig.buffer,
+            sinkConfig.name,
             executorService,
             sqsClientAndName
           )

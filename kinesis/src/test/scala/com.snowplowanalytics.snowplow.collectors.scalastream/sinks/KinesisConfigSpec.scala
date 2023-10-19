@@ -116,28 +116,52 @@ object KinesisConfigSpec {
       idleTimeout    = 610.seconds
     ),
     streams = Config.Streams(
-      good                       = "good",
-      bad                        = "bad",
       useIpAddressAsPartitionKey = false,
-      buffer = Config.Buffer(
-        byteLimit   = 3145728,
-        recordLimit = 500,
-        timeLimit   = 5000
-      ),
-      sink = KinesisSinkConfig(
-        maxBytes       = 1000000,
-        region         = "eu-central-1",
-        threadPoolSize = 10,
-        backoffPolicy = KinesisSinkConfig.BackoffPolicy(
-          minBackoff = 500,
-          maxBackoff = 1500,
-          maxRetries = 3
+      good = Config.Sink(
+        name = "good",
+        buffer = Config.Buffer(
+          byteLimit   = 3145728,
+          recordLimit = 500,
+          timeLimit   = 5000
         ),
-        sqsBadBuffer         = None,
-        sqsGoodBuffer        = None,
-        sqsMaxBytes          = 192000,
-        customEndpoint       = None,
-        startupCheckInterval = 1.second
+        config = KinesisSinkConfig(
+          maxBytes       = 1000000,
+          region         = "eu-central-1",
+          threadPoolSize = 10,
+          backoffPolicy = KinesisSinkConfig.BackoffPolicy(
+            minBackoff = 500,
+            maxBackoff = 1500,
+            maxRetries = 3
+          ),
+          sqsBadBuffer         = None,
+          sqsGoodBuffer        = None,
+          sqsMaxBytes          = 192000,
+          customEndpoint       = None,
+          startupCheckInterval = 1.second
+        )
+      ),
+      bad = Config.Sink(
+        name = "bad",
+        buffer = Config.Buffer(
+          byteLimit   = 3145728,
+          recordLimit = 500,
+          timeLimit   = 5000
+        ),
+        config = KinesisSinkConfig(
+          maxBytes       = 1000000,
+          region         = "eu-central-1",
+          threadPoolSize = 10,
+          backoffPolicy = KinesisSinkConfig.BackoffPolicy(
+            minBackoff = 500,
+            maxBackoff = 1500,
+            maxRetries = 3
+          ),
+          sqsBadBuffer         = None,
+          sqsGoodBuffer        = None,
+          sqsMaxBytes          = 192000,
+          customEndpoint       = None,
+          startupCheckInterval = 1.second
+        )
       )
     ),
     telemetry = Config.Telemetry(

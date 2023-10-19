@@ -96,19 +96,34 @@ object NsqConfigSpec {
     redirectDomains       = Set.empty,
     preTerminationPeriod  = 10.seconds,
     streams = Config.Streams(
-      good                       = "good",
-      bad                        = "bad",
       useIpAddressAsPartitionKey = false,
-      buffer = Config.Buffer(
-        byteLimit   = 3145728,
-        recordLimit = 500,
-        timeLimit   = 5000
+      good = Config.Sink(
+        name = "good",
+        buffer = Config.Buffer(
+          byteLimit   = 3145728,
+          recordLimit = 500,
+          timeLimit   = 5000
+        ),
+        config = NsqSinkConfig(
+          maxBytes       = 1000000,
+          threadPoolSize = 10,
+          host           = "nsqHost",
+          port           = 4150
+        )
       ),
-      sink = NsqSinkConfig(
-        maxBytes       = 1000000,
-        threadPoolSize = 10,
-        host           = "nsqHost",
-        port           = 4150
+      bad = Config.Sink(
+        name = "bad",
+        buffer = Config.Buffer(
+          byteLimit   = 3145728,
+          recordLimit = 500,
+          timeLimit   = 5000
+        ),
+        config = NsqSinkConfig(
+          maxBytes       = 1000000,
+          threadPoolSize = 10,
+          host           = "nsqHost",
+          port           = 4150
+        )
       )
     ),
     telemetry = Config.Telemetry(

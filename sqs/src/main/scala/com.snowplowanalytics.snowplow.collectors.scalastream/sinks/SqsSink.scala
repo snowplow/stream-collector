@@ -277,16 +277,13 @@ object SqsSink {
   final case class BatchResultErrorInfo(code: String, message: String)
 
   def create[F[_]: Sync](
-    maxBytes: Int,
-    sqsConfig: SqsSinkConfig,
-    bufferConfig: Config.Buffer,
-    queueName: String,
+    sqsConfig: Config.Sink[SqsSinkConfig],
     executorService: ScheduledExecutorService
   ): Resource[F, SqsSink[F]] = {
     val acquire =
       Sync[F]
         .delay(
-          createAndInitialize(maxBytes, sqsConfig, bufferConfig, queueName, executorService)
+          createAndInitialize(sqsConfig, executorService)
         )
         .rethrow
     val release = (sink: SqsSink[F]) => Sync[F].delay(sink.shutdown())
@@ -305,14 +302,12 @@ object SqsSink {
     * during its construction.
     */
   def createAndInitialize[F[_]: Sync](
-    maxBytes: Int,
-    sqsConfig: SqsSinkConfig,
-    bufferConfig: Config.Buffer,
-    queueName: String,
+    sqsConfig: Config.Sink[SqsSinkConfig],
     executorService: ScheduledExecutorService
   ): Either[Throwable, SqsSink[F]] =
-    createSqsClient(sqsConfig.region).map { c =>
-      val sqsSink = new SqsSink(maxBytes, c, sqsConfig, bufferConfig, queueName, executorService)
+    createSqsClient(sqsConfig.config.region).map { c =>
+      val sqsSink =
+        new SqsSink(sqsConfig.config.maxBytes, c, sqsConfig.config, sqsConfig.buffer, sqsConfig.name, executorService)
       sqsSink.EventStorage.scheduleFlush()
       sqsSink.checkSqsHealth()
       sqsSink

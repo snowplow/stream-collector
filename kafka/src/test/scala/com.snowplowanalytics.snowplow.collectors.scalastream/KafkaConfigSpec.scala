@@ -97,20 +97,35 @@ object KafkaConfigSpec {
     redirectDomains       = Set.empty,
     preTerminationPeriod  = 10.seconds,
     streams = Config.Streams(
-      good                       = "good",
-      bad                        = "bad",
-      useIpAddressAsPartitionKey = false,
-      buffer = Config.Buffer(
-        byteLimit   = 3145728,
-        recordLimit = 500,
-        timeLimit   = 5000
+      good = Config.Sink(
+        name = "good",
+        buffer = Config.Buffer(
+          byteLimit   = 3145728,
+          recordLimit = 500,
+          timeLimit   = 5000
+        ),
+        config = KafkaSinkConfig(
+          maxBytes     = 1000000,
+          brokers      = "localhost:9092,another.host:9092",
+          retries      = 10,
+          producerConf = None
+        )
       ),
-      sink = KafkaSinkConfig(
-        maxBytes     = 1000000,
-        brokers      = "localhost:9092,another.host:9092",
-        retries      = 10,
-        producerConf = None
-      )
+      bad = Config.Sink(
+        name = "bad",
+        buffer = Config.Buffer(
+          byteLimit   = 3145728,
+          recordLimit = 500,
+          timeLimit   = 5000
+        ),
+        config = KafkaSinkConfig(
+          maxBytes     = 1000000,
+          brokers      = "localhost:9092,another.host:9092",
+          retries      = 10,
+          producerConf = None
+        )
+      ),
+      useIpAddressAsPartitionKey = false
     ),
     telemetry = Config.Telemetry(
       disable         = false,
