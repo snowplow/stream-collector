@@ -3,10 +3,12 @@ collector {
   port = 8080
 
   streams {
-    good = "good"
-    bad = "bad"
-
-    sink {
+    good {
+      name = "good"
+      googleProjectId = "google-project-id"
+    }
+    bad {
+      name = "bad"
       googleProjectId = "google-project-id"
     }
   }

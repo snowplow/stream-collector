@@ -3,10 +3,13 @@ collector {
   port = ${PORT}
 
   streams {
-    good = ${TOPIC_GOOD}
-    bad = ${TOPIC_BAD}
-
-    sink {
+    good {
+      name = ${TOPIC_GOOD}
+      brokers = ${BROKER}
+      maxBytes = ${MAX_BYTES}
+    }
+    bad {
+      name = ${TOPIC_BAD}
       brokers = ${BROKER}
       maxBytes = ${MAX_BYTES}
     }

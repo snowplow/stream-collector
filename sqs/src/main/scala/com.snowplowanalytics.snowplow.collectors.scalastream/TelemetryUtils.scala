@@ -9,11 +9,11 @@ object TelemetryUtils {
   def getAccountId(config: Config.Streams[SqsSinkConfig]): IO[Option[String]] =
     Resource
       .make(
-        IO(SqsSink.createSqsClient(config.sink.region)).rethrow
+        IO(SqsSink.createSqsClient(config.good.config.region)).rethrow
       )(c => IO(c.shutdown()))
       .use { client =>
         IO {
-          val sqsQueueUrl = client.getQueueUrl(config.good).getQueueUrl
+          val sqsQueueUrl = client.getQueueUrl(config.good.name).getQueueUrl
           Some(extractAccountId(sqsQueueUrl))
         }
       }

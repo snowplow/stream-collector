@@ -10,6 +10,12 @@ collector {
       foo = "hello"
       bar = "world"
     }
+    
+    buffer {
+      byteLimit = 3145728
+      recordLimit = 500
+      timeLimit = 5000
+    }
   }
 
   ssl {
