@@ -10,11 +10,11 @@ object TelemetryUtils {
   def getAccountId(config: Config.Streams[KinesisSinkConfig]): IO[Option[String]] =
     Resource
       .make(
-        IO(KinesisSink.createKinesisClient(config.sink.endpoint, config.sink.region)).rethrow
+        IO(KinesisSink.createKinesisClient(config.good.config.endpoint, config.good.config.region)).rethrow
       )(c => IO(c.shutdown()))
       .use { kinesis =>
         IO {
-          val streamArn = KinesisSink.describeStream(kinesis, config.good).getStreamARN
+          val streamArn = KinesisSink.describeStream(kinesis, config.good.name).getStreamARN
           Some(extractAccountId(streamArn))
         }
       }

@@ -60,14 +60,11 @@ class KafkaSink[F[_]: Sync](
 object KafkaSink {
 
   def create[F[_]: Sync](
-    maxBytes: Int,
-    topicName: String,
-    kafkaConfig: KafkaSinkConfig,
-    bufferConfig: Config.Buffer
+    sinkConfig: Config.Sink[KafkaSinkConfig]
   ): Resource[F, KafkaSink[F]] =
     for {
-      kafkaProducer <- createProducer(kafkaConfig, bufferConfig)
-      kafkaSink = new KafkaSink(maxBytes, kafkaProducer, topicName)
+      kafkaProducer <- createProducer(sinkConfig.config, sinkConfig.buffer)
+      kafkaSink = new KafkaSink(sinkConfig.config.maxBytes, kafkaProducer, sinkConfig.name)
     } yield kafkaSink
 
   /**
