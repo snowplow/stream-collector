@@ -22,14 +22,12 @@ package com.snowplowanalytics.snowplow.collectors.scalastream.sinks
 import io.circe.Decoder
 import io.circe.generic.semiauto._
 
-import com.snowplowanalytics.snowplow.collector.core.Config
-
 final case class NsqSinkConfig(
   maxBytes: Int,
   threadPoolSize: Int,
   host: String,
   port: Int
-) extends Config.Sink
+)
 
 object NsqSinkConfig {
   implicit val configDecoder: Decoder[NsqSinkConfig] = deriveDecoder[NsqSinkConfig]

@@ -84,21 +84,18 @@ object PubSubSink {
     }
 
   def create[F[_]: Async: Parallel](
-    maxBytes: Int,
-    sinkConfig: PubSubSinkConfig,
-    bufferConfig: Config.Buffer,
-    topicName: String
+    sinkConfig: Config.Sink[PubSubSinkConfig]
   ): Resource[F, Sink[F]] =
     for {
       isHealthyState <- Resource.eval(Ref.of[F, Boolean](false))
-      producer       <- createProducer[F](sinkConfig, topicName, bufferConfig)
-      _              <- PubSubHealthCheck.run(isHealthyState, sinkConfig, topicName)
+      producer       <- createProducer[F](sinkConfig.config, sinkConfig.name, sinkConfig.buffer)
+      _              <- PubSubHealthCheck.run(isHealthyState, sinkConfig.config, sinkConfig.name)
     } yield new PubSubSink(
-      maxBytes,
+      sinkConfig.config.maxBytes,
       isHealthyState,
       producer,
-      sinkConfig.retryInterval,
-      topicName
+      sinkConfig.config.retryInterval,
+      sinkConfig.name
     )
 
   private def createProducer[F[_]: Async: Parallel](
