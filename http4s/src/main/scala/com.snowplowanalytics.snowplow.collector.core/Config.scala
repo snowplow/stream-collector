@@ -86,16 +86,12 @@ object Config {
   )
 
   case class Streams[+SinkConfig](
-    good: String,
-    bad: String,
-    useIpAddressAsPartitionKey: Boolean,
-    sink: SinkConfig,
-    buffer: Buffer
+    good: Sink[SinkConfig],
+    bad: Sink[SinkConfig],
+    useIpAddressAsPartitionKey: Boolean
   )
 
-  trait Sink {
-    val maxBytes: Int
-  }
+  final case class Sink[+SinkConfig](name: String, buffer: Buffer, config: SinkConfig)
 
   case class Buffer(
     byteLimit: Long,
@@ -166,15 +162,57 @@ object Config {
     implicit val redirectMacro    = deriveDecoder[RedirectMacro]
     implicit val rootResponse     = deriveDecoder[RootResponse]
     implicit val cors             = deriveDecoder[CORS]
-    implicit val buffer           = deriveDecoder[Buffer]
-    implicit val streams          = deriveDecoder[Streams[SinkConfig]]
     implicit val statsd           = deriveDecoder[Statsd]
     implicit val metrics          = deriveDecoder[Metrics]
     implicit val monitoring       = deriveDecoder[Monitoring]
     implicit val ssl              = deriveDecoder[SSL]
     implicit val telemetry        = deriveDecoder[Telemetry]
     implicit val networking       = deriveDecoder[Networking]
+    implicit val sinkConfig       = newDecoder[SinkConfig].or(legacyDecoder[SinkConfig])
+    implicit val streams          = deriveDecoder[Streams[SinkConfig]]
+
     deriveDecoder[Config[SinkConfig]]
   }
 
+  implicit private val buffer: Decoder[Buffer] = deriveDecoder[Buffer]
+
+  /**
+    * streams {
+    *   good {
+    *     name: "good-name"
+    *     buffer {...}
+    *     // rest of the sink config...
+    *   }
+    *   bad {
+    *     name: "bad-name"
+    *     buffer {...}
+    *     // rest of the sink config...
+    *   }
+    * }
+    */
+  private def newDecoder[SinkConfig: Decoder]: Decoder[Sink[SinkConfig]] =
+    Decoder.instance { cursor => // cursor is at 'good'/'bad' section level
+      for {
+        sinkName <- cursor.get[String]("name")
+        config   <- cursor.as[SinkConfig]
+        buffer   <- cursor.get[Buffer]("buffer")
+      } yield Sink(sinkName, buffer, config)
+    }
+
+  /**
+    * streams {
+    *   good = "good-name"
+    *   bad = "bad-name"
+    *   buffer {...} //shared by good and bad
+    *   sink {...} //shared by good and bad
+    * }
+    */
+  private def legacyDecoder[SinkConfig: Decoder]: Decoder[Sink[SinkConfig]] =
+    Decoder.instance { cursor => //cursor is at 'good'/'bad' section level
+      for {
+        sinkName <- cursor.as[String]
+        config   <- cursor.up.get[SinkConfig]("sink") //up first to the 'streams' section
+        buffer   <- cursor.up.get[Buffer]("buffer") //up first to the 'streams' section
+      } yield Sink(sinkName, buffer, config)
+    }
 }

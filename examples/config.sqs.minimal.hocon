@@ -3,10 +3,12 @@ collector {
   port = 8080
 
   streams {
-    good = "good"
-    bad = "bad"
-
-    sink {
+    good {
+      name = "good"
+      region = eu-central-1
+    }
+    bad {
+      name = "bad"
       region = eu-central-1
     }
   }

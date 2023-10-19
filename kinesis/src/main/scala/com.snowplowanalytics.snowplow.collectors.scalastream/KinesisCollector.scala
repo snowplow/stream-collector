@@ -29,24 +29,10 @@ object KinesisCollector extends App[KinesisSinkConfig](BuildInfo) {
   private lazy val log = LoggerFactory.getLogger(getClass)
 
   override def mkSinks(config: Config.Streams[KinesisSinkConfig]): Resource[IO, Sinks[IO]] = {
-    val threadPoolExecutor = buildExecutorService(config.sink)
+    val threadPoolExecutor = buildExecutorService(config.good.config)
     for {
-      good <- KinesisSink.create[IO](
-        kinesisMaxBytes = config.sink.maxBytes,
-        kinesisConfig   = config.sink,
-        bufferConfig    = config.buffer,
-        streamName      = config.good,
-        sqsBufferName   = config.sink.sqsGoodBuffer,
-        threadPoolExecutor
-      )
-      bad <- KinesisSink.create[IO](
-        kinesisMaxBytes = config.sink.maxBytes,
-        kinesisConfig   = config.sink,
-        bufferConfig    = config.buffer,
-        streamName      = config.bad,
-        sqsBufferName   = config.sink.sqsBadBuffer,
-        threadPoolExecutor
-      )
+      good <- KinesisSink.create[IO](config.good, config.good.config.sqsGoodBuffer, threadPoolExecutor)
+      bad  <- KinesisSink.create[IO](config.bad, config.good.config.sqsBadBuffer, threadPoolExecutor)
     } yield Sinks(good, bad)
   }
 
@@ -55,7 +41,7 @@ object KinesisCollector extends App[KinesisSinkConfig](BuildInfo) {
       .getAccountId(config)
       .map(id =>
         Telemetry.TelemetryInfo(
-          region                 = Some(config.sink.region),
+          region                 = Some(config.good.config.region),
           cloud                  = Some("AWS"),
           unhashedInstallationId = id
         )

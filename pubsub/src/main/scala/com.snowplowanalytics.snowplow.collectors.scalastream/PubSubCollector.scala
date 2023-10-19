@@ -10,8 +10,8 @@ object PubSubCollector extends App[PubSubSinkConfig](BuildInfo) {
 
   override def mkSinks(config: Config.Streams[PubSubSinkConfig]): Resource[IO, Sinks[IO]] =
     for {
-      good <- PubSubSink.create[IO](config.sink.maxBytes, config.sink, config.buffer, config.good)
-      bad  <- PubSubSink.create[IO](config.sink.maxBytes, config.sink, config.buffer, config.bad)
+      good <- PubSubSink.create[IO](config.good)
+      bad  <- PubSubSink.create[IO](config.bad)
     } yield Sinks(good, bad)
 
   override def telemetryInfo(config: Config.Streams[PubSubSinkConfig]): IO[Telemetry.TelemetryInfo] =
@@ -19,7 +19,7 @@ object PubSubCollector extends App[PubSubSinkConfig](BuildInfo) {
       Telemetry.TelemetryInfo(
         region                 = None,
         cloud                  = Some("GCP"),
-        unhashedInstallationId = Some(config.sink.googleProjectId)
+        unhashedInstallationId = Some(config.good.config.googleProjectId)
       )
     )
 }

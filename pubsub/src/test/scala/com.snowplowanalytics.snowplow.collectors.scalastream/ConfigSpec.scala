@@ -100,28 +100,52 @@ object ConfigSpec {
       idleTimeout    = 610.seconds
     ),
     streams = Config.Streams(
-      good                       = "good",
-      bad                        = "bad",
       useIpAddressAsPartitionKey = false,
-      buffer = Config.Buffer(
-        byteLimit   = 100000,
-        recordLimit = 40,
-        timeLimit   = 1000
-      ),
-      sink = PubSubSinkConfig(
-        maxBytes        = 10000000,
-        googleProjectId = "google-project-id",
-        backoffPolicy = PubSubSinkConfig.BackoffPolicy(
-          minBackoff           = 1000,
-          maxBackoff           = 1000,
-          totalBackoff         = 9223372036854L,
-          multiplier           = 2,
-          initialRpcTimeout    = 10000,
-          maxRpcTimeout        = 10000,
-          rpcTimeoutMultiplier = 2
+      good = Config.Sink(
+        name = "good",
+        buffer = Config.Buffer(
+          byteLimit   = 100000,
+          recordLimit = 40,
+          timeLimit   = 1000
         ),
-        startupCheckInterval = 1.second,
-        retryInterval        = 10.seconds
+        config = PubSubSinkConfig(
+          maxBytes        = 10000000,
+          googleProjectId = "google-project-id",
+          backoffPolicy = PubSubSinkConfig.BackoffPolicy(
+            minBackoff           = 1000,
+            maxBackoff           = 1000,
+            totalBackoff         = 9223372036854L,
+            multiplier           = 2,
+            initialRpcTimeout    = 10000,
+            maxRpcTimeout        = 10000,
+            rpcTimeoutMultiplier = 2
+          ),
+          startupCheckInterval = 1.second,
+          retryInterval        = 10.seconds
+        )
+      ),
+      bad = Config.Sink(
+        name = "bad",
+        buffer = Config.Buffer(
+          byteLimit   = 100000,
+          recordLimit = 40,
+          timeLimit   = 1000
+        ),
+        config = PubSubSinkConfig(
+          maxBytes        = 10000000,
+          googleProjectId = "google-project-id",
+          backoffPolicy = PubSubSinkConfig.BackoffPolicy(
+            minBackoff           = 1000,
+            maxBackoff           = 1000,
+            totalBackoff         = 9223372036854L,
+            multiplier           = 2,
+            initialRpcTimeout    = 10000,
+            maxRpcTimeout        = 10000,
+            rpcTimeoutMultiplier = 2
+          ),
+          startupCheckInterval = 1.second,
+          retryInterval        = 10.seconds
+        )
       )
     ),
     telemetry = Config.Telemetry(
