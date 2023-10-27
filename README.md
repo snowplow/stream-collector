@@ -21,16 +21,9 @@ events to [Amazon Kinesis][kinesis] and [NSQ][nsq], and is built on top of [akka
 
 ## Copyright and license
 
-The Scala Stream Collector is copyright 2013-2022 Snowplow Analytics Ltd.
+Copyright (c) 2023-present Snowplow Analytics Ltd. All rights reserved.
 
-Licensed under the [Apache License, Version 2.0][license] (the "License");
-you may not use this software except in compliance with the License.
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+Licensed under the [Snowplow Community License][license]. _(If you are uncertain how it applies to your use case, check our answers to [frequently asked questions][faq].)_
 
 [snowplow]: http://snowplowanalytics.com
 
@@ -55,5 +48,7 @@ limitations under the License.
 [release-image]: https://img.shields.io/github/v/release/snowplow/stream-collector?sort=semver&style=flat
 [releases]: https://github.com/snowplow/stream-collector
 
-[license-image]: http://img.shields.io/badge/license-Apache--2-blue.svg?style=flat
-[license]: http://www.apache.org/licenses/LICENSE-2.0
+[license]: https://docs.snowplow.io/community-license-1.0
+[license-image]: https://img.shields.io/badge/license-Snowplow--Community-blue.svg?style=flat
+
+[faq]: https://docs.snowplow.io/docs/contributing/community-license-faq/
