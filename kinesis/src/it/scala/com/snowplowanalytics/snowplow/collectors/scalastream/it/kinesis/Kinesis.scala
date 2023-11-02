@@ -8,7 +8,7 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection.mutable.ArrayBuffer
 
 import cats.effect.{IO, Resource}

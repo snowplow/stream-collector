@@ -29,7 +29,7 @@ object Run {
 
   type TelemetryInfo[F[_], SinkConfig] = Config.Streams[SinkConfig] => F[Telemetry.TelemetryInfo]
 
-  implicit private def logger[F[_]: Sync] = Slf4jLogger.getLogger[F]
+  implicit private def logger[F[_]: Sync]: Logger[F] = Slf4jLogger.getLogger[F]
 
   def fromCli[F[_]: Async: Tracking, SinkConfig: Decoder](
     appInfo: AppInfo,
@@ -72,7 +72,6 @@ object Run {
       )
       httpServer = HttpServer.build[F](
         new Routes[F](config.enableDefaultRedirect, collectorService).value,
-        config.interface,
         if (config.ssl.enable) config.ssl.port else config.port,
         config.ssl.enable,
         config.networking

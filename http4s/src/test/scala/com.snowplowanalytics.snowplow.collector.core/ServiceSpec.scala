@@ -1,7 +1,7 @@
 package com.snowplowanalytics.snowplow.collector.core
 
 import scala.concurrent.duration._
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 import org.specs2.mutable.Specification
 
@@ -404,7 +404,7 @@ class ServiceSpec extends Specification {
           `Access-Control-Allow-Headers`(ci"Content-Type", ci"SP-Anonymous"),
           `Access-Control-Max-Age`.Cache(3600).asInstanceOf[`Access-Control-Max-Age`]
         )
-        service.preflightResponse(Request[IO]()).unsafeRunSync.headers shouldEqual expected
+        service.preflightResponse(Request[IO]()).unsafeRunSync().headers shouldEqual expected
       }
     }
 
@@ -700,7 +700,7 @@ class ServiceSpec extends Specification {
           )
         cookie.secure must beTrue
         cookie.httpOnly must beTrue
-        cookie.sameSite must beSome(SameSite.None)
+        cookie.sameSite must beSome[SameSite](SameSite.None)
         cookie.extension must beNone
         service.cookieHeader(
           headers       = Headers.empty,

@@ -93,7 +93,7 @@ object PubSubSink {
       sinkConfig.name
     )
 
-  private def createProducer[F[_]: Async: Parallel](
+  private def createProducer[F[_]: Async](
     sinkConfig: PubSubSinkConfig,
     topicName: String,
     bufferConfig: Config.Buffer

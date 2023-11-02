@@ -171,6 +171,8 @@ class RoutesSpec extends Specification {
           case Method.GET =>
             cookieParams.pixelExpected shouldEqual true
             cookieParams.contentType shouldEqual None
+          case other =>
+            ko(s"Invalid http method - $other")
         }
         cookieParams.doNotTrack shouldEqual false
         response.status must beEqualTo(Status.Ok)
