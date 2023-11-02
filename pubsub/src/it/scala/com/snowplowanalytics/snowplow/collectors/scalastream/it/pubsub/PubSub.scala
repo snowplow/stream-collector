@@ -8,7 +8,7 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream.it.pubsub
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 import com.google.api.gax.grpc.GrpcTransportChannel
 import com.google.api.gax.rpc.{FixedTransportChannelProvider, TransportChannelProvider}

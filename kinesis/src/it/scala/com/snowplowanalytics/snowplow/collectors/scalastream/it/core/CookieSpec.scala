@@ -46,13 +46,13 @@ class CookieSpec extends Specification with Localstack with CatsEffect {
                 cookie.name must beEqualTo("greatName")
                 cookie.expires match {
                   case Some(expiry) =>
-                    expiry.epochSecond should beCloseTo((now + 42.days).toSeconds, 10)
+                    expiry.epochSecond should beCloseTo((now + 42.days).toSeconds, 10L)
                   case None =>
                     ko(s"Cookie [$cookie] doesn't contain the expiry date")
                 }
                 cookie.secure should beTrue
                 cookie.httpOnly should beTrue
-                cookie.sameSite should beSome(SameSite.Strict)
+                cookie.sameSite should beSome[SameSite](SameSite.Strict)
               case _ => ko(s"There is not 1 cookie but ${resp.cookies.size}")
             }
           }

@@ -10,7 +10,7 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 package sinks
 
 import java.util.concurrent.TimeoutException
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import cats.effect.{Resource, Sync}
 import cats.implicits._
 import com.snowplowanalytics.client.nsq.NSQProducer
@@ -42,11 +42,15 @@ class NsqSink[F[_]: Sync] private (
   override def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit] =
     Sync[F].blocking(producer.produceMulti(topicName, events.asJava)).onError {
       case _: NSQException | _: TimeoutException =>
-        Sync[F].delay(healthStatus = false)
-    } *> Sync[F].delay(healthStatus = true)
+        setHealthStatus(false)
+    } *> setHealthStatus(true)
 
   def shutdown(): Unit =
     producer.shutdown()
+
+  private def setHealthStatus(status: Boolean): F[Unit] = Sync[F].delay {
+    healthStatus = status
+  }
 }
 
 object NsqSink {

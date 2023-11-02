@@ -8,20 +8,13 @@
  */
 package com.snowplowanalytics.snowplow.collectors.scalastream.it
 
-import scala.concurrent.ExecutionContext
-
+import cats.effect.{IO, Resource}
 import cats.implicits._
-
-import cats.effect.{ContextShift, IO, Resource}
-
-import org.http4s.{Request, Response, Status}
+import org.http4s.blaze.client.BlazeClientBuilder
 import org.http4s.client.Client
-import org.http4s.client.blaze.BlazeClientBuilder
+import org.http4s.{Request, Response, Status}
 
 object Http {
-
-  private val executionContext = ExecutionContext.global
-  implicit val ioContextShift: ContextShift[IO] = IO.contextShift(executionContext)
 
   def statuses(requests: List[Request[IO]]): IO[List[Status]] =
     mkClient.use { client => requests.traverse(client.status) }
