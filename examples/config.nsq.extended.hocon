@@ -233,7 +233,7 @@ collector {
   # Can be helpful for removing the collector from a load balancer's targets.
   preTerminationUnhealthy = false
 
-  # The akka server's deadline for closing connections during graceful shutdown
+  # The server's deadline for closing connections during graceful shutdown
   terminationDeadline = 10 seconds
 
   experimental {
@@ -246,31 +246,5 @@ collector {
       maxConnections = 2000
       maxCycles = 3
     }
-  }
-}
-
-# Akka has a variety of possible configuration options defined at
-# http://doc.akka.io/docs/akka/current/scala/general/configuration.html
-akka {
-  loglevel = WARNING # 'OFF' for no logging, 'DEBUG' for all logging.
-  loggers = ["akka.event.slf4j.Slf4jLogger"]
-
-  # akka-http is the server the Stream collector uses and has configurable options defined at
-  # http://doc.akka.io/docs/akka-http/current/scala/http/configuration.html
-  http.server {
-    # To obtain the hostname in the collector, the 'remote-address' header
-    # should be set. By default, this is disabled, and enabling it
-    # adds the 'Remote-Address' header to every request automatically.
-    remote-address-header = on
-
-    raw-request-uri-header = on
-
-    # Define the maximum request length (the default is 2048)
-    parsing {
-      max-uri-length = 32768
-      uri-parsing-mode = relaxed
-    }
-
-    max-connections = 2048
   }
 }

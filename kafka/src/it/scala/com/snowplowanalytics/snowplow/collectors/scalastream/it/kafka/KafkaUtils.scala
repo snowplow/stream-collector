@@ -12,7 +12,7 @@ import cats.effect._
 import org.apache.kafka.clients.consumer._
 import java.util.Properties
 import java.time.Duration
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import com.snowplowanalytics.snowplow.collectors.scalastream.it.utils._
 import com.snowplowanalytics.snowplow.collectors.scalastream.it.CollectorOutput
 

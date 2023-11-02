@@ -9,7 +9,6 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream.it
 
 import scala.concurrent.duration._
-import scala.concurrent.ExecutionContext
 
 import org.apache.thrift.TDeserializer
 
@@ -22,7 +21,7 @@ import io.circe.{Json, parser}
 
 import cats.implicits._
 
-import cats.effect.{IO, Timer}
+import cats.effect.IO
 
 import retry.syntax.all._
 import retry.RetryPolicies
@@ -35,9 +34,6 @@ import com.snowplowanalytics.iglu.core.circe.implicits._
 import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
 
 object utils {
-
-  private val executionContext: ExecutionContext = ExecutionContext.global
-  implicit val ioTimer: Timer[IO] = IO.timer(executionContext)
 
   def parseCollectorPayload(bytes: Array[Byte]): CollectorPayload = {
     val deserializer = new TDeserializer()
@@ -92,7 +88,7 @@ object utils {
     )
 
     IO(condition(a)).retryingOnFailures(
-      _ == false,
+      result => IO(!result),
       retryPolicy,
       (_, _) => IO.unit
     )

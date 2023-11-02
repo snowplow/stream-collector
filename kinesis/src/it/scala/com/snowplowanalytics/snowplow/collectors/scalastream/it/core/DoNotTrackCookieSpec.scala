@@ -16,7 +16,7 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containe
 import org.specs2.execute.PendingUntilFixed
 import org.specs2.mutable.Specification
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
 
 class DoNotTrackCookieSpec extends Specification with Localstack with CatsEffect with PendingUntilFixed {
