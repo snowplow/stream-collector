@@ -5,7 +5,7 @@ import java.util.UUID
 import org.apache.commons.codec.binary.Base64
 
 import scala.concurrent.duration._
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 import cats.effect.{Clock, Sync}
 import cats.implicits._

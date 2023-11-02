@@ -1,25 +1,20 @@
 package com.snowplowanalytics.snowplow.collector.core
 
 import java.nio.file.{Files, Path}
-
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-
-import com.typesafe.config.{Config => TypesafeConfig, ConfigFactory}
-
-import scala.collection.JavaConverters._
-
+import com.typesafe.config.{ConfigFactory, Config => TypesafeConfig}
 import io.circe.Decoder
 import io.circe.config.syntax.CirceConfigOps
-
 import cats.implicits._
 import cats.data.EitherT
-
 import cats.effect.{ExitCode, Sync}
+
+import scala.jdk.CollectionConverters._
 
 object ConfigParser {
 
-  implicit private def logger[F[_]: Sync] = Slf4jLogger.getLogger[F]
+  implicit private def logger[F[_]: Sync]: Logger[F] = Slf4jLogger.getLogger[F]
 
   def fromPath[F[_]: Sync, SinkConfig: Decoder](
     configPath: Option[Path]

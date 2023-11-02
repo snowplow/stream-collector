@@ -6,7 +6,7 @@ import cats.Applicative
 
 import org.http4s.SameSite
 
-import com.snowplowanalytics.snowplow.collector.core.Config._
+import com.snowplowanalytics.snowplow.collector.core.Config.{Sink => SinkConfig, _}
 
 object TestUtils {
   val appName    = "collector-test"
@@ -75,7 +75,7 @@ object TestUtils {
     ),
     cors = CORS(60.minutes),
     streams = Streams(
-      good = Sink(
+      good = SinkConfig(
         name = "raw",
         Buffer(
           3145728,
@@ -84,7 +84,7 @@ object TestUtils {
         ),
         AnyRef
       ),
-      bad = Sink(
+      bad = SinkConfig(
         name = "bad-1",
         Buffer(
           3145728,

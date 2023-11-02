@@ -22,9 +22,9 @@ class GooglePubSubCollectorSpec extends Specification with CatsEffect with Befor
 
   override protected val Timeout = 5.minutes
 
-  def beforeAll: Unit = Containers.startEmulator()
+  def beforeAll(): Unit = Containers.startEmulator()
 
-  def afterAll: Unit = Containers.stopEmulator()
+  def afterAll(): Unit = Containers.stopEmulator()
 
   val stopTimeout = 20.second
 
