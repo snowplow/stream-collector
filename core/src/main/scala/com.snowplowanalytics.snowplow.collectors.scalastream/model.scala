@@ -139,7 +139,8 @@ package model {
     googleProjectId: String,
     backoffPolicy: GooglePubSubBackoffPolicyConfig,
     startupCheckInterval: FiniteDuration,
-    retryInterval: FiniteDuration
+    retryInterval: FiniteDuration,
+    gcpUserAgent: GcpUserAgent
   ) extends SinkConfig
   final case class Kafka(
     maxBytes: Int,
@@ -169,6 +170,7 @@ package model {
     sink: SinkConfig,
     buffer: BufferConfig
   )
+  final case class GcpUserAgent(productName: String)
 
   final case class StatsdConfig(
     enabled: Boolean,

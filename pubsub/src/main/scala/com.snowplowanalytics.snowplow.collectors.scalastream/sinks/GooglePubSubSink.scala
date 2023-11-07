@@ -176,7 +176,14 @@ object GooglePubSubSink {
         val credentialsProvider = NoCredentialsProvider.create()
         (channelProvider, credentialsProvider)
       }
-      publisher <- createPublisher(googlePubSubConfig.googleProjectId, topicName, batching, retry, customProviders)
+      publisher <- createPublisher(
+        googlePubSubConfig.googleProjectId,
+        topicName,
+        batching,
+        retry,
+        customProviders,
+        googlePubSubConfig.gcpUserAgent
+      )
       sink = new GooglePubSubSink(
         maxBytes,
         publisher,
@@ -186,8 +193,6 @@ object GooglePubSubSink {
       )
       _ = sink.checkPubsubHealth(customProviders, googlePubSubConfig.startupCheckInterval)
     } yield sink
-
-  private val UserAgent = s"snowplow/stream-collector-${generated.BuildInfo.version}"
 
   /**
     * Instantiates a Publisher on a topic with the given configuration options.
@@ -199,19 +204,23 @@ object GooglePubSubSink {
     topicName: String,
     batchingSettings: BatchingSettings,
     retrySettings: RetrySettings,
-    customProviders: Option[(TransportChannelProvider, CredentialsProvider)]
+    customProviders: Option[(TransportChannelProvider, CredentialsProvider)],
+    gcpUserAgent: GcpUserAgent
   ): Either[Throwable, Publisher] = {
     val builder = Publisher
       .newBuilder(ProjectTopicName.of(projectId, topicName))
       .setBatchingSettings(batchingSettings)
       .setRetrySettings(retrySettings)
-      .setHeaderProvider(FixedHeaderProvider.create("User-Agent", UserAgent))
+      .setHeaderProvider(FixedHeaderProvider.create("User-Agent", createUserAgent(gcpUserAgent)))
     customProviders.foreach {
       case (channelProvider, credentialsProvider) =>
         builder.setChannelProvider(channelProvider).setCredentialsProvider(credentialsProvider)
     }
     Either.catchNonFatal(builder.build()).leftMap(e => new RuntimeException("Couldn't build PubSub publisher", e))
   }
+
+  private[sinks] def createUserAgent(gcpUserAgent: GcpUserAgent): String =
+    s"${gcpUserAgent.productName}/collector (GPN:Snowplow;)"
 
   private def batchingSettings(bufferConfig: BufferConfig): BatchingSettings =
     BatchingSettings

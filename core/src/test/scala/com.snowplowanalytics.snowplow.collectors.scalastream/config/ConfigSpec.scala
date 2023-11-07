@@ -120,7 +120,8 @@ abstract class ConfigSpec extends Specification {
           rpcTimeoutMultiplier = 2
         ),
         startupCheckInterval = 1.second,
-        retryInterval        = 10.seconds
+        retryInterval        = 10.seconds,
+        gcpUserAgent         = GcpUserAgent(productName = "Snowplow OSS")
       )
     case "sqs" =>
       Sqs(
