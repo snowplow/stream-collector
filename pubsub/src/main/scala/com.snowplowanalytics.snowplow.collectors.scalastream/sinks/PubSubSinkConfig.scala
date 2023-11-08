@@ -1,6 +1,6 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream.sinks
 
-import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.PubSubSinkConfig.BackoffPolicy
+import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.PubSubSinkConfig._
 import io.circe.Decoder
 import io.circe.config.syntax.durationDecoder
 import io.circe.generic.semiauto._
@@ -12,7 +12,8 @@ final case class PubSubSinkConfig(
   googleProjectId: String,
   backoffPolicy: BackoffPolicy,
   startupCheckInterval: FiniteDuration,
-  retryInterval: FiniteDuration
+  retryInterval: FiniteDuration,
+  gcpUserAgent: GcpUserAgent
 )
 
 object PubSubSinkConfig {
@@ -26,7 +27,11 @@ object PubSubSinkConfig {
     maxRpcTimeout: Long,
     rpcTimeoutMultiplier: Double
   )
+
+  final case class GcpUserAgent(productName: String)
+
   implicit val configDecoder: Decoder[PubSubSinkConfig] = deriveDecoder[PubSubSinkConfig]
   implicit val backoffPolicyConfigDecoder: Decoder[BackoffPolicy] =
     deriveDecoder[BackoffPolicy]
+  implicit val gcpUserAgentDecoder: Decoder[GcpUserAgent] = deriveDecoder[GcpUserAgent]
 }

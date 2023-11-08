@@ -121,7 +121,8 @@ object ConfigSpec {
             rpcTimeoutMultiplier = 2
           ),
           startupCheckInterval = 1.second,
-          retryInterval        = 10.seconds
+          retryInterval        = 10.seconds,
+          gcpUserAgent         = PubSubSinkConfig.GcpUserAgent(productName = "Snowplow OSS")
         )
       ),
       bad = Config.Sink(
@@ -144,7 +145,8 @@ object ConfigSpec {
             rpcTimeoutMultiplier = 2
           ),
           startupCheckInterval = 1.second,
-          retryInterval        = 10.seconds
+          retryInterval        = 10.seconds,
+          gcpUserAgent         = PubSubSinkConfig.GcpUserAgent(productName = "Snowplow OSS")
         )
       )
     ),

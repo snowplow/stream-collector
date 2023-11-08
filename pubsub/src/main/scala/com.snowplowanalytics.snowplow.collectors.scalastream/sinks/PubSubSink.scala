@@ -19,7 +19,6 @@ import com.permutive.pubsub.producer.encoder.MessageEncoder
 import com.permutive.pubsub.producer.grpc.{GooglePubsubProducer, PubsubProducerConfig}
 import com.permutive.pubsub.producer.{Model, PubsubProducer}
 import com.snowplowanalytics.snowplow.collector.core.{Config, Sink}
-import com.snowplowanalytics.snowplow.collectors.scalastream.BuildInfo
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.BuilderOps._
 import org.threeten.bp.Duration
 import org.typelevel.log4cats.Logger
@@ -106,13 +105,16 @@ object PubSubSink {
       onFailedTerminate    = err => Logger[F].error(err)("PubSub sink termination error"),
       customizePublisher = Some {
         _.setRetrySettings(retrySettings(sinkConfig.backoffPolicy))
-          .setHeaderProvider(FixedHeaderProvider.create("User-Agent", BuildInfo.dockerAlias))
+          .setHeaderProvider(FixedHeaderProvider.create("User-Agent", createUserAgent(sinkConfig.gcpUserAgent)))
           .setProvidersForEmulator()
       }
     )
 
     GooglePubsubProducer.of[F, Array[Byte]](ProjectId(sinkConfig.googleProjectId), Topic(topicName), config)
   }
+
+  private[sinks] def createUserAgent(gcpUserAgent: PubSubSinkConfig.GcpUserAgent): String =
+    s"${gcpUserAgent.productName}/collector (GPN:Snowplow;)"
 
   private def retrySettings(backoffPolicy: PubSubSinkConfig.BackoffPolicy): RetrySettings =
     RetrySettings
