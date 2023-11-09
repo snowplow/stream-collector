@@ -9,9 +9,9 @@
   
 lazy val root = project
   .in(file("."))
-  .aggregate(kinesis, pubsub, kafka, nsq, stdout, sqs, http4s)
+  .aggregate(kinesis, pubsub, kafka, nsq, stdout, sqs, core)
 
-lazy val http4s = project
+lazy val core = project
   .settings(moduleName := "snowplow-stream-collector-http4s-core")
   .settings(BuildSettings.coreHttp4sSettings)
   .settings(
@@ -45,7 +45,7 @@ lazy val http4s = project
 lazy val kinesis = project
   .settings(BuildSettings.kinesisSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDockerPlugin, BuildInfoPlugin)
-  .dependsOn(http4s % "test->test;compile->compile;it->it")
+  .dependsOn(core % "test->test;compile->compile;it->it")
   .configs(IntegrationTest)
 
 lazy val kinesisDistroless = project
@@ -53,25 +53,25 @@ lazy val kinesisDistroless = project
   .settings(sourceDirectory := (kinesis / sourceDirectory).value)
   .settings(BuildSettings.kinesisSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDistrolessDockerPlugin, BuildInfoPlugin)
-  .dependsOn(http4s % "test->test;compile->compile;it->it")
+  .dependsOn(core % "test->test;compile->compile;it->it")
   .configs(IntegrationTest)
 
 lazy val sqs = project
   .settings(BuildSettings.sqsSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDockerPlugin, BuildInfoPlugin)
-  .dependsOn(http4s % "test->test;compile->compile")
+  .dependsOn(core % "test->test;compile->compile")
 
 lazy val sqsDistroless = project
   .in(file("distroless/sqs"))
   .settings(sourceDirectory := (sqs / sourceDirectory).value)
   .settings(BuildSettings.sqsSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDistrolessDockerPlugin, BuildInfoPlugin)
-  .dependsOn(http4s % "test->test;compile->compile")
+  .dependsOn(core % "test->test;compile->compile")
 
 lazy val pubsub = project
   .settings(BuildSettings.pubsubSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDockerPlugin, BuildInfoPlugin)
-  .dependsOn(http4s % "test->test;compile->compile;it->it")
+  .dependsOn(core % "test->test;compile->compile;it->it")
   .configs(IntegrationTest)
 
 lazy val pubsubDistroless = project
@@ -79,13 +79,13 @@ lazy val pubsubDistroless = project
   .settings(sourceDirectory := (pubsub / sourceDirectory).value)
   .settings(BuildSettings.pubsubSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDistrolessDockerPlugin, BuildInfoPlugin)
-  .dependsOn(http4s % "test->test;compile->compile;it->it")
+  .dependsOn(core % "test->test;compile->compile;it->it")
   .configs(IntegrationTest)
 
 lazy val kafka = project
   .settings(BuildSettings.kafkaSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDockerPlugin, BuildInfoPlugin)
-  .dependsOn(http4s % "test->test;compile->compile;it->it")
+  .dependsOn(core % "test->test;compile->compile;it->it")
   .configs(IntegrationTest)
 
 lazy val kafkaDistroless = project
@@ -93,29 +93,29 @@ lazy val kafkaDistroless = project
   .settings(sourceDirectory := (kafka / sourceDirectory).value)
   .settings(BuildSettings.kafkaSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDistrolessDockerPlugin, BuildInfoPlugin)
-  .dependsOn(http4s % "test->test;compile->compile;it->it")
+  .dependsOn(core % "test->test;compile->compile;it->it")
   .configs(IntegrationTest)
 
 lazy val nsq = project
   .settings(BuildSettings.nsqSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDockerPlugin, BuildInfoPlugin)
-  .dependsOn(http4s % "test->test;compile->compile")
+  .dependsOn(core % "test->test;compile->compile")
 
 lazy val nsqDistroless = project
   .in(file("distroless/nsq"))
   .settings(sourceDirectory := (nsq / sourceDirectory).value)
   .settings(BuildSettings.nsqSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDistrolessDockerPlugin, BuildInfoPlugin)
-  .dependsOn(http4s % "test->test;compile->compile")
+  .dependsOn(core % "test->test;compile->compile")
 
 lazy val stdout = project
   .settings(BuildSettings.stdoutSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDockerPlugin, BuildInfoPlugin)
-  .dependsOn(http4s % "test->test;compile->compile")
+  .dependsOn(core % "test->test;compile->compile")
 
 lazy val stdoutDistroless = project
   .in(file("distroless/stdout"))
   .settings(sourceDirectory := (stdout / sourceDirectory).value)
   .settings(BuildSettings.stdoutSettings)
   .enablePlugins(JavaAppPackaging, SnowplowDistrolessDockerPlugin, BuildInfoPlugin)
-  .dependsOn(http4s % "test->test;compile->compile")
+  .dependsOn(core % "test->test;compile->compile")
