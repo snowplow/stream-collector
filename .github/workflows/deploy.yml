@@ -36,12 +36,12 @@ jobs:
           name: ${{ steps.ver.outputs.project_version }}
           tag_name: ${{ steps.ver.outputs.project_version }}
           files: |
-            kafka/target/scala-2.12/snowplow-stream-collector-kafka-${{ steps.ver.outputs.project_version }}.jar
-            kinesis/target/scala-2.12/snowplow-stream-collector-kinesis-${{ steps.ver.outputs.project_version }}.jar
-            nsq/target/scala-2.12/snowplow-stream-collector-nsq-${{ steps.ver.outputs.project_version }}.jar
-            pubsub/target/scala-2.12/snowplow-stream-collector-google-pubsub-${{ steps.ver.outputs.project_version }}.jar
-            sqs/target/scala-2.12/snowplow-stream-collector-sqs-${{ steps.ver.outputs.project_version }}.jar
-            stdout/target/scala-2.12/snowplow-stream-collector-stdout-${{ steps.ver.outputs.project_version }}.jar
+            kafka/target/scala-2.13/snowplow-stream-collector-kafka-${{ steps.ver.outputs.project_version }}.jar
+            kinesis/target/scala-2.13/snowplow-stream-collector-kinesis-${{ steps.ver.outputs.project_version }}.jar
+            nsq/target/scala-2.13/snowplow-stream-collector-nsq-${{ steps.ver.outputs.project_version }}.jar
+            pubsub/target/scala-2.13/snowplow-stream-collector-google-pubsub-${{ steps.ver.outputs.project_version }}.jar
+            sqs/target/scala-2.13/snowplow-stream-collector-sqs-${{ steps.ver.outputs.project_version }}.jar
+            stdout/target/scala-2.13/snowplow-stream-collector-stdout-${{ steps.ver.outputs.project_version }}.jar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
