@@ -26,7 +26,7 @@ object KinesisCollector extends App[KinesisSinkConfig](BuildInfo) {
     val threadPoolExecutor = buildExecutorService(config.good.config)
     for {
       good <- KinesisSink.create[IO](config.good, config.good.config.sqsGoodBuffer, threadPoolExecutor)
-      bad  <- KinesisSink.create[IO](config.bad, config.good.config.sqsBadBuffer, threadPoolExecutor)
+      bad  <- KinesisSink.create[IO](config.bad, config.bad.config.sqsBadBuffer, threadPoolExecutor)
     } yield Sinks(good, bad)
   }
 
