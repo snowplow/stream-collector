@@ -79,7 +79,7 @@ object Run {
         appInfo
       )
       httpServer = HttpServer.build[F](
-        new Routes[F](config.enableDefaultRedirect, collectorService).value,
+        new Routes[F](config.enableDefaultRedirect, config.rootResponse.enabled, collectorService).value,
         if (config.ssl.enable) config.ssl.port else config.port,
         config.ssl.enable,
         config.networking
