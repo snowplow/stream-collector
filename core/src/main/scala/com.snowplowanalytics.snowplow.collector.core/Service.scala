@@ -45,6 +45,7 @@ trait IService[F[_]] {
   ): F[Response[F]]
   def determinePath(vendor: String, version: String): String
   def sinksHealthy: F[Boolean]
+  def rootResponse: F[Response[F]]
 }
 
 object Service {
@@ -139,6 +140,20 @@ class Service[F[_]: Sync](
         `Access-Control-Allow-Headers`(ci"Content-Type", ci"SP-Anonymous"),
         `Access-Control-Max-Age`.Cache(config.cors.accessControlMaxAge.toSeconds).asInstanceOf[`Access-Control-Max-Age`]
       )
+    )
+  }
+
+  override def rootResponse: F[Response[F]] = Sync[F].fromEither {
+    for {
+      status <- Status.fromInt(config.rootResponse.statusCode)
+      body = Stream.emit(config.rootResponse.body).through(fs2.text.utf8.encode)
+      headers = Headers(
+        config.rootResponse.headers.toList.map { case (name, value) => Header.Raw(CIString(name), value) }
+      )
+    } yield Response[F](
+      status  = status,
+      body    = body,
+      headers = headers
     )
   }
 
