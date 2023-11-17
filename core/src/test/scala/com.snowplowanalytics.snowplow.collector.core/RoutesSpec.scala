@@ -34,6 +34,9 @@ class RoutesSpec extends Specification {
     override def preflightResponse(req: Request[IO]): IO[Response[IO]] =
       IO.pure(Response[IO](status = Ok, body = Stream.emit("preflight response").through(text.utf8.encode)))
 
+    override def rootResponse: IO[Response[IO]] =
+      IO.pure(Response(status = Ok, body = Stream.emit("root").through(text.utf8.encode)))
+
     override def cookie(
       body: IO[Option[String]],
       path: String,
@@ -59,9 +62,9 @@ class RoutesSpec extends Specification {
     override def sinksHealthy: IO[Boolean] = IO.pure(true)
   }
 
-  def createTestServices(enabledDefaultRedirect: Boolean = true) = {
+  def createTestServices(enabledDefaultRedirect: Boolean = true, enableRootResponse: Boolean = false) = {
     val service = new TestService()
-    val routes  = new Routes(enabledDefaultRedirect, service).value
+    val routes  = new Routes(enabledDefaultRedirect, enableRootResponse, service).value
     (service, routes)
   }
 
@@ -239,6 +242,24 @@ class RoutesSpec extends Specification {
 
       test(Method.GET)
       test(Method.POST)
+    }
+
+    "respond to the root route" in {
+      "enabled return the response" in {
+        val (_, routes) = createTestServices(enableRootResponse = true)
+        val request     = Request[IO](method = Method.GET, uri = uri"/")
+        val response    = routes.run(request).unsafeRunSync()
+
+        response.status must beEqualTo(Status.Ok)
+        response.as[String].unsafeRunSync() must beEqualTo("root")
+      }
+      "disabled return NotFound" in {
+        val (_, routes) = createTestServices(enableRootResponse = false)
+        val request     = Request[IO](method = Method.GET, uri = uri"/")
+        val response    = routes.run(request).unsafeRunSync()
+
+        response.status must beEqualTo(Status.NotFound)
+      }
     }
   }
 
