@@ -17,8 +17,12 @@ import org.http4s.dsl.Http4sDsl
 import org.http4s.implicits._
 import com.comcast.ip4s.Dns
 
-class Routes[F[_]: Sync](enableDefaultRedirect: Boolean, enableRootResponse: Boolean, service: IService[F])
-    extends Http4sDsl[F] {
+class Routes[F[_]: Sync](
+  enableDefaultRedirect: Boolean,
+  enableRootResponse: Boolean,
+  enableCrossdomainTracking: Boolean,
+  service: IService[F]
+) extends Http4sDsl[F] {
 
   implicit val dns: Dns[F] = Dns.forSync[F]
 
@@ -85,8 +89,13 @@ class Routes[F[_]: Sync](enableDefaultRedirect: Boolean, enableRootResponse: Boo
       service.rootResponse
   }
 
+  private val crossdomainRoute = HttpRoutes.of[F] {
+    case GET -> Root / "crossdomain.xml" if enableCrossdomainTracking =>
+      service.crossdomainResponse
+  }
+
   val value: HttpApp[F] = {
-    val routes = healthRoutes <+> corsRoute <+> cookieRoutes <+> rootRoute
+    val routes = healthRoutes <+> corsRoute <+> cookieRoutes <+> rootRoute <+> crossdomainRoute
     val res    = if (enableDefaultRedirect) routes else rejectRedirect <+> routes
     res.orNotFound
   }
