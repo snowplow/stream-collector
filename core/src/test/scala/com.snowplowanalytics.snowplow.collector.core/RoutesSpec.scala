@@ -37,6 +37,9 @@ class RoutesSpec extends Specification {
     override def rootResponse: IO[Response[IO]] =
       IO.pure(Response(status = Ok, body = Stream.emit("root").through(text.utf8.encode)))
 
+    override def crossdomainResponse: IO[Response[IO]] =
+      IO.pure(Response(status = Ok, body = Stream.empty))
+
     override def cookie(
       body: IO[Option[String]],
       path: String,
@@ -62,9 +65,13 @@ class RoutesSpec extends Specification {
     override def sinksHealthy: IO[Boolean] = IO.pure(true)
   }
 
-  def createTestServices(enabledDefaultRedirect: Boolean = true, enableRootResponse: Boolean = false) = {
+  def createTestServices(
+    enabledDefaultRedirect: Boolean    = true,
+    enableRootResponse: Boolean        = false,
+    enableCrossdomainTracking: Boolean = false
+  ) = {
     val service = new TestService()
-    val routes  = new Routes(enabledDefaultRedirect, enableRootResponse, service).value
+    val routes  = new Routes(enabledDefaultRedirect, enableRootResponse, enableCrossdomainTracking, service).value
     (service, routes)
   }
 
@@ -244,7 +251,7 @@ class RoutesSpec extends Specification {
       test(Method.POST)
     }
 
-    "respond to the root route" in {
+    "respond to root route" in {
       "enabled return the response" in {
         val (_, routes) = createTestServices(enableRootResponse = true)
         val request     = Request[IO](method = Method.GET, uri = uri"/")
@@ -261,6 +268,24 @@ class RoutesSpec extends Specification {
         response.status must beEqualTo(Status.NotFound)
       }
     }
+
+    "respond to crossdomain route" in {
+      "enabled return the response" in {
+        val (_, routes) = createTestServices(enableCrossdomainTracking = true)
+        val request     = Request[IO](method = Method.GET, uri = uri"/crossdomain.xml")
+        val response    = routes.run(request).unsafeRunSync()
+
+        response.status must beEqualTo(Status.Ok)
+      }
+      "disabled return NotFound" in {
+        val (_, routes) = createTestServices(enableCrossdomainTracking = false)
+        val request     = Request[IO](method = Method.GET, uri = uri"/crossdomain.xml")
+        val response    = routes.run(request).unsafeRunSync()
+
+        response.status must beEqualTo(Status.NotFound)
+      }
+    }
+
   }
 
 }
