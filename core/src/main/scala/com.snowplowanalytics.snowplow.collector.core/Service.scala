@@ -44,12 +44,12 @@ trait IService[F[_]] {
   def determinePath(vendor: String, version: String): String
   def sinksHealthy: F[Boolean]
   def rootResponse: F[Response[F]]
+  def crossdomainResponse: F[Response[F]]
 }
 
 object Service {
   // Contains an invisible pixel to return for `/i` requests.
-  val pixel = Base64.decodeBase64("R0lGODlhAQABAPAAAP///wAAACH5BAUAAAAALAAAAAABAAEAAAICRAEAOw==")
-
+  val pixel           = Base64.decodeBase64("R0lGODlhAQABAPAAAP///wAAACH5BAUAAAAALAAAAAABAAEAAAICRAEAOw==")
   val spAnonymousNuid = "00000000-0000-0000-0000-000000000000"
 }
 
@@ -152,6 +152,26 @@ class Service[F[_]: Sync](
       status  = status,
       body    = body,
       headers = headers
+    )
+  }
+
+  def crossdomainResponse: F[Response[F]] = Sync[F].pure {
+    val policy =
+      config
+        .crossDomain
+        .domains
+        .map(d => s"""<allow-access-from domain="${d}" secure="${config.crossDomain.secure}" />""")
+        .mkString("\n")
+
+    val xml = s"""<?xml version="1.0"?>
+                 |<cross-domain-policy>
+                 |${policy}
+                 |</cross-domain-policy>""".stripMargin
+
+    Response[F](
+      status  = Ok,
+      body    = Stream.emit(xml).through(fs2.text.utf8.encode),
+      headers = Headers(`Content-Type`(MediaType.text.xml))
     )
   }
 
