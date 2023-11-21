@@ -1016,5 +1016,13 @@ class ServiceSpec extends Specification {
         service.determinePath(vendor, version3) shouldEqual expected3
       }
     }
+
+    "crossdomainResponse" in {
+      val response = service.crossdomainResponse.unsafeRunSync()
+      val body     = response.body.compile.toList.unsafeRunSync().map(_.toChar).mkString
+      body must startWith("""<?xml version="1.0"?>""")
+      body must contain("<cross-domain-policy>")
+      body must endWith("</cross-domain-policy>")
+    }
   }
 }
