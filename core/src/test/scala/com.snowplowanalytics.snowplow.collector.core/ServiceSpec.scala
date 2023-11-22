@@ -491,7 +491,8 @@ class ServiceSpec extends Specification {
           queryParams   = Map("u" -> "https://example1.com/12"),
           headers       = testHeaders,
           redirect      = true,
-          pixelExpected = true
+          pixelExpected = true,
+          shouldBounce  = false
         )
         res.status shouldEqual Status.Found
         res.headers shouldEqual testHeaders.put(Location(Uri.unsafeFromString("https://example1.com/12")))
@@ -501,18 +502,31 @@ class ServiceSpec extends Specification {
           queryParams   = Map.empty,
           headers       = testHeaders,
           redirect      = false,
-          pixelExpected = true
+          pixelExpected = true,
+          shouldBounce  = false
         )
         res.status shouldEqual Status.Ok
         res.headers shouldEqual testHeaders.put(`Content-Type`(MediaType.image.gif))
         res.body.compile.toList.unsafeRunSync().toArray shouldEqual Service.pixel
+      }
+      "return 302 Found if expecting tracking pixel and cookie shouldBounce is performed" in {
+        val res = service.buildHttpResponse(
+          queryParams   = Map.empty,
+          headers       = testHeaders,
+          redirect      = false,
+          pixelExpected = true,
+          shouldBounce  = true
+        )
+        res.status shouldEqual Status.Found
+        res.headers shouldEqual testHeaders
       }
       "send back ok otherwise" in {
         val res = service.buildHttpResponse(
           queryParams   = Map.empty,
           headers       = testHeaders,
           redirect      = false,
-          pixelExpected = false
+          pixelExpected = false,
+          shouldBounce  = false
         )
         res.status shouldEqual Status.Ok
         res.headers shouldEqual testHeaders
@@ -524,7 +538,8 @@ class ServiceSpec extends Specification {
       "send back a gif if pixelExpected is true" in {
         val res = service.buildUsualHttpResponse(
           headers       = testHeaders,
-          pixelExpected = true
+          pixelExpected = true,
+          shouldBounce  = false
         )
         res.status shouldEqual Status.Ok
         res.headers shouldEqual testHeaders.put(`Content-Type`(MediaType.image.gif))
@@ -533,7 +548,8 @@ class ServiceSpec extends Specification {
       "send back ok otherwise" in {
         val res = service.buildUsualHttpResponse(
           headers       = testHeaders,
-          pixelExpected = false
+          pixelExpected = false,
+          shouldBounce  = false
         )
         res.status shouldEqual Status.Ok
         res.headers shouldEqual testHeaders
@@ -1023,6 +1039,57 @@ class ServiceSpec extends Specification {
       body must startWith("""<?xml version="1.0"?>""")
       body must contain("<cross-domain-policy>")
       body must endWith("</cross-domain-policy>")
+    }
+
+    "checkDoNotTrackCookie" should {
+      "be disabled when value does not match regex" in {
+        val cookieName = "do-not-track"
+        val expected   = "lorem-1p5uM"
+        val request = Request[IO](
+          headers = Headers(
+            Cookie(RequestCookie(cookieName, expected))
+          )
+        )
+        val service = new Service(
+          config =
+            TestUtils.testConfig.copy(doNotTrackCookie = Config.DoNotTrackCookie(true, cookieName, "^snowplow-(.*)$")),
+          sinks   = Sinks(new TestSink, new TestSink),
+          appInfo = TestUtils.appInfo
+        )
+        service.checkDoNotTrackCookie(request) should beFalse
+      }
+      "be disabled when name does not match config" in {
+        val cookieName = "do-not-track"
+        val expected   = "lorem-1p5uM"
+        val request = Request[IO](
+          headers = Headers(
+            Cookie(RequestCookie(cookieName, expected))
+          )
+        )
+        val service = new Service(
+          config = TestUtils
+            .testConfig
+            .copy(doNotTrackCookie = Config.DoNotTrackCookie(true, s"snowplow-$cookieName", "^(.*)$")),
+          sinks   = Sinks(new TestSink, new TestSink),
+          appInfo = TestUtils.appInfo
+        )
+        service.checkDoNotTrackCookie(request) should beFalse
+      }
+      "match cookie against a regex when it exists" in {
+        val cookieName = "do-not-track"
+        val expected   = "lorem-1p5uM"
+        val request = Request[IO](
+          headers = Headers(
+            Cookie(RequestCookie(cookieName, expected))
+          )
+        )
+        val service = new Service(
+          config  = TestUtils.testConfig.copy(doNotTrackCookie = Config.DoNotTrackCookie(true, cookieName, "^(.*)$")),
+          sinks   = Sinks(new TestSink, new TestSink),
+          appInfo = TestUtils.appInfo
+        )
+        service.checkDoNotTrackCookie(request) should beTrue
+      }
     }
   }
 }
