@@ -77,16 +77,24 @@ class Service[F[_]: Sync](
   ): F[Response[F]] =
     for {
       body <- body
-      redirect                  = path.startsWith("/r/")
-      hostname                  = extractHostname(request)
-      userAgent                 = extractHeader(request, "User-Agent")
-      refererUri                = extractHeader(request, "Referer")
-      spAnonymous               = extractHeader(request, "SP-Anonymous")
-      ip                        = extractIp(request, spAnonymous)
-      queryString               = Some(request.queryString)
-      cookie                    = extractCookie(request)
-      nuidOpt                   = networkUserId(request, cookie, spAnonymous)
-      nuid                      = nuidOpt.getOrElse(UUID.randomUUID().toString)
+      redirect        = path.startsWith("/r/")
+      hostname        = extractHostname(request)
+      userAgent       = extractHeader(request, "User-Agent")
+      refererUri      = extractHeader(request, "Referer")
+      spAnonymous     = extractHeader(request, "SP-Anonymous")
+      ip              = extractIp(request, spAnonymous)
+      queryString     = Some(request.queryString)
+      cookie          = extractCookie(request)
+      doNotTrack      = checkDoNotTrackCookie(request)
+      alreadyBouncing = queryString.contains(config.cookieBounce.name)
+      nuidOpt         = networkUserId(request, cookie, spAnonymous)
+      nuid = nuidOpt.getOrElse {
+        if (alreadyBouncing) config.cookieBounce.fallbackNetworkUserId
+        else UUID.randomUUID().toString
+      }
+      shouldBounce = config.cookieBounce.enabled && nuidOpt.isEmpty && !alreadyBouncing &&
+        pixelExpected && !redirect
+
       (ipAddress, partitionKey) = ipAndPartitionKey(ip, config.streams.useIpAddressAsPartitionKey)
       event = buildEvent(
         queryString,
@@ -115,13 +123,14 @@ class Service[F[_]: Sync](
         accessControlAllowOriginHeader(request).some,
         `Access-Control-Allow-Credentials`().toRaw1.some
       ).flatten
-      responseHeaders = Headers(headerList)
-      _ <- sinkEvent(event, partitionKey)
+      responseHeaders = Headers(headerList ++ bounceLocationHeaders(config.cookieBounce, shouldBounce, request))
+      _ <- if (!doNotTrack && !shouldBounce) sinkEvent(event, partitionKey) else Sync[F].unit
       resp = buildHttpResponse(
         queryParams   = request.uri.query.params,
         headers       = responseHeaders,
         redirect      = redirect,
-        pixelExpected = pixelExpected
+        pixelExpected = pixelExpected,
+        shouldBounce  = shouldBounce
       )
     } yield resp
 
@@ -183,6 +192,13 @@ class Service[F[_]: Sync](
   def extractCookie(req: Request[F]): Option[RequestCookie] =
     req.cookies.find(_.name == config.cookie.name)
 
+  def checkDoNotTrackCookie(req: Request[F]): Boolean =
+    config.doNotTrackCookie.enabled && req
+      .cookies
+      .find(_.name == config.doNotTrackCookie.name)
+      .map(cookie => config.doNotTrackCookie.value.r.matches(cookie.content))
+      .getOrElse(false)
+
   def extractHostname(req: Request[F]): Option[String] =
     req.uri.authority.map(_.host.renderString) // Hostname is extracted like this in Akka-Http as well
 
@@ -228,23 +244,25 @@ class Service[F[_]: Sync](
     queryParams: Map[String, String],
     headers: Headers,
     redirect: Boolean,
-    pixelExpected: Boolean
+    pixelExpected: Boolean,
+    shouldBounce: Boolean
   ): Response[F] =
     if (redirect)
       buildRedirectHttpResponse(queryParams, headers)
     else
-      buildUsualHttpResponse(pixelExpected, headers)
+      buildUsualHttpResponse(pixelExpected, shouldBounce, headers)
 
   /** Builds the appropriate http response when not dealing with click redirects. */
-  def buildUsualHttpResponse(pixelExpected: Boolean, headers: Headers): Response[F] =
-    pixelExpected match {
-      case true =>
+  def buildUsualHttpResponse(pixelExpected: Boolean, shouldBounce: Boolean, headers: Headers): Response[F] =
+    (pixelExpected, shouldBounce) match {
+      case (true, true) => Response[F](status = Found, headers = headers)
+      case (true, false) =>
         Response[F](
           headers = headers.put(`Content-Type`(MediaType.image.gif)),
           body    = pixelStream
         )
       // See https://github.com/snowplow/snowplow-javascript-tracker/issues/482
-      case false =>
+      case _ =>
         Response[F](
           status  = Ok,
           headers = headers,
@@ -440,5 +458,26 @@ class Service[F[_]: Sync](
       case Some(_) => Some(Service.spAnonymousNuid)
       case None    => request.uri.query.params.get("nuid").orElse(requestCookie.map(_.content))
     }
+
+  /**
+    * Builds a location header redirecting to itself to check if third-party cookies are blocked.
+    *
+    * @param request
+    * @param shouldBounce
+    * @return http optional location header
+    */
+  def bounceLocationHeaders(cfg: Config.CookieBounce, shouldBounce: Boolean, request: Request[F]): Option[Header.Raw] =
+    if (shouldBounce) Some {
+      val forwardedScheme = for {
+        headerName  <- cfg.forwardedProtocolHeader.map(CIString(_))
+        headerValue <- request.headers.get(headerName).flatMap(_.map(_.value).toList.headOption)
+        maybeScheme <- if (Set("http", "https").contains(headerValue)) Some(headerValue) else None
+        scheme      <- Uri.Scheme.fromString(maybeScheme).toOption
+      } yield scheme
+      val redirectUri =
+        request.uri.withQueryParam(cfg.name, "true").copy(scheme = forwardedScheme.orElse(request.uri.scheme))
+
+      `Location`(redirectUri).toRaw1
+    } else None
 
 }

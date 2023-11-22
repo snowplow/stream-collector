@@ -61,8 +61,8 @@ class DoNotTrackCookieSpec extends Specification with Localstack with CatsEffect
           expected.forall(cookie => headers.exists(_.contains(cookie))) must beTrue
         }
       }.unsafeRunSync()
-    }.pendingUntilFixed("Remove when 'do not track cookie' feature is implemented")
-    
+    }
+
     "track events that have a cookie whose name and value match doNotTrackCookie config if disabled" in { 
       val testName = "doNotTrackCookie-disabled"
       val streamGood = s"$testName-raw"
