@@ -57,6 +57,7 @@ package model {
   final case class CookieConfig(
     enabled: Boolean,
     name: String,
+    oldName: Option[String],
     expiration: FiniteDuration,
     domains: Option[List[String]],
     fallbackDomain: Option[String],
@@ -248,6 +249,7 @@ package model {
         None
 
     def cookieName       = cookieConfig.map(_.name)
+    def oldCookieName    = cookieConfig.flatMap(_.oldName)
     def cookieDomain     = cookieConfig.flatMap(_.domains)
     def fallbackDomain   = cookieConfig.flatMap(_.fallbackDomain)
     def cookieExpiration = cookieConfig.map(_.expiration)
