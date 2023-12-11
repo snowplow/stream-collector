@@ -88,7 +88,8 @@ object BuildSettings {
       libraryDependencies ++= Seq(
         Dependencies.Libraries.kafkaClients,
         Dependencies.Libraries.mskAuth,
-        
+        Dependencies.Libraries.azureIdentity,
+
         // integration tests dependencies
         Dependencies.Libraries.IntegrationTests.specs2,
         Dependencies.Libraries.IntegrationTests.specs2CE

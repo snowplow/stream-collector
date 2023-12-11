@@ -62,10 +62,11 @@ class KafkaSink[F[_]: Sync](
 object KafkaSink {
 
   def create[F[_]: Sync](
-    sinkConfig: Config.Sink[KafkaSinkConfig]
+    sinkConfig: Config.Sink[KafkaSinkConfig],
+    authCallbackClass: String
   ): Resource[F, KafkaSink[F]] =
     for {
-      kafkaProducer <- createProducer(sinkConfig.config, sinkConfig.buffer)
+      kafkaProducer <- createProducer(sinkConfig.config, sinkConfig.buffer, authCallbackClass)
       kafkaSink = new KafkaSink(sinkConfig.config.maxBytes, kafkaProducer, sinkConfig.name)
     } yield kafkaSink
 
@@ -77,7 +78,8 @@ object KafkaSink {
     */
   private def createProducer[F[_]: Sync](
     kafkaConfig: KafkaSinkConfig,
-    bufferConfig: Config.Buffer
+    bufferConfig: Config.Buffer,
+    authCallbackClass: String
   ): Resource[F, KafkaProducer[String, Array[Byte]]] = {
     val acquire = Sync[F].delay {
       val props = new Properties()
@@ -88,6 +90,7 @@ object KafkaSink {
       props.setProperty("linger.ms", bufferConfig.timeLimit.toString)
       props.setProperty("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
       props.setProperty("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer")
+      props.setProperty("sasl.login.callback.handler.class", authCallbackClass)
 
       // Can't use `putAll` in JDK 11 because of https://github.com/scala/bug/issues/10418
       kafkaConfig.producerConf.getOrElse(Map()).foreach { case (k, v) => props.setProperty(k, v) }
