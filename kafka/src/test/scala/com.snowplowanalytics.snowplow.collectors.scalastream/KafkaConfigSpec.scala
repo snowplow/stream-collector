@@ -120,10 +120,17 @@ object KafkaConfigSpec {
           timeLimit   = 5000
         ),
         config = KafkaSinkConfig(
-          maxBytes     = 1000000,
-          brokers      = "localhost:9092,another.host:9092",
-          retries      = 10,
-          producerConf = None
+          maxBytes = 1000000,
+          brokers  = "localhost:9092,another.host:9092",
+          retries  = 10,
+          producerConf = Some(
+            Map(
+              "security.protocol"                 -> "SASL_SSL",
+              "sasl.mechanism"                    -> "OAUTHBEARER",
+              "sasl.jaas.config"                  -> "org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required;",
+              "sasl.login.callback.handler.class" -> "com.snowplowanalytics.snowplow.collectors.scalastream.sinks.AzureAuthenticationCallbackHandler"
+            )
+          )
         )
       ),
       bad = Config.Sink(
@@ -134,10 +141,17 @@ object KafkaConfigSpec {
           timeLimit   = 5000
         ),
         config = KafkaSinkConfig(
-          maxBytes     = 1000000,
-          brokers      = "localhost:9092,another.host:9092",
-          retries      = 10,
-          producerConf = None
+          maxBytes = 1000000,
+          brokers  = "localhost:9092,another.host:9092",
+          retries  = 10,
+          producerConf = Some(
+            Map(
+              "security.protocol"                 -> "SASL_SSL",
+              "sasl.mechanism"                    -> "OAUTHBEARER",
+              "sasl.jaas.config"                  -> "org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required;",
+              "sasl.login.callback.handler.class" -> "com.snowplowanalytics.snowplow.collectors.scalastream.sinks.AzureAuthenticationCallbackHandler"
+            )
+          )
         )
       ),
       useIpAddressAsPartitionKey = false
