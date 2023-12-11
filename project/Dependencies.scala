@@ -40,6 +40,7 @@ object Dependencies {
     val thrift           = "0.15.0" // force this version to mitigate security vulnerabilities
     val tracker          = "2.0.0"
     val dataDog4s        = "0.32.0"
+    val azureAuth        = "1.7.14"
   }
 
   object Libraries {
@@ -63,17 +64,18 @@ object Dependencies {
     val datadogStatsd     = "com.avast.cloud"       %% "datadog4s-statsd"                      % V.dataDog4s
     
     //sinks
-    val fs2PubSub      = "com.permutive"              %% "fs2-google-pubsub-grpc" % V.fs2PubSub
-    val jackson        = "com.fasterxml.jackson.core" % "jackson-databind"        % V.jackson
-    val kafkaClients   = "org.apache.kafka"           % "kafka-clients"           % V.kafka
-    val kinesis        = "com.amazonaws"              % "aws-java-sdk-kinesis"    % V.awsSdk
-    val log4j          = "org.apache.logging.log4j"   % "log4j-core"              % V.log4j
-    val mskAuth        = "software.amazon.msk"        % "aws-msk-iam-auth"        % V.mskAuth % Runtime // Enables AWS MSK IAM authentication https://github.com/snowplow/stream-collector/pull/214
-    val nettyAll       = "io.netty"                   % "netty-all"               % V.nettyAll
-    val nsqClient      = "com.snowplowanalytics"      % "nsq-java-client"         % V.nsqClient
-    val pubsub         = "com.google.cloud"           % "google-cloud-pubsub"     % V.pubsub
-    val sqs            = "com.amazonaws"              % "aws-java-sdk-sqs"        % V.awsSdk
-    val sts            = "com.amazonaws"              % "aws-java-sdk-sts"        % V.awsSdk % Runtime // Enables web token authentication https://github.com/snowplow/stream-collector/issues/169
+    val fs2PubSub      = "com.permutive"              %% "fs2-google-pubsub-grpc"     % V.fs2PubSub
+    val jackson        = "com.fasterxml.jackson.core" % "jackson-databind"            % V.jackson
+    val kafkaClients   = "org.apache.kafka"           % "kafka-clients"               % V.kafka
+    val kinesis        = "com.amazonaws"              % "aws-java-sdk-kinesis"        % V.awsSdk
+    val log4j          = "org.apache.logging.log4j"   % "log4j-core"                  % V.log4j
+    val mskAuth        = "software.amazon.msk"        % "aws-msk-iam-auth"            % V.mskAuth % Runtime // Enables AWS MSK IAM authentication https://github.com/snowplow/stream-collector/pull/214
+    val nettyAll       = "io.netty"                   % "netty-all"                   % V.nettyAll
+    val nsqClient      = "com.snowplowanalytics"      % "nsq-java-client"             % V.nsqClient
+    val pubsub         = "com.google.cloud"           % "google-cloud-pubsub"         % V.pubsub
+    val sqs            = "com.amazonaws"              % "aws-java-sdk-sqs"            % V.awsSdk
+    val sts            = "com.amazonaws"              % "aws-java-sdk-sts"            % V.awsSdk % Runtime // Enables web token authentication https://github.com/snowplow/stream-collector/issues/169
+    val azureAuth      = "com.microsoft.azure"        % "azure-client-authentication" % V.azureAuth
 
     //common unit tests
     val specs2    = "org.specs2"     %% "specs2-core"                % V.specs2    % Test
