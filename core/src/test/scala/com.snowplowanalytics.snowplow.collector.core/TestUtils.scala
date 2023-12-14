@@ -17,6 +17,7 @@ object TestUtils {
     def moduleName  = appName
     def version     = appVersion
     def dockerAlias = "docker run collector"
+    def shortName   = "ssc"
   }
 
   def noopSink[F[_]: Applicative]: Sink[F] = new Sink[F] {
