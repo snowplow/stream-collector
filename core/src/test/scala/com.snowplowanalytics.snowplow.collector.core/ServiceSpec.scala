@@ -242,7 +242,7 @@ class ServiceSpec extends Specification {
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
         e.ipAddress shouldEqual "192.0.2.3"
         e.encoding shouldEqual "UTF-8"
-        e.collector shouldEqual s"${TestUtils.appName}:${TestUtils.appVersion}"
+        e.collector shouldEqual s"${TestUtils.appInfo.shortName}-${TestUtils.appVersion}-testsink"
         e.querystring shouldEqual "a=b"
         e.body shouldEqual "b"
         e.path shouldEqual "p"
@@ -427,7 +427,7 @@ class ServiceSpec extends Specification {
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
         e.ipAddress shouldEqual "ip"
         e.encoding shouldEqual "UTF-8"
-        e.collector shouldEqual s"${TestUtils.appName}:${TestUtils.appVersion}"
+        e.collector shouldEqual s"${TestUtils.appInfo.shortName}-${TestUtils.appVersion}-testsink"
         e.querystring shouldEqual "q"
         e.body shouldEqual "b"
         e.path shouldEqual "p"
@@ -456,7 +456,7 @@ class ServiceSpec extends Specification {
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
         e.ipAddress shouldEqual "ip"
         e.encoding shouldEqual "UTF-8"
-        e.collector shouldEqual s"${TestUtils.appName}:${TestUtils.appVersion}"
+        e.collector shouldEqual s"${TestUtils.appInfo.shortName}-${TestUtils.appVersion}-testsink"
         e.querystring shouldEqual null
         e.body shouldEqual null
         e.path shouldEqual "p"
