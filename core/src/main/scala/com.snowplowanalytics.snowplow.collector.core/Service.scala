@@ -63,7 +63,8 @@ class Service[F[_]: Sync](
 
   val pixelStream = Stream.iterable[F, Byte](Service.pixel)
 
-  private val collector = s"${appInfo.name}:${appInfo.version}"
+  private val collector =
+    s"""${appInfo.shortName}-${appInfo.version}-${sinks.good.getClass.getSimpleName.toLowerCase}"""
 
   private val splitBatch: SplitBatch = SplitBatch(appInfo)
 

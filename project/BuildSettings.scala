@@ -123,7 +123,7 @@ object BuildSettings {
       addExampleConfToTestCp
 
   lazy val buildInfoSettings = Seq(
-    buildInfoKeys := Seq[BuildInfoKey](name, moduleName, dockerAlias, version),
+    buildInfoKeys := Seq[BuildInfoKey](name, moduleName, dockerAlias, version, "shortName" -> "ssc"),
     buildInfoOptions += BuildInfoOption.Traits("com.snowplowanalytics.snowplow.collector.core.AppInfo"),
     buildInfoPackage := s"com.snowplowanalytics.snowplow.collectors.scalastream"
   )
