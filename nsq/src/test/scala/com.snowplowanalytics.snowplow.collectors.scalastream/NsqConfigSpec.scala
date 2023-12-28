@@ -25,8 +25,18 @@ class NsqConfigSpec extends Specification with CatsEffect {
   "Config parser" should {
     "be able to parse extended nsq config" in {
       assert(
-        resource       = "/config.nsq.extended.hocon",
-        expectedResult = Right(NsqConfigSpec.expectedConfig)
+        resource = "/config.nsq.extended.hocon",
+        expectedResult = Right(
+          NsqConfigSpec
+            .expectedConfig
+            .copy(
+              monitoring = Config.Monitoring(
+                Config.Metrics(
+                  NsqConfigSpec.expectedConfig.monitoring.metrics.statsd.copy(tags = Map("app" -> "collector"))
+                )
+              )
+            )
+        )
       )
     }
     "be able to parse minimal nsq config" in {
@@ -91,8 +101,11 @@ object NsqConfigSpec {
       body       = ""
     ),
     cors = Config.CORS(1.hour),
-    monitoring =
-      Config.Monitoring(Config.Metrics(Config.Statsd(false, "localhost", 8125, 10.seconds, "snowplow.collector"))),
+    monitoring = Config.Monitoring(
+      Config.Metrics(
+        Config.Statsd(false, "localhost", 8125, 10.seconds, "snowplow.collector", Map.empty)
+      )
+    ),
     ssl                   = Config.SSL(enable = false, redirect = false, port = 443),
     enableDefaultRedirect = false,
     redirectDomains       = Set.empty,

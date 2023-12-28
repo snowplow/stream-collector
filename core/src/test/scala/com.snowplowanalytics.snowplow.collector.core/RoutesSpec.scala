@@ -71,7 +71,8 @@ class RoutesSpec extends Specification {
     enableCrossdomainTracking: Boolean = false
   ) = {
     val service = new TestService()
-    val routes  = new Routes(enabledDefaultRedirect, enableRootResponse, enableCrossdomainTracking, service).value
+    val routes =
+      new Routes(enabledDefaultRedirect, enableRootResponse, enableCrossdomainTracking, service).value.orNotFound
     (service, routes)
   }
 

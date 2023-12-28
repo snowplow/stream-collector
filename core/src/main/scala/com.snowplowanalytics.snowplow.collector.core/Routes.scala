@@ -94,9 +94,8 @@ class Routes[F[_]: Sync](
       service.crossdomainResponse
   }
 
-  val value: HttpApp[F] = {
+  val value: HttpRoutes[F] = {
     val routes = healthRoutes <+> corsRoute <+> cookieRoutes <+> rootRoute <+> crossdomainRoute
-    val res    = if (enableDefaultRedirect) routes else rejectRedirect <+> routes
-    res.orNotFound
+    if (enableDefaultRedirect) routes else rejectRedirect <+> routes
   }
 }

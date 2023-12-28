@@ -25,8 +25,18 @@ class SqsConfigSpec extends Specification with CatsEffect {
   "Config parser" should {
     "be able to parse extended kinesis config" in {
       assert(
-        resource       = "/config.sqs.extended.hocon",
-        expectedResult = Right(SqsConfigSpec.expectedConfig)
+        resource = "/config.sqs.extended.hocon",
+        expectedResult = Right(
+          SqsConfigSpec
+            .expectedConfig
+            .copy(
+              monitoring = Config.Monitoring(
+                Config.Metrics(
+                  SqsConfigSpec.expectedConfig.monitoring.metrics.statsd.copy(tags = Map("app" -> "collector"))
+                )
+              )
+            )
+        )
       )
     }
     "be able to parse minimal kinesis config" in {
@@ -92,8 +102,11 @@ object SqsConfigSpec {
       body       = ""
     ),
     cors = Config.CORS(1.hour),
-    monitoring =
-      Config.Monitoring(Config.Metrics(Config.Statsd(false, "localhost", 8125, 10.seconds, "snowplow.collector"))),
+    monitoring = Config.Monitoring(
+      Config.Metrics(
+        Config.Statsd(false, "localhost", 8125, 10.seconds, "snowplow.collector", Map.empty)
+      )
+    ),
     ssl                   = Config.SSL(enable = false, redirect = false, port = 443),
     enableDefaultRedirect = false,
     redirectDomains       = Set.empty,
