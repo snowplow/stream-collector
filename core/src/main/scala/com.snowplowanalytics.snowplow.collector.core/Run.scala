@@ -87,7 +87,8 @@ object Run {
         ).value,
         if (config.ssl.enable) config.ssl.port else config.port,
         config.ssl.enable,
-        config.networking
+        config.networking,
+        config.monitoring.metrics
       )
       _          <- withGracefulShutdown(config.preTerminationPeriod)(httpServer)
       httpClient <- BlazeClientBuilder[F].resource

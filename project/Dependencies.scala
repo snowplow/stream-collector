@@ -37,6 +37,7 @@ object Dependencies {
     val testcontainers   = "0.40.10"
     val thrift           = "0.15.0" // force this version to mitigate security vulnerabilities
     val tracker          = "2.0.0"
+    val dataDog4s        = "0.32.0"
   }
 
   object Libraries {
@@ -56,6 +57,8 @@ object Dependencies {
     val slf4j             = "org.slf4j"             % "slf4j-simple"                           % V.slf4j
     val thrift            = "org.apache.thrift"     % "libthrift"                              % V.thrift
     val trackerCore       = "com.snowplowanalytics" %% "snowplow-scala-tracker-core"           % V.tracker
+    val datadogHttp4s     = "com.avast.cloud"       %% "datadog4s-http4s"                      % V.dataDog4s
+    val datadogStatsd     = "com.avast.cloud"       %% "datadog4s-statsd"                      % V.dataDog4s
     
     //sinks
     val fs2PubSub      = "com.permutive"              %% "fs2-google-pubsub-grpc" % V.fs2PubSub

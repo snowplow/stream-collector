@@ -23,8 +23,18 @@ class KafkaConfigSpec extends Specification with CatsEffect {
   "Config parser" should {
     "be able to parse extended kafka config" in {
       assert(
-        resource       = "/config.kafka.extended.hocon",
-        expectedResult = Right(KafkaConfigSpec.expectedConfig)
+        resource = "/config.kafka.extended.hocon",
+        expectedResult = Right(
+          KafkaConfigSpec
+            .expectedConfig
+            .copy(
+              monitoring = Config.Monitoring(
+                Config.Metrics(
+                  KafkaConfigSpec.expectedConfig.monitoring.metrics.statsd.copy(tags = Map("app" -> "collector"))
+                )
+              )
+            )
+        )
       )
     }
     "be able to parse minimal kafka config" in {
@@ -90,8 +100,11 @@ object KafkaConfigSpec {
       body       = ""
     ),
     cors = Config.CORS(1.hour),
-    monitoring =
-      Config.Monitoring(Config.Metrics(Config.Statsd(false, "localhost", 8125, 10.seconds, "snowplow.collector"))),
+    monitoring = Config.Monitoring(
+      Config.Metrics(
+        Config.Statsd(false, "localhost", 8125, 10.seconds, "snowplow.collector", Map.empty)
+      )
+    ),
     ssl                   = Config.SSL(enable = false, redirect = false, port = 443),
     enableDefaultRedirect = false,
     redirectDomains       = Set.empty,
