@@ -41,6 +41,7 @@ object Dependencies {
     val tracker          = "2.0.0"
     val dataDog4s        = "0.32.0"
     val azureAuth        = "1.7.14"
+    val azureIdentity    = "1.11.0"
   }
 
   object Libraries {
@@ -75,7 +76,7 @@ object Dependencies {
     val pubsub         = "com.google.cloud"           % "google-cloud-pubsub"         % V.pubsub
     val sqs            = "com.amazonaws"              % "aws-java-sdk-sqs"            % V.awsSdk
     val sts            = "com.amazonaws"              % "aws-java-sdk-sts"            % V.awsSdk % Runtime // Enables web token authentication https://github.com/snowplow/stream-collector/issues/169
-    val azureAuth      = "com.microsoft.azure"        % "azure-client-authentication" % V.azureAuth
+    val azureIdentity  = "com.azure"                  % "azure-identity"              % V.azureIdentity
 
     //common unit tests
     val specs2    = "org.specs2"     %% "specs2-core"                % V.specs2    % Test

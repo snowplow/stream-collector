@@ -21,17 +21,14 @@ import org.apache.kafka.common.security.auth.AuthenticateCallbackHandler
 import org.apache.kafka.common.security.oauthbearer.OAuthBearerToken
 import org.apache.kafka.common.security.oauthbearer.OAuthBearerTokenCallback
 
-import com.microsoft.azure.credentials.MSICredentials
+import com.azure.identity.DefaultAzureCredentialBuilder
+import com.azure.core.credential.TokenRequestContext
 
 import com.nimbusds.jwt.JWTParser
 
 class AzureAuthenticationCallbackHandler extends AuthenticateCallbackHandler {
 
-  val credentials: MSICredentials = {
-    val clientId = sys.env.get("AZURE_CLIENT_ID_FOR_EVENT_HUB").orElse(sys.env.get("AZURE_CLIENT_ID"))
-    val creds    = new MSICredentials()
-    clientId.map(creds.withClientId).getOrElse(creds)
-  }
+  val credentials = new DefaultAzureCredentialBuilder().build()
 
   var sbUri: String = ""
 
@@ -64,7 +61,9 @@ class AzureAuthenticationCallbackHandler extends AuthenticateCallbackHandler {
     }
 
   def getOAuthBearerToken(): OAuthBearerToken = {
-    val accessToken = credentials.getToken(sbUri)
+    val reqContext = new TokenRequestContext()
+    reqContext.addScopes(sbUri)
+    val accessToken = credentials.getTokenSync(reqContext).getToken
     val jwt         = JWTParser.parse(accessToken)
     val claims      = jwt.getJWTClaimsSet
 
