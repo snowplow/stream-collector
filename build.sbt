@@ -29,6 +29,8 @@ lazy val core = project
       Dependencies.Libraries.circeConfig,
       Dependencies.Libraries.trackerCore,
       Dependencies.Libraries.emitterHttps,
+      Dependencies.Libraries.datadogHttp4s,
+      Dependencies.Libraries.datadogStatsd,
       Dependencies.Libraries.specs2,
       Dependencies.Libraries.specs2CE,
       Dependencies.Libraries.ceTestkit,

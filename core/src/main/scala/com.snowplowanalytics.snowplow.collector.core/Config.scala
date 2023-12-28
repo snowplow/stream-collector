@@ -120,7 +120,8 @@ object Config {
     hostname: String,
     port: Int,
     period: FiniteDuration,
-    prefix: String
+    prefix: String,
+    tags: Map[String, String]
   )
 
   case class SSL(

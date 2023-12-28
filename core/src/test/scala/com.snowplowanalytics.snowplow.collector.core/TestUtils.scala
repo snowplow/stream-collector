@@ -102,7 +102,8 @@ object TestUtils {
           "localhost",
           8125,
           10.seconds,
-          "snowplow.collector"
+          "snowplow.collector",
+          Map.empty
         )
       )
     ),

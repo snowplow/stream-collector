@@ -23,8 +23,18 @@ class ConfigSpec extends Specification with CatsEffect {
   "Config parser" should {
     "be able to parse extended pubsub config" in {
       assert(
-        resource       = "/config.pubsub.extended.hocon",
-        expectedResult = Right(ConfigSpec.expectedConfig)
+        resource = "/config.pubsub.extended.hocon",
+        expectedResult = Right(
+          ConfigSpec
+            .expectedConfig
+            .copy(
+              monitoring = Config.Monitoring(
+                Config.Metrics(
+                  ConfigSpec.expectedConfig.monitoring.metrics.statsd.copy(tags = Map("app" -> "collector"))
+                )
+              )
+            )
+        )
       )
     }
     "be able to parse minimal pubsub config" in {
@@ -90,8 +100,11 @@ object ConfigSpec {
       body       = ""
     ),
     cors = Config.CORS(1.hour),
-    monitoring =
-      Config.Monitoring(Config.Metrics(Config.Statsd(false, "localhost", 8125, 10.seconds, "snowplow.collector"))),
+    monitoring = Config.Monitoring(
+      Config.Metrics(
+        Config.Statsd(false, "localhost", 8125, 10.seconds, "snowplow.collector", Map.empty)
+      )
+    ),
     ssl                   = Config.SSL(enable = false, redirect = false, port = 443),
     enableDefaultRedirect = false,
     redirectDomains       = Set.empty,
