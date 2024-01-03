@@ -3,11 +3,13 @@ collector {
   port = 8080
 
   streams {
-    good = "good"
-    bad = "bad"
-
-    sink {
-      brokers = "localhost:9092,another.host:9092"
+    good {
+      name = "good"
+      brokers = "localhost:9092,another.host:9092" 
+    }
+    bad {
+      name = "bad"
+      brokers = "localhost:9092,another.host:9092"  
     }
   }
 }
