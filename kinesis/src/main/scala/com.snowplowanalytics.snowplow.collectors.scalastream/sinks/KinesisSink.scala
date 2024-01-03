@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.util.UUID
 import java.util.concurrent.ScheduledExecutorService
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutorService, Future}
@@ -94,7 +94,7 @@ class KinesisSink[F[_]: Sync] private (
 
     def flush(): Unit = {
       val eventsToSend = synchronized {
-        val evts = storedEvents.result
+        val evts = storedEvents.result()
         storedEvents.clear()
         byteCount = 0
         evts
@@ -369,7 +369,7 @@ class KinesisSink[F[_]: Sync] private (
 
   private def checkKinesisHealth(): Unit = {
     val healthRunnable = new Runnable {
-      override def run() {
+      override def run(): Unit = {
         log.info(s"Starting background check for Kinesis stream $streamName")
         while (!kinesisHealthy) {
           Try {
@@ -394,7 +394,7 @@ class KinesisSink[F[_]: Sync] private (
 
   private def checkSqsHealth(): Unit = maybeSqs.foreach { sqs =>
     val healthRunnable = new Runnable {
-      override def run() {
+      override def run(): Unit = {
         log.info(s"Starting background check for SQS buffer ${sqs.sqsBufferName}")
         while (!sqsHealthy) {
           Try {

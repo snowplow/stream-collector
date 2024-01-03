@@ -9,7 +9,7 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.BuilderOps._
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.util._
 
 object PubSubHealthCheck {
