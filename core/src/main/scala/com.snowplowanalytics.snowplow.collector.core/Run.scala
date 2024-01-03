@@ -58,6 +58,7 @@ object Run {
   ): F[ExitCode] = {
     val eitherT = for {
       config <- ConfigParser.fromPath[F, SinkConfig](path)
+      _      <- checkLicense(config.license.accept)
       _      <- EitherT.right[ExitCode](fromConfig(appInfo, mkSinks, telemetryInfo, config))
     } yield ExitCode.Success
 
@@ -66,6 +67,18 @@ object Run {
         prettyLogException(e).as(ExitCode.Error)
     }
   }
+
+  private def checkLicense[F[_]: Sync](acceptLicense: Boolean): EitherT[F, ExitCode, _] =
+    EitherT.liftF {
+      if (acceptLicense)
+        Sync[F].unit
+      else
+        Sync[F].raiseError(
+          new IllegalStateException(
+            "Please accept the terms of the Snowplow Limited Use License Agreement to proceed. See https://docs.snowplow.io/docs/pipeline-components-and-applications/stream-collector/configure/#license for more information on the license and how to configure this."
+          )
+        )
+    }
 
   private def fromConfig[F[_]: Async: Tracking, SinkConfig](
     appInfo: AppInfo,
