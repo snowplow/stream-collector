@@ -8,8 +8,8 @@ import com.snowplowanalytics.snowplow.collector.core.{App, Config, Telemetry}
 object StdoutCollector extends App[SinkConfig](BuildInfo) {
 
   override def mkSinks(config: Config.Streams[SinkConfig]): Resource[IO, Sinks[IO]] = {
-    val good = new PrintingSink[IO](config.sink.maxBytes, System.out)
-    val bad  = new PrintingSink[IO](config.sink.maxBytes, System.err)
+    val good = new PrintingSink[IO](config.good.config.maxBytes, System.out)
+    val bad  = new PrintingSink[IO](config.bad.config.maxBytes, System.err)
     Resource.pure(Sinks(good, bad))
   }
 

@@ -3,12 +3,15 @@ collector {
   port = ${PORT}
 
   streams {
-    good = ${TOPIC_GOOD}
-    bad = ${TOPIC_BAD}
-
-    sink {
-      googleProjectId = ${GOOGLE_PROJECT_ID}
-      maxBytes = ${MAX_BYTES}
+     good {
+       name = ${TOPIC_GOOD}
+       googleProjectId = ${GOOGLE_PROJECT_ID}
+       maxBytes = ${MAX_BYTES}
+     }
+     bad {
+       name = ${TOPIC_BAD}
+       googleProjectId = ${GOOGLE_PROJECT_ID}
+       maxBytes = ${MAX_BYTES}
     }
   }
 }

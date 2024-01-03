@@ -3,10 +3,21 @@ collector {
   port = ${PORT}
 
   streams {
-    good = ${STREAM_GOOD}
-    bad = ${STREAM_BAD}
+    good {
+      name = ${STREAM_GOOD}
+      region = ${REGION}
+      customEndpoint = ${KINESIS_ENDPOINT}
 
-    sink {
+      aws {
+        accessKey = env
+        secretKey = env
+      }
+
+      maxBytes = ${MAX_BYTES}
+    } 
+       
+    bad {
+      name = ${STREAM_BAD}
       region = ${REGION}
       customEndpoint = ${KINESIS_ENDPOINT}
 

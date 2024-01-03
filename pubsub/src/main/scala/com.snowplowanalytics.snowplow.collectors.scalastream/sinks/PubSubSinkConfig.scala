@@ -1,6 +1,5 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream.sinks
 
-import com.snowplowanalytics.snowplow.collector.core.Config
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.PubSubSinkConfig.BackoffPolicy
 import io.circe.Decoder
 import io.circe.config.syntax.durationDecoder
@@ -14,7 +13,7 @@ final case class PubSubSinkConfig(
   backoffPolicy: BackoffPolicy,
   startupCheckInterval: FiniteDuration,
   retryInterval: FiniteDuration
-) extends Config.Sink
+)
 
 object PubSubSinkConfig {
 

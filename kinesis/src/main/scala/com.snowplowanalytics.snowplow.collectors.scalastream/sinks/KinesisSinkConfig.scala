@@ -1,6 +1,5 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream.sinks
 
-import com.snowplowanalytics.snowplow.collector.core.Config
 import io.circe.Decoder
 import io.circe.generic.semiauto._
 import io.circe.config.syntax.durationDecoder
@@ -17,7 +16,7 @@ final case class KinesisSinkConfig(
   sqsBadBuffer: Option[String],
   sqsMaxBytes: Int,
   startupCheckInterval: FiniteDuration
-) extends Config.Sink {
+) {
   val endpoint = customEndpoint.getOrElse(region match {
     case cn @ "cn-north-1"     => s"https://kinesis.$cn.amazonaws.com.cn"
     case cn @ "cn-northwest-1" => s"https://kinesis.$cn.amazonaws.com.cn"
