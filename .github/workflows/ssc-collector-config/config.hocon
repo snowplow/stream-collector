@@ -1,4 +1,5 @@
 collector {
+  license { accept = true }
   interface = 0.0.0.0
   port = 12345
 

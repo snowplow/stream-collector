@@ -1,4 +1,7 @@
 collector {
+  license {
+    accept = true
+  }
   interface = "0.0.0.0"
   port = 8080
 
@@ -6,8 +9,8 @@ collector {
     good {
       name = "good"
       host = "nsqHost"
-    }   
-    
+    }
+
     bad {
       name = "bad"
       host = "nsqHost"
