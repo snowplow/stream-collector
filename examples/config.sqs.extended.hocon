@@ -7,6 +7,11 @@
 
 # 'collector' contains configuration options for the main Scala collector.
 collector {
+  # Full license text available in LICENSE.md
+  license {
+    accept = true
+  }
+
   # The collector runs as a web service specified on the following interface and port.
   interface = "0.0.0.0"
   port = 8080

@@ -37,7 +37,8 @@ case class Config[+SinkConfig](
   networking: Config.Networking,
   enableDefaultRedirect: Boolean,
   redirectDomains: Set[String],
-  preTerminationPeriod: FiniteDuration
+  preTerminationPeriod: FiniteDuration,
+  license: Config.License
 )
 
 object Config {
@@ -152,7 +153,17 @@ object Config {
     idleTimeout: FiniteDuration
   )
 
+  case class License(
+    accept: Boolean
+  )
+
   implicit def decoder[SinkConfig: Decoder]: Decoder[Config[SinkConfig]] = {
+    implicit val license: Decoder[License] = {
+      val truthy = Set("true", "yes", "on", "1")
+      Decoder
+        .forProduct1("accept")((s: String) => License(truthy(s.toLowerCase())))
+        .or(Decoder.forProduct1("accept")((b: Boolean) => License(b)))
+    }
     implicit val p3p         = deriveDecoder[P3P]
     implicit val crossDomain = deriveDecoder[CrossDomain]
     implicit val sameSite: Decoder[SameSite] = Decoder.instance { cur =>

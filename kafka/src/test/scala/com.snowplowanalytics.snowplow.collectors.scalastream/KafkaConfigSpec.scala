@@ -156,6 +156,7 @@ object KafkaConfigSpec {
     networking = Config.Networking(
       maxConnections = 1024,
       idleTimeout    = 610.seconds
-    )
+    ),
+    license = Config.License(accept = true)
   )
 }

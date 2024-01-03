@@ -52,7 +52,8 @@ class ConfigParserSpec extends Specification with CatsEffect {
       .copy[SinkConfig](
         paths   = Map.empty[String, String],
         streams = expectedStreams,
-        ssl     = TestUtils.testConfig.ssl.copy(enable = true)
+        ssl     = TestUtils.testConfig.ssl.copy(enable = true),
+        license = Config.License(false)
       )
 
     ConfigParser.fromPath[IO, SinkConfig](Some(path)).value.map(_ should beRight(expected))
