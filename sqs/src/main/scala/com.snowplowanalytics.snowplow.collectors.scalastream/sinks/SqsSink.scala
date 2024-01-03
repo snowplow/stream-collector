@@ -23,7 +23,7 @@ import scala.collection.mutable.ListBuffer
 import scala.util.{Failure, Random, Success, Try}
 import scala.concurrent.{ExecutionContextExecutorService, Future}
 import scala.concurrent.duration.MILLISECONDS
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 import cats.syntax.either._
 
@@ -84,7 +84,7 @@ class SqsSink[F[_]: Sync] private (
 
     def flush(): Unit = {
       val eventsToSend = synchronized {
-        val evts = storedEvents.result
+        val evts = storedEvents.result()
         storedEvents.clear()
         byteCount = 0
         evts
@@ -244,7 +244,7 @@ class SqsSink[F[_]: Sync] private (
 
   private def checkSqsHealth(): Unit = {
     val healthRunnable = new Runnable {
-      override def run() {
+      override def run(): Unit =
         while (!sqsHealthy) {
           Try {
             client.getQueueUrl(queueName)
@@ -257,7 +257,6 @@ class SqsSink[F[_]: Sync] private (
               Thread.sleep(1000L)
           }
         }
-      }
     }
     executorService.execute(healthRunnable)
   }

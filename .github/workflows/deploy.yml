@@ -23,7 +23,6 @@ jobs:
           sbt 'project pubsub' assembly
           sbt 'project sqs' assembly
           sbt 'project stdout' assembly
-          sbt 'project rabbitmq' assembly
       - name: Get current version
         id: ver
         run: |
@@ -43,7 +42,6 @@ jobs:
             pubsub/target/scala-2.12/snowplow-stream-collector-google-pubsub-${{ steps.ver.outputs.project_version }}.jar
             sqs/target/scala-2.12/snowplow-stream-collector-sqs-${{ steps.ver.outputs.project_version }}.jar
             stdout/target/scala-2.12/snowplow-stream-collector-stdout-${{ steps.ver.outputs.project_version }}.jar
-            rabbitmq/target/scala-2.12/snowplow-stream-collector-stdout-${{ steps.ver.outputs.project_version }}.jar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -58,11 +56,8 @@ jobs:
           - kafka
           - nsq
           - stdout
-          - rabbitmq
         include:
           - suffix: ""
-          - suffix: -experimental
-            platform: rabbitmq
           - platform: kinesis
             run_snyk: ${{ !contains(github.ref, 'rc') }}
           - platform: pubsub
