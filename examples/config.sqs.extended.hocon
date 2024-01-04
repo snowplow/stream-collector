@@ -113,10 +113,6 @@ collector {
     name = "n3pc"
     # Network user id to fallback to when third-party cookies are blocked.
     fallbackNetworkUserId = "00000000-0000-4000-A000-000000000000"
-    # Optionally, specify the name of the header containing the originating protocol for use in the
-    # bounce redirect location. Use this if behind a load balancer that performs SSL termination.
-    # The value of this header must be http or https. Example, if behind an AWS Classic ELB.
-    #forwardedProtocolHeader = "X-Forwarded-Proto"
   }
 
   # When enabled, redirect prefix `r/` will be enabled and its query parameters resolved.
@@ -297,16 +293,4 @@ collector {
 
   # The server's deadline for closing connections during graceful shutdown
   terminationDeadline = 10 seconds
-
-  experimental {
-    # Enable an experimental feature to send some "warm-up" requests to the collector's own /health endpoint during startup.
-    # We have found from experiment this can cut down the number of 502s returned from a load balancer in front of the collector in Kubernetes deployments.
-    # More details in https://github.com/snowplow/stream-collector/issues/249
-    warmup {
-      enable = false
-      numRequests = 2000
-      maxConnections = 2000
-      maxCycles = 3
-    }
-  }
 }
