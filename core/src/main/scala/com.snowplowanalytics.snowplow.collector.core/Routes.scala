@@ -53,7 +53,6 @@ class Routes[F[_]: Sync](
         path          = path,
         request       = req,
         pixelExpected = false,
-        doNotTrack    = false,
         contentType   = req.contentType.map(_.value.toLowerCase)
       )
 
@@ -64,7 +63,6 @@ class Routes[F[_]: Sync](
         path          = path,
         request       = req,
         pixelExpected = true,
-        doNotTrack    = false,
         contentType   = None
       )
 
@@ -74,7 +72,6 @@ class Routes[F[_]: Sync](
         path          = req.pathInfo.renderString,
         request       = req,
         pixelExpected = true,
-        doNotTrack    = false,
         contentType   = None
       )
   }

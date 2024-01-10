@@ -40,7 +40,6 @@ trait IService[F[_]] {
     path: String,
     request: Request[F],
     pixelExpected: Boolean,
-    doNotTrack: Boolean,
     contentType: Option[String] = None
   ): F[Response[F]]
   def determinePath(vendor: String, version: String): String
@@ -73,7 +72,6 @@ class Service[F[_]: Sync](
     path: String,
     request: Request[F],
     pixelExpected: Boolean,
-    doNotTrack: Boolean,
     contentType: Option[String] = None
   ): F[Response[F]] =
     for {
@@ -87,15 +85,13 @@ class Service[F[_]: Sync](
       queryString     = Some(request.queryString)
       cookie          = extractCookie(request)
       doNotTrack      = checkDoNotTrackCookie(request)
-      alreadyBouncing = queryString.contains(config.cookieBounce.name)
+      alreadyBouncing = config.cookieBounce.enabled && queryString.contains(config.cookieBounce.name)
       nuidOpt         = networkUserId(request, cookie, spAnonymous)
       nuid = nuidOpt.getOrElse {
         if (alreadyBouncing) config.cookieBounce.fallbackNetworkUserId
         else UUID.randomUUID().toString
       }
-      shouldBounce = config.cookieBounce.enabled && nuidOpt.isEmpty && !alreadyBouncing &&
-        pixelExpected && !redirect
-
+      shouldBounce              = config.cookieBounce.enabled && nuidOpt.isEmpty && !alreadyBouncing && pixelExpected && !redirect
       (ipAddress, partitionKey) = ipAndPartitionKey(ip, config.streams.useIpAddressAsPartitionKey)
       event = buildEvent(
         queryString,
