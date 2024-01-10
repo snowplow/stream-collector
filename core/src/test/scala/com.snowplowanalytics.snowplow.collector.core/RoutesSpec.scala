@@ -45,7 +45,6 @@ class RoutesSpec extends Specification {
       path: String,
       request: Request[IO],
       pixelExpected: Boolean,
-      doNotTrack: Boolean,
       contentType: Option[String]
     ): IO[Response[IO]] =
       IO.delay {
@@ -54,7 +53,7 @@ class RoutesSpec extends Specification {
           path,
           request,
           pixelExpected,
-          doNotTrack,
+          false,
           contentType
         )
         Response(status = Ok, body = Stream.emit("cookie").through(text.utf8.encode))

@@ -79,7 +79,6 @@ class ServiceSpec extends Specification {
             path          = "p",
             request       = request,
             pixelExpected = false,
-            doNotTrack    = false,
             contentType   = None
           )
           .unsafeRunSync()
@@ -100,7 +99,6 @@ class ServiceSpec extends Specification {
             path          = "p",
             request       = req,
             pixelExpected = false,
-            doNotTrack    = false,
             contentType   = Some("image/gif")
           )
           .unsafeRunSync()
@@ -124,7 +122,6 @@ class ServiceSpec extends Specification {
             path          = "p",
             request       = req,
             pixelExpected = false,
-            doNotTrack    = false,
             contentType   = Some("image/gif")
           )
           .unsafeRunSync()
@@ -150,7 +147,6 @@ class ServiceSpec extends Specification {
             path          = "p",
             request       = req,
             pixelExpected = false,
-            doNotTrack    = false,
             contentType   = Some("image/gif")
           )
           .unsafeRunSync()
@@ -173,7 +169,6 @@ class ServiceSpec extends Specification {
             path          = "p",
             request       = req,
             pixelExpected = false,
-            doNotTrack    = false,
             contentType   = Some("image/gif")
           )
           .unsafeRunSync()
@@ -199,7 +194,6 @@ class ServiceSpec extends Specification {
             path          = "p",
             request       = req,
             pixelExpected = false,
-            doNotTrack    = false,
             contentType   = Some("image/gif")
           )
           .unsafeRunSync()
@@ -228,7 +222,6 @@ class ServiceSpec extends Specification {
             path          = "p",
             request       = req,
             pixelExpected = false,
-            doNotTrack    = false,
             contentType   = Some("image/gif")
           )
           .unsafeRunSync()
@@ -275,7 +268,6 @@ class ServiceSpec extends Specification {
             path          = "p",
             request       = req,
             pixelExpected = false,
-            doNotTrack    = false,
             contentType   = Some("image/gif")
           )
           .unsafeRunSync()
@@ -303,7 +295,6 @@ class ServiceSpec extends Specification {
             path          = "p",
             request       = Request[IO](),
             pixelExpected = true,
-            doNotTrack    = false,
             contentType   = None
           )
           .unsafeRunSync()
@@ -320,7 +311,6 @@ class ServiceSpec extends Specification {
             path          = "p",
             request       = Request[IO](),
             pixelExpected = true,
-            doNotTrack    = false,
             contentType   = None
           )
           .unsafeRunSync()
@@ -354,7 +344,6 @@ class ServiceSpec extends Specification {
             path          = "p",
             request       = request,
             pixelExpected = true,
-            doNotTrack    = false,
             contentType   = None
           )
           .unsafeRunSync()
@@ -384,7 +373,6 @@ class ServiceSpec extends Specification {
             path          = testPath,
             request       = req,
             pixelExpected = false,
-            doNotTrack    = false,
             contentType   = None
           )
           .unsafeRunSync()
@@ -673,8 +661,8 @@ class ServiceSpec extends Specification {
           headers       = Headers.empty,
           cookieConfig  = testCookieConfig.copy(enabled = false),
           networkUserId = "nuid",
-          doNotTrack    = false,
           spAnonymous   = None,
+          doNotTrack    = true,
           now           = now
         ) shouldEqual None
       }
@@ -683,8 +671,8 @@ class ServiceSpec extends Specification {
           headers       = Headers.empty,
           cookieConfig  = testCookieConfig,
           networkUserId = "nuid",
-          doNotTrack    = true,
           spAnonymous   = None,
+          doNotTrack    = true,
           now           = now
         ) shouldEqual None
       }
@@ -693,8 +681,8 @@ class ServiceSpec extends Specification {
           headers       = Headers.empty,
           cookieConfig  = testCookieConfig,
           networkUserId = "nuid",
-          doNotTrack    = true,
           spAnonymous   = Some("*"),
+          doNotTrack    = true,
           now           = now
         ) shouldEqual None
       }
@@ -710,8 +698,8 @@ class ServiceSpec extends Specification {
             headers       = Headers.empty,
             cookieConfig  = conf,
             networkUserId = nuid,
-            doNotTrack    = false,
             spAnonymous   = None,
+            doNotTrack    = false,
             now           = now
           )
         cookie.secure must beTrue
