@@ -36,6 +36,7 @@ case class Config[+SinkConfig](
   monitoring: Config.Monitoring,
   telemetry: Config.Telemetry,
   ssl: Config.SSL,
+  hsts: Config.HSTS,
   networking: Config.Networking,
   enableDefaultRedirect: Boolean,
   redirectDomains: Set[String],
@@ -133,6 +134,11 @@ object Config {
     port: Int
   )
 
+  case class HSTS(
+    enable: Boolean,
+    maxAge: FiniteDuration
+  )
+
   final case class Telemetry(
     // General params
     disable: Boolean,
@@ -188,6 +194,7 @@ object Config {
     implicit val metrics          = deriveDecoder[Metrics]
     implicit val monitoring       = deriveDecoder[Monitoring]
     implicit val ssl              = deriveDecoder[SSL]
+    implicit val hsts             = deriveDecoder[HSTS]
     implicit val telemetry        = deriveDecoder[Telemetry]
     implicit val networking       = deriveDecoder[Networking]
     implicit val sinkConfig       = newDecoder[SinkConfig].or(legacyDecoder[SinkConfig])

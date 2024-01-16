@@ -15,10 +15,11 @@ import cats.implicits._
 import com.avast.datadog4s.api.Tag
 import com.avast.datadog4s.extension.http4s.DatadogMetricsOps
 import com.avast.datadog4s.{StatsDMetricFactory, StatsDMetricFactoryConfig}
-import org.http4s.HttpRoutes
+import org.http4s.{HttpApp, HttpRoutes}
 import org.http4s.blaze.server.BlazeServerBuilder
+import org.http4s.headers.`Strict-Transport-Security`
 import org.http4s.server.Server
-import org.http4s.server.middleware.Metrics
+import org.http4s.server.middleware.{HSTS, Metrics}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
@@ -33,12 +34,13 @@ object HttpServer {
     routes: HttpRoutes[F],
     port: Int,
     secure: Boolean,
+    hsts: Config.HSTS,
     networking: Config.Networking,
     metricsConfig: Config.Metrics
   ): Resource[F, Server] =
     for {
       withMetricsMiddleware <- createMetricsMiddleware(routes, metricsConfig)
-      server                <- buildBlazeServer[F](withMetricsMiddleware, port, secure, networking)
+      server                <- buildBlazeServer[F](withMetricsMiddleware, port, secure, hsts, networking)
     } yield server
 
   private def createMetricsMiddleware[F[_]: Async](
@@ -60,16 +62,22 @@ object HttpServer {
     StatsDMetricFactoryConfig(Some(metricsConfig.statsd.prefix), server, defaultTags = tags)
   }
 
+  private[core] def hstsMiddleware[F[_]: Async](hsts: Config.HSTS, routes: HttpApp[F]): HttpApp[F] =
+    if (hsts.enable)
+      HSTS(routes, `Strict-Transport-Security`.unsafeFromDuration(hsts.maxAge))
+    else routes
+
   private def buildBlazeServer[F[_]: Async](
     routes: HttpRoutes[F],
     port: Int,
     secure: Boolean,
+    hsts: Config.HSTS,
     networking: Config.Networking
   ): Resource[F, Server] =
     Resource.eval(Logger[F].info("Building blaze server")) >>
       BlazeServerBuilder[F]
         .bindSocketAddress(new InetSocketAddress(port))
-        .withHttpApp(routes.orNotFound)
+        .withHttpApp(hstsMiddleware(hsts, routes.orNotFound))
         .withIdleTimeout(networking.idleTimeout)
         .withMaxConnections(networking.maxConnections)
         .cond(secure, _.withSslContext(SSLContext.getDefault))

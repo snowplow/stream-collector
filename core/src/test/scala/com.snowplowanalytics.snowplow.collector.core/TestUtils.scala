@@ -113,6 +113,10 @@ object TestUtils {
       false,
       443
     ),
+    hsts = HSTS(
+      false,
+      365.days
+    ),
     networking = Networking(
       1024,
       610.seconds

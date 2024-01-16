@@ -107,6 +107,7 @@ object ConfigSpec {
       )
     ),
     ssl                   = Config.SSL(enable = false, redirect = false, port = 443),
+    hsts                  = Config.HSTS(enable = false, maxAge = 365.days),
     enableDefaultRedirect = false,
     redirectDomains       = Set.empty,
     preTerminationPeriod  = 10.seconds,

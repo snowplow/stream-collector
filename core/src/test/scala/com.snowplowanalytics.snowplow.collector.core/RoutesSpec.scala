@@ -1,18 +1,19 @@
 package com.snowplowanalytics.snowplow.collector.core
 
+import cats.data.NonEmptyList
+
 import scala.collection.mutable.ListBuffer
-
 import org.specs2.mutable.Specification
-
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
-
 import org.http4s.implicits._
 import org.http4s._
 import org.http4s.headers._
 import org.http4s.Status._
-
 import fs2.{Stream, text}
+import org.typelevel.ci.CIString
+
+import scala.concurrent.duration.DurationInt
 
 class RoutesSpec extends Specification {
 
@@ -67,12 +68,14 @@ class RoutesSpec extends Specification {
   def createTestServices(
     enabledDefaultRedirect: Boolean    = true,
     enableRootResponse: Boolean        = false,
-    enableCrossdomainTracking: Boolean = false
+    enableCrossdomainTracking: Boolean = false,
+    enableHsts: Boolean                = false
   ) = {
     val service = new TestService()
     val routes =
       new Routes(enabledDefaultRedirect, enableRootResponse, enableCrossdomainTracking, service).value.orNotFound
-    (service, routes)
+    val routesWithHsts = HttpServer.hstsMiddleware(Config.HSTS(enableHsts, 180.days), routes)
+    (service, routesWithHsts)
   }
 
   "The collector route" should {
@@ -95,6 +98,30 @@ class RoutesSpec extends Specification {
       test(uri"/i")
       test(uri"/health")
       test(uri"/p3/p4")
+    }
+
+    "respond with an HSTS header when HSTS is enabled" in {
+      val (_, routesHstsOn)  = createTestServices(enableHsts = true)
+      val (_, routesHstsOff) = createTestServices(enableHsts = false)
+      def testHstsOn(uri: Uri) = {
+        val request  = Request[IO](method = Method.GET, uri = uri)
+        val response = routesHstsOn.run(request).unsafeRunSync()
+        response.headers.get(CIString("Strict-Transport-Security")) shouldEqual
+          Some(
+            NonEmptyList.of(Header.Raw(CIString("Strict-Transport-Security"), "max-age=15552000; includeSubDomains"))
+          )
+      }
+      def testHstsOff(uri: Uri) = {
+        val request  = Request[IO](method = Method.GET, uri = uri)
+        val response = routesHstsOff.run(request).unsafeRunSync()
+        response.headers.get(CIString("Strict-Transport-Security")) shouldEqual None
+      }
+      testHstsOn(uri"/i")
+      testHstsOn(uri"/health")
+      testHstsOn(uri"/give-me-404")
+      testHstsOff(uri"/i")
+      testHstsOff(uri"/health")
+      testHstsOff(uri"/give-me-404")
     }
 
     "respond to the post cookie route with the cookie response" in {

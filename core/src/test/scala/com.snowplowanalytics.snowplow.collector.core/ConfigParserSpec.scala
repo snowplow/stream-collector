@@ -7,6 +7,8 @@ import cats.effect.testing.specs2.CatsEffect
 import com.snowplowanalytics.snowplow.collector.core.Config.Buffer
 import io.circe.generic.semiauto._
 
+import scala.concurrent.duration.DurationInt
+
 class ConfigParserSpec extends Specification with CatsEffect {
 
   "Loading the configuration" should {
@@ -53,6 +55,7 @@ class ConfigParserSpec extends Specification with CatsEffect {
         paths   = Map.empty[String, String],
         streams = expectedStreams,
         ssl     = TestUtils.testConfig.ssl.copy(enable = true),
+        hsts    = TestUtils.testConfig.hsts.copy(enable = true, 180.days),
         license = Config.License(false)
       )
 
