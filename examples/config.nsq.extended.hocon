@@ -32,6 +32,12 @@ collector {
     port = 443
   }
 
+  # optional HSTS configuration
+  hsts {
+    enable = false
+    maxAge = 365 days
+  }
+
   # The collector responds with a cookie to requests with a path that matches the 'vendor/version' protocol.
   # The expected values are:
   # - com.snowplowanalytics.snowplow/tp2 for Tracker Protocol 2

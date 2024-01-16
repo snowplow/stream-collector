@@ -21,4 +21,9 @@ collector {
   ssl {
     enable = true
   }
+
+  hsts {
+    enable = true
+    maxAge = 180 days
+  }
 }

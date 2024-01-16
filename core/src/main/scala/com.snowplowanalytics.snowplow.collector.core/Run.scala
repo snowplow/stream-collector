@@ -102,6 +102,7 @@ object Run {
         ).value,
         if (config.ssl.enable) config.ssl.port else config.port,
         config.ssl.enable,
+        config.hsts,
         config.networking,
         config.monitoring.metrics
       )
