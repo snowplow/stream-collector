@@ -1,5 +1,9 @@
 Release 3.0.1 (2024-01-10)
 --------------------------
+Add an option to send HSTS header (#408)
+
+Release 3.0.1 (2024-01-10)
+--------------------------
 Remove unnecessary argument (#407)
 
 Release 3.0.0 (2024-01-08)
