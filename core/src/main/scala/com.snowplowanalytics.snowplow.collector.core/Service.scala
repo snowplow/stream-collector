@@ -193,8 +193,7 @@ class Service[F[_]: Sync](
     config.doNotTrackCookie.enabled && req
       .cookies
       .find(_.name == config.doNotTrackCookie.name)
-      .map(cookie => config.doNotTrackCookie.value.r.matches(cookie.content))
-      .getOrElse(false)
+      .exists(cookie => config.doNotTrackCookie.value.r.pattern.matcher(cookie.content).matches())
 
   def extractHostname(req: Request[F]): Option[String] =
     req.uri.authority.map(_.host.renderString) // Hostname is extracted like this in Akka-Http as well
