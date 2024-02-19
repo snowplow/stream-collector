@@ -288,6 +288,32 @@ class ServiceSpec extends Specification {
         ).asJava
       }
 
+      "sink event with Cookie header upcased" in {
+        val ProbeService(service, good, bad) = probeService()
+
+        val req = Request[IO](
+          method  = Method.POST,
+          headers = Headers(Header.Raw(CIString("cookie"), "name=value"))
+        )
+        val r = service
+          .cookie(
+            body          = IO.pure(Some("b")),
+            path          = "p",
+            request       = req,
+            pixelExpected = false,
+            contentType   = Some("image/gif")
+          )
+          .unsafeRunSync()
+
+        r.status mustEqual Status.Ok
+        good.storedRawEvents must have size 1
+        bad.storedRawEvents must have size 0
+
+        val e = emptyCollectorPayload
+        deserializer.deserialize(e, good.storedRawEvents.head)
+        e.headers.asScala must contain("Cookie: name=value")
+      }
+
       "return necessary cache control headers and respond with pixel when pixelExpected is true" in {
         val r = service
           .cookie(

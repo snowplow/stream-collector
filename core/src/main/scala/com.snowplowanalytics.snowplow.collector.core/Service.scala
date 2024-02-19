@@ -304,7 +304,10 @@ class Service[F[_]: Sync](
     request.headers.headers.flatMap { h =>
       h.name match {
         case ci"X-Forwarded-For" | ci"X-Real-Ip" | ci"Cookie" if spAnonymous.isDefined => None
-        case _ => Some(h.toString())
+        // FIXME: This is a temporary backport of old akka behaviour we will remove by
+        //        adapting enrich to support a CIString header names as per RFC7230#Section-3.2
+        case ci"Cookie" => Some(s"Cookie: ${h.value}")
+        case _          => Some(h.toString())
       }
     }
 
