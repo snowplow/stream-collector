@@ -85,7 +85,7 @@ class Service[F[_]: Sync](
       queryString     = Some(request.queryString)
       cookie          = extractCookie(request)
       doNotTrack      = checkDoNotTrackCookie(request)
-      alreadyBouncing = config.cookieBounce.enabled && queryString.contains(config.cookieBounce.name)
+      alreadyBouncing = config.cookieBounce.enabled && request.queryString.contains(config.cookieBounce.name)
       nuidOpt         = networkUserId(request, cookie, spAnonymous)
       nuid = nuidOpt.getOrElse {
         if (alreadyBouncing) config.cookieBounce.fallbackNetworkUserId
@@ -472,10 +472,11 @@ class Service[F[_]: Sync](
         headerName  <- cfg.forwardedProtocolHeader.map(CIString(_))
         headerValue <- request.headers.get(headerName).flatMap(_.map(_.value).toList.headOption)
         maybeScheme <- if (Set("http", "https").contains(headerValue)) Some(headerValue) else None
+        _           <- request.uri.authority.map(_.host)
         scheme      <- Uri.Scheme.fromString(maybeScheme).toOption
       } yield scheme
       val redirectUri =
-        request.uri.withQueryParam(cfg.name, "true").copy(scheme = forwardedScheme.orElse(request.uri.scheme))
+        request.uri.withQueryParam(cfg.name, "true").copy(scheme = forwardedScheme)
 
       `Location`(redirectUri).toRaw1
     } else None
