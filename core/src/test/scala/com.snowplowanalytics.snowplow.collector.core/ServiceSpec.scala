@@ -1105,5 +1105,106 @@ class ServiceSpec extends Specification {
         service.checkDoNotTrackCookie(request) should beTrue
       }
     }
+
+    "cookie bounce" in {
+
+      val config = TestUtils
+        .testConfig
+        .copy(cookieBounce = Config.CookieBounce(true, name = "n3pc", "000000000000000000000", None))
+      val nuid = "00000000-0000-4000-A000-000000000000"
+      val service = new Service(
+        config  = config,
+        sinks   = Sinks(new TestSink, new TestSink),
+        appInfo = TestUtils.appInfo
+      )
+      "should set a redirect location when enabled and no nuid" in {
+        val req = Request[IO](
+          method  = Method.POST,
+          headers = testHeaders,
+          uri = Uri(
+            path      = Uri.Path.unsafeFromString("i"),
+            query     = Query.unsafeFromString("e=pv"),
+            authority = Some(Uri.Authority(host = Uri.RegName("example.com")))
+          )
+        ).withAttribute(Request.Keys.ConnectionInfo, testConnection)
+
+        val r = service
+          .cookie(
+            body          = IO.pure(Some("b")),
+            path          = "p",
+            request       = req,
+            pixelExpected = true,
+            contentType   = None
+          )
+          .unsafeRunSync()
+        r.headers.get(ci"Location").headOption.map(_.head.value) must beSome("//example.com/i?e=pv&n3pc=true")
+      }
+      "should set a redirect location when enabled and no nuid w/o hostname" in {
+        val req = Request[IO](
+          method  = Method.POST,
+          headers = testHeaders,
+          uri = Uri(
+            scheme = Some(Uri.Scheme.http),
+            path   = Uri.Path.unsafeFromString("i"),
+            query  = Query.unsafeFromString("e=pv")
+          )
+        ).withAttribute(Request.Keys.ConnectionInfo, testConnection)
+
+        val r = service
+          .cookie(
+            body          = IO.pure(Some("b")),
+            path          = "p",
+            request       = req,
+            pixelExpected = true,
+            contentType   = None
+          )
+          .unsafeRunSync()
+        r.headers.get(ci"Location").headOption.map(_.head.value) must beSome("i?e=pv&n3pc=true")
+      }
+      "should not set a redirect location when enabled and nuid set" in {
+        val req = Request[IO](
+          method  = Method.POST,
+          headers = testHeaders,
+          uri = Uri(
+            path      = Uri.Path.unsafeFromString("i"),
+            query     = Query.unsafeFromString(s"e=pv&nuid=$nuid"),
+            authority = Some(Uri.Authority(host = Uri.RegName("example.com")))
+          )
+        ).withAttribute(Request.Keys.ConnectionInfo, testConnection)
+
+        val r = service
+          .cookie(
+            body          = IO.pure(Some("b")),
+            path          = "p",
+            request       = req,
+            pixelExpected = true,
+            contentType   = None
+          )
+          .unsafeRunSync()
+        r.headers.get(ci"Location").headOption.map(_.head.value) must beNone
+      }
+      "should not set a redirect location when already bouncing" in {
+        val req = Request[IO](
+          method  = Method.POST,
+          headers = testHeaders,
+          uri = Uri(
+            path      = Uri.Path.unsafeFromString("i"),
+            query     = Query.unsafeFromString("e=pv&n3pc=true"),
+            authority = Some(Uri.Authority(host = Uri.RegName("example.com")))
+          )
+        ).withAttribute(Request.Keys.ConnectionInfo, testConnection)
+
+        val r = service
+          .cookie(
+            body          = IO.pure(Some("b")),
+            path          = "p",
+            request       = req,
+            pixelExpected = true,
+            contentType   = None
+          )
+          .unsafeRunSync()
+        r.headers.get(ci"Location").headOption.map(_.head.value) must beNone
+      }
+    }
   }
 }
