@@ -1,3 +1,7 @@
+Release 3.1.2 (2024-02-22)
++--------------------------
+Improve relative redirect in cookie bounce feature (#413)
+
 Release 3.1.1 (2024-02-20)
 +--------------------------
 Upcase cookie header name (#412)
