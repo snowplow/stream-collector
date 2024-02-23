@@ -1,0 +1,160 @@
+name: build
+
+on:
+  push:
+    tags:
+      - '*'
+    branches: qa-framework-test
+
+jobs:
+  deploy_to_github:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: coursier/cache-action@v3
+      - name: Set up JDK
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Build artifacts
+        run: |
+          sbt 'project kafka' assembly
+          sbt 'project kinesis' assembly
+          sbt 'project nsq' assembly
+          sbt 'project pubsub' assembly
+          sbt 'project sqs' assembly
+          sbt 'project stdout' assembly
+      - name: Get current version
+        id: ver
+        run: |
+          export PROJECT_VERSION=$(sbt "project core" version -Dsbt.log.noformat=true | perl -ne 'print "$1\n" if /info.*(\d+\.\d+\.\d+[^\r\n]*)/' | tail -n 1 | tr -d '\n')
+          echo "project_version=$PROJECT_VERSION" >> $GITHUB_OUTPUT
+      - name: Create GitHub release and attach artifacts
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          prerelease: true
+          name: ${{ steps.ver.outputs.project_version }}
+          tag_name: ${{ steps.ver.outputs.project_version }}
+          files: |
+            kafka/target/scala-2.13/snowplow-stream-collector-kafka-${{ steps.ver.outputs.project_version }}.jar
+            kinesis/target/scala-2.13/snowplow-stream-collector-kinesis-${{ steps.ver.outputs.project_version }}.jar
+            nsq/target/scala-2.13/snowplow-stream-collector-nsq-${{ steps.ver.outputs.project_version }}.jar
+            pubsub/target/scala-2.13/snowplow-stream-collector-google-pubsub-${{ steps.ver.outputs.project_version }}.jar
+            sqs/target/scala-2.13/snowplow-stream-collector-sqs-${{ steps.ver.outputs.project_version }}.jar
+            stdout/target/scala-2.13/snowplow-stream-collector-stdout-${{ steps.ver.outputs.project_version }}.jar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy_to_docker:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform:
+          - kinesis
+          - sqs
+          - pubsub
+          - kafka
+          - nsq
+          - stdout
+        include:
+          - suffix: ""
+          - platform: kinesis
+            run_snyk: ${{ !contains(github.ref, 'rc') }}
+          - platform: pubsub
+            run_snyk: ${{ !contains(github.ref, 'rc') }}
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: coursier/cache-action@v3
+      - name: Set up JDK
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+
+      - name: Get current version
+        id: ver
+        run: |
+          export PROJECT_VERSION=$(sbt "project core" version -Dsbt.log.noformat=true | perl -ne 'print "$1\n" if /info.*(\d+\.\d+\.\d+[^\r\n]*)/' | tail -n 1 | tr -d '\n')
+          echo "project_version=$PROJECT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Stage the Docker build
+        run: sbt "project ${{ matrix.platform }}" docker:stage
+
+      - name: Stage the Docker distroless build
+        run: sbt "project ${{ matrix.platform }}Distroless" docker:stage
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v3
+        with:
+          images: snowplow/scala-stream-collector-${{ matrix.platform }}${{ matrix.suffix }}
+          tags: |
+            type=raw,value=latest,enable=${{ !contains(steps.ver.outputs.project_version, 'rc') }}
+            type=raw,value=latest-focal,enable=${{ !contains(steps.ver.outputs.project_version, 'rc') }}
+            type=raw,value=${{ steps.ver.outputs.project_version }}
+            type=raw,value=${{ steps.ver.outputs.project_version }}-focal
+          flavor: |
+            latest=false
+
+      - name: Docker metadata distroless
+        id: distroless-meta
+        uses: docker/metadata-action@v3
+        with:
+          images: snowplow/scala-stream-collector-${{ matrix.platform }}${{ matrix.suffix }}
+          tags: |
+            type=raw,value=latest-distroless,enable=${{ !contains(steps.ver.outputs.project_version, 'rc') }}
+            type=raw,value=${{ steps.ver.outputs.project_version }}-distroless
+          flavor: |
+            latest=false
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Push image
+        uses: docker/build-push-action@v2
+        with:
+          context: ${{ matrix.platform }}/target/docker/stage
+          file: ${{ matrix.platform }}/target/docker/stage/Dockerfile
+          platforms: linux/amd64,linux/arm64/v8
+          tags: ${{ steps.meta.outputs.tags }}
+          push: true
+      - name: Push distroless image
+        uses: docker/build-push-action@v2
+        with:
+          context: distroless/${{ matrix.platform }}/target/docker/stage
+          file: distroless/${{ matrix.platform }}/target/docker/stage/Dockerfile
+          platforms: linux/amd64,linux/arm64/v8
+          tags: ${{ steps.distroless-meta.outputs.tags }}
+          push: true
+
+      # - name: Build local distroless image, which is needed to run Snyk
+      #   if: matrix.run_snyk
+      #   run: sbt "project ${{ matrix.platform }}Distroless" docker:publishLocal
+      - name: Show local docker images
+        run: docker images
+      - name: Execute QA Framework tests
+        uses: aurelien-baudet/workflow-dispatch@v2
+        with:
+          workflow: test-component
+          repo: snowplow-devops/qa-framework
+          token: ${{ secrets.GLOBAL_QA_FRAMEWORK_PAT }}
+          inputs: '{ "test_directory": "collector", "qa_collector_version": steps.ver.outputs.project_version }'
+      # - name: Run Snyk to check for vulnerabilities
+      #   uses: snyk/actions/docker@master
+      #   if: matrix.run_snyk
+      #   with:
+      #     image: "snowplow/scala-stream-collector-${{ matrix.platform }}:${{ github.ref_name }}-distroless"
+      #     args: "--app-vulns --org=data-processing-new"
+      #     command: monitor
+      #   env:
+      #     SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
