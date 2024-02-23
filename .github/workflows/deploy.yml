@@ -150,3 +150,28 @@ jobs:
           command: monitor
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+  qa_framework:
+    runs-on: ubuntu-latest
+    needs: deploy_to_docker
+    steps:
+      - uses: actions/checkout@v2
+      - uses: coursier/cache-action@v3
+      - name: Set up JDK
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Get current version
+        id: ver
+        run: |
+          export PROJECT_VERSION=$(sbt "project core" version -Dsbt.log.noformat=true | perl -ne 'print "$1\n" if /info.*(\d+\.\d+\.\d+[^\r\n]*)/' | tail -n 1 | tr -d '\n')
+          echo "project_version=$PROJECT_VERSION" >> $GITHUB_OUTPUT
+      - name: Execute QA Framework tests
+        uses: aurelien-baudet/workflow-dispatch@v2
+        with:
+          workflow: test-component
+          repo: snowplow-devops/qa-framework
+          token: ${{ secrets.GLOBAL_QA_FRAMEWORK_PAT }}
+          ref: "refs/heads/main"
+          inputs: '{ "test_directory": "collector", "qa_collector_version": "${{ steps.ver.outputs.project_version }}" }'
+          wait-for-completion-timeout: 30m # workflow is much slower in Azure; can take up to 20-something minutes
+          display-workflow-run-url: true
