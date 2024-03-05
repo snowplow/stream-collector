@@ -40,7 +40,7 @@ class KafkaSink[F[_]: Sync](
     * @param events The list of events to send
     * @param key The partition key to use
     */
-  override def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit] = Sync[F].delay {
+  override def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit] = Sync[F].blocking {
     log.debug(s"Writing ${events.size} Thrift records to Kafka topic $topicName at key $key")
     events.foreach { event =>
       kafkaProducer.send(

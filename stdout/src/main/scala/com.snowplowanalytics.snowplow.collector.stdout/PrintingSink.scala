@@ -20,7 +20,7 @@ class PrintingSink[F[_]: Sync](
 
   override def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit] =
     events.traverse_ { event =>
-      Sync[F].delay {
+      Sync[F].blocking {
         stream.println(encoder.encodeToString(event))
       }
     }

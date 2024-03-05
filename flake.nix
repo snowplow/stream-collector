@@ -35,7 +35,7 @@
                 jre
                 metals
                 sbt
-                # pkgs.nodePackages.snyk
+                pkgs.snyk
                 pkgs.kubernetes-helm
                 # (pkgs.wrapHelm pkgs.kubernetes-helm {plugins = [pkgs.kubernetes-helmPlugins.helm-diff];})
                 # pkgs.google-cloud-sdk.withExtraComponents( with pkgs.google-cloud-sdk.components [ gke-gcloud-auth-plugin ]);
