@@ -10,6 +10,7 @@
  */
 
 import com.typesafe.sbt.packager.Keys.packageName
+import com.typesafe.sbt.packager.universal.UniversalPlugin.autoImport._
 import com.typesafe.sbt.packager.docker.DockerPlugin.autoImport._
 import org.scalafmt.sbt.ScalafmtPlugin.autoImport._
 import sbt.Keys._
@@ -86,6 +87,15 @@ object BuildSettings {
     commonSinkSettings ++ integrationTestSettings ++ Seq(
       moduleName := "snowplow-stream-collector-kafka",
       Docker / packageName := "scala-stream-collector-kafka",
+      Universal / javaOptions ++= Seq(
+        "-Djavax.management.builder.initial=",
+        "-Djava.rmi.server.hostname=127.0.0.1",
+        "-Dcom.sun.management.jmxremote=true",
+        "-Dcom.sun.management.jmxremote.port=9186",
+        "-Dcom.sun.management.jmxremote.rmi.port=9186",
+        "-Dcom.sun.management.jmxremote.ssl=false",
+        "-Dcom.sun.management.jmxremote.authenticate=false"
+      ),
       libraryDependencies ++= Seq(
         Dependencies.Libraries.kafkaClients,
         Dependencies.Libraries.mskAuth,
