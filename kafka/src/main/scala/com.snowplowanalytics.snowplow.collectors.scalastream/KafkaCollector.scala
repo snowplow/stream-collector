@@ -19,8 +19,14 @@ object KafkaCollector extends App[KafkaSinkConfig](BuildInfo) {
 
   override def mkSinks(config: Config.Streams[KafkaSinkConfig]): Resource[IO, Sinks[IO]] =
     for {
-      good <- KafkaSink.create[IO](config.good)
-      bad  <- KafkaSink.create[IO](config.bad)
+      good <- KafkaSink.create[IO](
+        config.good,
+        classOf[GoodAzureAuthenticationCallbackHandler].getName
+      )
+      bad <- KafkaSink.create[IO](
+        config.bad,
+        classOf[BadAzureAuthenticationCallbackHandler].getName
+      )
     } yield Sinks(good, bad)
 
   override def telemetryInfo(config: Config.Streams[KafkaSinkConfig]): IO[Telemetry.TelemetryInfo] =

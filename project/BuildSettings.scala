@@ -27,6 +27,7 @@ object BuildSettings {
     name           := "snowplow-stream-collector",
     description    := "Scala Stream Collector for Snowplow raw events",
     scalaVersion   := "2.13.12",
+    crossScalaVersions := Seq("2.13.12", "2.12.14"),
     scalacOptions ++= Seq("-Ywarn-macros:after"),
     javacOptions   := Seq("-source", "11", "-target", "11"),
     resolvers     ++= Seq(
@@ -88,7 +89,8 @@ object BuildSettings {
       libraryDependencies ++= Seq(
         Dependencies.Libraries.kafkaClients,
         Dependencies.Libraries.mskAuth,
-        
+        Dependencies.Libraries.azureIdentity,
+
         // integration tests dependencies
         Dependencies.Libraries.IntegrationTests.specs2,
         Dependencies.Libraries.IntegrationTests.specs2CE

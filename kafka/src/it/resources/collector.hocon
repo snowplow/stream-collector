@@ -8,11 +8,19 @@ collector {
       name = ${TOPIC_GOOD}
       brokers = ${BROKER}
       maxBytes = ${MAX_BYTES}
+      producerConf = {
+        "security.protocol" = "PLAINTEXT"
+        "sasl.mechanism" = "GSSAPI"
+      }
     }
     bad {
       name = ${TOPIC_BAD}
       brokers = ${BROKER}
       maxBytes = ${MAX_BYTES}
+      producerConf = {
+        "security.protocol" = "PLAINTEXT"
+        "sasl.mechanism" = "GSSAPI"
+      }
     }
   }
 }

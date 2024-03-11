@@ -10,13 +10,19 @@
   */
 package com.snowplowanalytics.snowplow.collector.core
 
+import scala.concurrent.duration._
+
 import cats.effect.{ExitCode, IO}
 import cats.effect.kernel.Resource
+import cats.effect.metrics.CpuStarvationWarningMetrics
 
 import com.monovore.decline.effect.CommandIOApp
 import com.monovore.decline.Opts
 
 import io.circe.Decoder
+
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import com.snowplowanalytics.snowplow.scalatracker.emitters.http4s.ceTracking
 
@@ -28,6 +34,16 @@ abstract class App[SinkConfig: Decoder](appInfo: AppInfo)
       header  = "Snowplow application that collects tracking events",
       version = appInfo.version
     ) {
+
+  implicit private val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
+
+  override def runtimeConfig =
+    super.runtimeConfig.copy(cpuStarvationCheckInterval = 10.seconds)
+
+  override def onCpuStarvationWarn(metrics: CpuStarvationWarningMetrics): IO[Unit] =
+    Logger[IO].debug(
+      s"Cats Effect measured responsiveness in excess of ${metrics.starvationInterval * metrics.starvationThreshold}"
+    )
 
   def mkSinks(config: Config.Streams[SinkConfig]): Resource[IO, Sinks[IO]]
 

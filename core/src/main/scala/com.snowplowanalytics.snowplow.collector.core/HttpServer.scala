@@ -58,7 +58,7 @@ object HttpServer {
 
   private def createStatsdConfig(metricsConfig: Config.Metrics): StatsDMetricFactoryConfig = {
     val server = InetSocketAddress.createUnresolved(metricsConfig.statsd.hostname, metricsConfig.statsd.port)
-    val tags   = metricsConfig.statsd.tags.toSeq.map { case (name, value) => Tag.of(name, value) }
+    val tags   = metricsConfig.statsd.tags.toVector.map { case (name, value) => Tag.of(name, value) }
     StatsDMetricFactoryConfig(Some(metricsConfig.statsd.prefix), server, defaultTags = tags)
   }
 
