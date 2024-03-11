@@ -1,3 +1,9 @@
+Release 3.2.0 (2024-03-11)
++--------------------------
+Cross compile to scala 2.12
+Log cats-effect warning at debug level (#414)
+collector-kafka: authenticate with Event Hubs using OAuth2 (#401)
+
 Release 3.1.2 (2024-02-22)
 +--------------------------
 Improve relative redirect in cookie bounce feature (#413)
