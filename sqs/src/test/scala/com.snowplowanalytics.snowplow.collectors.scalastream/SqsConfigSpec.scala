@@ -113,8 +113,10 @@ object SqsConfigSpec {
     redirectDomains       = Set.empty,
     preTerminationPeriod  = 10.seconds,
     networking = Config.Networking(
-      maxConnections = 1024,
-      idleTimeout    = 610.seconds
+      maxConnections        = 1024,
+      idleTimeout           = 610.seconds,
+      responseHeaderTimeout = 2.seconds,
+      bodyReadTimeout       = 500.millis
     ),
     streams = Config.Streams(
       useIpAddressAsPartitionKey = false,
