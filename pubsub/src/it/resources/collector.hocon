@@ -15,4 +15,9 @@ collector {
        maxBytes = ${MAX_BYTES}
     }
   }
+
+  networking {
+    responseHeaderTimeout = 10 seconds
+    bodyReadTimeout = 2 seconds
+  }
 }

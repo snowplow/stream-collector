@@ -119,7 +119,9 @@ object TestUtils {
     ),
     networking = Networking(
       1024,
-      610.seconds
+      610.seconds,
+      2.second,
+      500.millis
     ),
     enableDefaultRedirect = false,
     redirectDomains       = Set.empty[String],
