@@ -80,6 +80,7 @@ object HttpServer {
         .withHttpApp(hstsMiddleware(hsts, routes.orNotFound))
         .withIdleTimeout(networking.idleTimeout)
         .withMaxConnections(networking.maxConnections)
+        .withResponseHeaderTimeout(networking.responseHeaderTimeout)
         .cond(secure, _.withSslContext(SSLContext.getDefault))
         .resource
 

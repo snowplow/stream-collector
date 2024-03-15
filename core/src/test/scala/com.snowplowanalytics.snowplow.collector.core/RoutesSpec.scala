@@ -73,7 +73,9 @@ class RoutesSpec extends Specification {
   ) = {
     val service = new TestService()
     val routes =
-      new Routes(enabledDefaultRedirect, enableRootResponse, enableCrossdomainTracking, service).value.orNotFound
+      new Routes(enabledDefaultRedirect, enableRootResponse, enableCrossdomainTracking, 500.millis, service)
+        .value
+        .orNotFound
     val routesWithHsts = HttpServer.hstsMiddleware(Config.HSTS(enableHsts, 180.days), routes)
     (service, routesWithHsts)
   }

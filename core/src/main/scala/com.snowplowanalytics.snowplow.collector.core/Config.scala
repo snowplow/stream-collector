@@ -158,7 +158,9 @@ object Config {
 
   case class Networking(
     maxConnections: Int,
-    idleTimeout: FiniteDuration
+    idleTimeout: FiniteDuration,
+    responseHeaderTimeout: FiniteDuration,
+    bodyReadTimeout: FiniteDuration
   )
 
   case class License(
