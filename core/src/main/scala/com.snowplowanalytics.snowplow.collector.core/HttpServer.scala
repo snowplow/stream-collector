@@ -19,7 +19,8 @@ import org.http4s.{HttpApp, HttpRoutes}
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.headers.`Strict-Transport-Security`
 import org.http4s.server.Server
-import org.http4s.server.middleware.{HSTS, Metrics}
+import org.http4s.server.middleware.{HSTS, Logger => LoggerMiddleware, Metrics, Timeout}
+import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
@@ -36,11 +37,12 @@ object HttpServer {
     secure: Boolean,
     hsts: Config.HSTS,
     networking: Config.Networking,
-    metricsConfig: Config.Metrics
+    metricsConfig: Config.Metrics,
+    debugHttp: Config.Debug.Http
   ): Resource[F, Server] =
     for {
       withMetricsMiddleware <- createMetricsMiddleware(routes, metricsConfig)
-      server                <- buildBlazeServer[F](withMetricsMiddleware, port, secure, hsts, networking)
+      server                <- buildBlazeServer[F](withMetricsMiddleware, port, secure, hsts, networking, debugHttp)
     } yield server
 
   private def createMetricsMiddleware[F[_]: Async](
@@ -67,17 +69,33 @@ object HttpServer {
       HSTS(routes, `Strict-Transport-Security`.unsafeFromDuration(hsts.maxAge))
     else routes
 
+  private def loggerMiddleware[F[_]: Async](routes: HttpApp[F], config: Config.Debug.Http): HttpApp[F] =
+    if (config.enable) {
+      LoggerMiddleware.httpApp[F](
+        logHeaders        = config.logHeaders,
+        logBody           = config.logBody,
+        redactHeadersWhen = config.redactHeaders.map(CIString(_)).contains(_),
+        logAction         = Some((msg: String) => Logger[F].debug(msg))
+      )(routes)
+    } else routes
+
+  private def timeoutMiddleware[F[_]: Async](routes: HttpApp[F], networking: Config.Networking): HttpApp[F] =
+    Timeout.httpApp[F](timeout = networking.responseHeaderTimeout)(routes)
+
   private def buildBlazeServer[F[_]: Async](
     routes: HttpRoutes[F],
     port: Int,
     secure: Boolean,
     hsts: Config.HSTS,
-    networking: Config.Networking
+    networking: Config.Networking,
+    debugHttp: Config.Debug.Http
   ): Resource[F, Server] =
     Resource.eval(Logger[F].info("Building blaze server")) >>
       BlazeServerBuilder[F]
         .bindSocketAddress(new InetSocketAddress(port))
-        .withHttpApp(hstsMiddleware(hsts, routes.orNotFound))
+        .withHttpApp(
+          loggerMiddleware(timeoutMiddleware(hstsMiddleware(hsts, routes.orNotFound), networking), debugHttp)
+        )
         .withIdleTimeout(networking.idleTimeout)
         .withMaxConnections(networking.maxConnections)
         .withResponseHeaderTimeout(networking.responseHeaderTimeout)

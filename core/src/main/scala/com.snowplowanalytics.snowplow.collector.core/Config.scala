@@ -41,7 +41,8 @@ case class Config[+SinkConfig](
   enableDefaultRedirect: Boolean,
   redirectDomains: Set[String],
   preTerminationPeriod: FiniteDuration,
-  license: Config.License
+  license: Config.License,
+  debug: Config.Debug.Debug
 )
 
 object Config {
@@ -167,6 +168,11 @@ object Config {
     accept: Boolean
   )
 
+  object Debug {
+    case class Http(enable: Boolean, logHeaders: Boolean, logBody: Boolean, redactHeaders: List[String])
+    case class Debug(http: Http)
+  }
+
   implicit def decoder[SinkConfig: Decoder]: Decoder[Config[SinkConfig]] = {
     implicit val license: Decoder[License] = {
       val truthy = Set("true", "yes", "on", "1")
@@ -199,6 +205,8 @@ object Config {
     implicit val hsts             = deriveDecoder[HSTS]
     implicit val telemetry        = deriveDecoder[Telemetry]
     implicit val networking       = deriveDecoder[Networking]
+    implicit val http             = deriveDecoder[Debug.Http]
+    implicit val debug            = deriveDecoder[Debug.Debug]
     implicit val sinkConfig       = newDecoder[SinkConfig].or(legacyDecoder[SinkConfig])
     implicit val streams          = deriveDecoder[Streams[SinkConfig]]
 
