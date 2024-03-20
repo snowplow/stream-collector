@@ -123,6 +123,9 @@ object TestUtils {
       2.second,
       500.millis
     ),
+    debug = Debug.Debug(
+      http = Debug.Http(enable = false, logHeaders = true, logBody = false, redactHeaders = List.empty)
+    ),
     enableDefaultRedirect = false,
     redirectDomains       = Set.empty[String],
     preTerminationPeriod  = 10.seconds,

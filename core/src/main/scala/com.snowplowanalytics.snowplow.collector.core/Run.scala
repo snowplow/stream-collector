@@ -105,7 +105,8 @@ object Run {
         config.ssl.enable,
         config.hsts,
         config.networking,
-        config.monitoring.metrics
+        config.monitoring.metrics,
+        config.debug.http
       )
       _          <- withGracefulShutdown(config.preTerminationPeriod)(httpServer)
       httpClient <- BlazeClientBuilder[F].resource
