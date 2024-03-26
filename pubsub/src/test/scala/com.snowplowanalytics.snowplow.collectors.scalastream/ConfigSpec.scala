@@ -115,7 +115,9 @@ object ConfigSpec {
       maxConnections        = 1024,
       idleTimeout           = 610.seconds,
       responseHeaderTimeout = 2.seconds,
-      bodyReadTimeout       = 500.millis
+      bodyReadTimeout       = 500.millis,
+      maxRequestLineLength  = 20480,
+      maxHeadersLength      = 40960
     ),
     streams = Config.Streams(
       useIpAddressAsPartitionKey = false,
