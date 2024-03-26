@@ -99,6 +99,10 @@ object HttpServer {
         .withIdleTimeout(networking.idleTimeout)
         .withMaxConnections(networking.maxConnections)
         .withResponseHeaderTimeout(networking.responseHeaderTimeout)
+        .withLengthLimits(
+          maxRequestLineLen = networking.maxRequestLineLength,
+          maxHeadersLen     = networking.maxHeadersLength
+        )
         .cond(secure, _.withSslContext(SSLContext.getDefault))
         .resource
 
