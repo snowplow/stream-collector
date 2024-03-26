@@ -11,28 +11,28 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 package sinks
 
-import cats.effect.{Resource, Sync}
+import cats.implicits._
+import cats.effect._
 
 import org.slf4j.LoggerFactory
 
-import java.util.Properties
-
-import org.apache.kafka.clients.producer._
+import fs2.kafka._
 
 import com.snowplowanalytics.snowplow.collector.core.{Config, Sink}
 
 /**
   * Kafka Sink for the Scala Stream Collector
   */
-class KafkaSink[F[_]: Sync](
+class KafkaSink[F[_]: Async](
   val maxBytes: Int,
-  kafkaProducer: KafkaProducer[String, Array[Byte]],
+  isHealthyState: Ref[F, Boolean],
+  kafkaProducer: KafkaProducer[F, String, Array[Byte]],
   topicName: String
 ) extends Sink[F] {
 
-  private lazy val log                        = LoggerFactory.getLogger(getClass())
-  @volatile private var kafkaHealthy: Boolean = false
-  override def isHealthy: F[Boolean]          = Sync[F].pure(kafkaHealthy)
+  private lazy val log = LoggerFactory.getLogger(getClass())
+
+  override def isHealthy: F[Boolean] = isHealthyState.get
 
   /**
     * Store raw events to the topic
@@ -40,34 +40,25 @@ class KafkaSink[F[_]: Sync](
     * @param events The list of events to send
     * @param key The partition key to use
     */
-  override def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit] = Sync[F].delay {
+  override def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit] = {
     log.debug(s"Writing ${events.size} Thrift records to Kafka topic $topicName at key $key")
-    events.foreach { event =>
-      kafkaProducer.send(
-        new ProducerRecord(topicName, key, event),
-        new Callback {
-          override def onCompletion(metadata: RecordMetadata, e: Exception): Unit =
-            if (e != null) {
-              kafkaHealthy = false
-              log.error(s"Sending event failed: ${e.getMessage}")
-            } else {
-              kafkaHealthy = true
-            }
-        }
-      )
-    }
+    val records = ProducerRecords(events.map(e => (ProducerRecord(topicName, key, e))))
+    kafkaProducer.produce(records).onError { case _: Throwable => isHealthyState.set(false) } *> isHealthyState.set(
+      true
+    )
   }
 }
 
 object KafkaSink {
 
-  def create[F[_]: Sync](
+  def create[F[_]: Async](
     sinkConfig: Config.Sink[KafkaSinkConfig],
     authCallbackClass: String
   ): Resource[F, KafkaSink[F]] =
     for {
-      kafkaProducer <- createProducer(sinkConfig.config, sinkConfig.buffer, authCallbackClass)
-      kafkaSink = new KafkaSink(sinkConfig.config.maxBytes, kafkaProducer, sinkConfig.name)
+      isHealthyState <- Resource.eval(Ref.of[F, Boolean](false))
+      kafkaProducer  <- createProducer(sinkConfig.config, sinkConfig.buffer, authCallbackClass)
+      kafkaSink = new KafkaSink(sinkConfig.config.maxBytes, isHealthyState, kafkaProducer, sinkConfig.name)
     } yield kafkaSink
 
   /**
@@ -76,28 +67,24 @@ object KafkaSink {
     *
     * @return a new Kafka Producer
     */
-  private def createProducer[F[_]: Sync](
+  private def createProducer[F[_]: Async](
     kafkaConfig: KafkaSinkConfig,
     bufferConfig: Config.Buffer,
     authCallbackClass: String
-  ): Resource[F, KafkaProducer[String, Array[Byte]]] = {
-    val acquire = Sync[F].delay {
-      val props = new Properties()
-      props.setProperty("bootstrap.servers", kafkaConfig.brokers)
-      props.setProperty("acks", "all")
-      props.setProperty("retries", kafkaConfig.retries.toString)
-      props.setProperty("buffer.memory", bufferConfig.byteLimit.toString)
-      props.setProperty("linger.ms", bufferConfig.timeLimit.toString)
-      props.setProperty("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
-      props.setProperty("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer")
-      props.setProperty("sasl.login.callback.handler.class", authCallbackClass)
+  ): Resource[F, KafkaProducer[F, String, Array[Byte]]] = {
+    val props = Map(
+      "acks"                              -> "all",
+      "retries"                           -> kafkaConfig.retries.toString,
+      "buffer.memory"                     -> bufferConfig.byteLimit.toString,
+      "linger.ms"                         -> bufferConfig.timeLimit.toString,
+      "key.serializer"                    -> "org.apache.kafka.common.serialization.StringSerializer",
+      "value.serializer"                  -> "org.apache.kafka.common.serialization.ByteArraySerializer",
+      "sasl.login.callback.handler.class" -> authCallbackClass
+    ) ++ kafkaConfig.producerConf.getOrElse(Map.empty)
 
-      // Can't use `putAll` in JDK 11 because of https://github.com/scala/bug/issues/10418
-      kafkaConfig.producerConf.getOrElse(Map()).foreach { case (k, v) => props.setProperty(k, v) }
+    val producerSettings =
+      ProducerSettings[F, String, Array[Byte]].withBootstrapServers(kafkaConfig.brokers).withProperties(props)
 
-      new KafkaProducer[String, Array[Byte]](props)
-    }
-    val release = (p: KafkaProducer[String, Array[Byte]]) => Sync[F].delay(p.close())
-    Resource.make(acquire)(release)
+    KafkaProducer.resource(producerSettings)
   }
 }

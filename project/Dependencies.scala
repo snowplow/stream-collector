@@ -25,7 +25,7 @@ object Dependencies {
     val fs2PubSub        = "0.22.0"
     val http4s           = "0.23.23"
     val jackson          = "2.12.7" // force this version to mitigate security vulnerabilities
-    val kafka            = "2.2.1"
+    val fs2Kafka         = "2.6.1"
     val log4cats         = "2.6.0"
     val log4j            = "2.17.2" // CVE-2021-44228
     val mskAuth          = "1.1.1"
@@ -66,7 +66,7 @@ object Dependencies {
     //sinks
     val fs2PubSub      = "com.permutive"              %% "fs2-google-pubsub-grpc"     % V.fs2PubSub
     val jackson        = "com.fasterxml.jackson.core" % "jackson-databind"            % V.jackson
-    val kafkaClients   = "org.apache.kafka"           % "kafka-clients"               % V.kafka
+    val fs2Kafka       = "com.github.fd4s"            %% "fs2-kafka"                  % V.fs2Kafka
     val kinesis        = "com.amazonaws"              % "aws-java-sdk-kinesis"        % V.awsSdk
     val log4j          = "org.apache.logging.log4j"   % "log4j-core"                  % V.log4j
     val mskAuth        = "software.amazon.msk"        % "aws-msk-iam-auth"            % V.mskAuth % Runtime // Enables AWS MSK IAM authentication https://github.com/snowplow/stream-collector/pull/214
