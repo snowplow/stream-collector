@@ -121,7 +121,9 @@ object TestUtils {
       1024,
       610.seconds,
       2.second,
-      500.millis
+      500.millis,
+      20480,
+      40960
     ),
     debug = Debug.Debug(
       http = Debug.Http(enable = false, logHeaders = true, logBody = false, redactHeaders = List.empty)

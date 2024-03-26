@@ -159,7 +159,9 @@ object NsqConfigSpec {
       maxConnections        = 1024,
       idleTimeout           = 610.seconds,
       responseHeaderTimeout = 2.seconds,
-      bodyReadTimeout       = 500.millis
+      bodyReadTimeout       = 500.millis,
+      maxRequestLineLength  = 20480,
+      maxHeadersLength      = 40960
     ),
     license = Config.License(accept = true),
     debug = Config
