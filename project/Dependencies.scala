@@ -40,6 +40,7 @@ object Dependencies {
     val thrift           = "0.15.0" // force this version to mitigate security vulnerabilities
     val tracker          = "2.0.0"
     val dataDog4s        = "0.32.0"
+    val jnrPosix         = "3.1.8"  // force this version to mitigate security vulnerabilities
     val azureIdentity    = "1.11.0"
   }
 
@@ -62,7 +63,8 @@ object Dependencies {
     val trackerCore       = "com.snowplowanalytics" %% "snowplow-scala-tracker-core"           % V.tracker
     val datadogHttp4s     = "com.avast.cloud"       %% "datadog4s-http4s"                      % V.dataDog4s
     val datadogStatsd     = "com.avast.cloud"       %% "datadog4s-statsd"                      % V.dataDog4s
-    
+    val jnrPosix          = "com.github.jnr"        % "jnr-posix"                              % V.jnrPosix
+
     //sinks
     val fs2PubSub      = "com.permutive"              %% "fs2-google-pubsub-grpc"     % V.fs2PubSub
     val jackson        = "com.fasterxml.jackson.core" % "jackson-databind"            % V.jackson
