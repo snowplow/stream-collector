@@ -120,8 +120,8 @@ object TestUtils {
     networking = Networking(
       1024,
       610.seconds,
-      2.second,
-      500.millis,
+      5.seconds,
+      1.second,
       20480,
       40960
     ),
