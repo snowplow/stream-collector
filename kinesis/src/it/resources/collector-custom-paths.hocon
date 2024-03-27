@@ -31,6 +31,12 @@ collector {
     }
   }
 
+  networking {
+    responseHeaderTimeout = 10 seconds
+    bodyReadTimeout = 2 seconds
+  }
+
+
   "paths": {
     "/acme/track":    "/com.snowplowanalytics.snowplow/tp2",
     "/acme/redirect": "/r/tp2",

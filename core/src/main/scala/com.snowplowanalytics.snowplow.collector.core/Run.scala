@@ -98,13 +98,15 @@ object Run {
           config.enableDefaultRedirect,
           config.rootResponse.enabled,
           config.crossDomain.enabled,
+          config.networking.responseHeaderTimeout,
           collectorService
         ).value,
         if (config.ssl.enable) config.ssl.port else config.port,
         config.ssl.enable,
         config.hsts,
         config.networking,
-        config.monitoring.metrics
+        config.monitoring.metrics,
+        config.debug.http
       )
       _          <- withGracefulShutdown(config.preTerminationPeriod)(httpServer)
       httpClient <- BlazeClientBuilder[F].resource

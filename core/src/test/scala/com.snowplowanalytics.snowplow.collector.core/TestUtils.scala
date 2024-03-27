@@ -119,7 +119,14 @@ object TestUtils {
     ),
     networking = Networking(
       1024,
-      610.seconds
+      610.seconds,
+      5.seconds,
+      1.second,
+      20480,
+      40960
+    ),
+    debug = Debug.Debug(
+      http = Debug.Http(enable = false, logHeaders = true, logBody = false, redactHeaders = List.empty)
     ),
     enableDefaultRedirect = false,
     redirectDomains       = Set.empty[String],
