@@ -17,6 +17,7 @@ import org.apache.commons.codec.binary.Base64
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 
+import cats.data.NonEmptyList
 import cats.effect.{Clock, Sync}
 import cats.implicits._
 
@@ -139,11 +140,13 @@ class Service[F[_]: Sync](
   }
 
   override def preflightResponse(req: Request[F]): F[Response[F]] = Sync[F].pure {
+    val allowedHeaders = (List("Content-Type", "SP-Anonymous") ++ config.cors.allowedCorsHeaders).map(CIString(_))
+    val corsHeaders    = NonEmptyList.fromListUnsafe(allowedHeaders)
     Response[F](
       headers = Headers(
         accessControlAllowOriginHeader(req),
         `Access-Control-Allow-Credentials`(),
-        `Access-Control-Allow-Headers`(ci"Content-Type", ci"SP-Anonymous"),
+        `Access-Control-Allow-Headers`(corsHeaders),
         `Access-Control-Max-Age`.Cache(config.cors.accessControlMaxAge.toSeconds).asInstanceOf[`Access-Control-Max-Age`]
       )
     )

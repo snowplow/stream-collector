@@ -415,7 +415,7 @@ class ServiceSpec extends Specification {
         val expected = Headers(
           Header.Raw(ci"Access-Control-Allow-Origin", "*"),
           `Access-Control-Allow-Credentials`(),
-          `Access-Control-Allow-Headers`(ci"Content-Type", ci"SP-Anonymous"),
+          `Access-Control-Allow-Headers`(ci"Content-Type", ci"SP-Anonymous", ci"X-Howdy"),
           `Access-Control-Max-Age`.Cache(3600).asInstanceOf[`Access-Control-Max-Age`]
         )
         service.preflightResponse(Request[IO]()).unsafeRunSync().headers shouldEqual expected

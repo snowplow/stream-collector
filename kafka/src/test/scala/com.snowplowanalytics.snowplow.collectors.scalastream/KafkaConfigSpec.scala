@@ -101,7 +101,7 @@ object KafkaConfigSpec {
       headers    = Map.empty[String, String],
       body       = ""
     ),
-    cors = Config.CORS(1.hour),
+    cors = Config.CORS(1.hour, List("X-Example")),
     monitoring = Config.Monitoring(
       Config.Metrics(
         Config.Statsd(false, "localhost", 8125, 10.seconds, "snowplow.collector", Map.empty)
