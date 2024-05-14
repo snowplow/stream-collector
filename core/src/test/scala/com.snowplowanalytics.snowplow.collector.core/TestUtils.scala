@@ -74,7 +74,7 @@ object TestUtils {
       Map.empty[String, String],
       ""
     ),
-    cors = CORS(60.minutes),
+    cors = CORS(60.minutes, List("X-Howdy")),
     streams = Streams(
       good = SinkConfig(
         name = "raw",
