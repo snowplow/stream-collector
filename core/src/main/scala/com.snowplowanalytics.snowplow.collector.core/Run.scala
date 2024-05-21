@@ -23,6 +23,8 @@ import cats.data.EitherT
 import cats.effect.{Async, ExitCode, Sync}
 import cats.effect.kernel.Resource
 
+import fs2.io.net.Network
+
 import org.http4s.blaze.client.BlazeClientBuilder
 
 import com.monovore.decline.Opts
@@ -41,7 +43,7 @@ object Run {
 
   implicit private def logger[F[_]: Sync]: Logger[F] = Slf4jLogger.getLogger[F]
 
-  def fromCli[F[_]: Async: Tracking, SinkConfig: Decoder](
+  def fromCli[F[_]: Async: Network: Tracking, SinkConfig: Decoder](
     appInfo: AppInfo,
     mkSinks: MkSinks[F, SinkConfig],
     telemetryInfo: TelemetryInfo[F, SinkConfig]
@@ -50,7 +52,7 @@ object Run {
     configPath.map(fromPath[F, SinkConfig](appInfo, mkSinks, telemetryInfo, _))
   }
 
-  private def fromPath[F[_]: Async: Tracking, SinkConfig: Decoder](
+  private def fromPath[F[_]: Async: Network: Tracking, SinkConfig: Decoder](
     appInfo: AppInfo,
     mkSinks: MkSinks[F, SinkConfig],
     telemetryInfo: TelemetryInfo[F, SinkConfig],
@@ -80,7 +82,7 @@ object Run {
         )
     }
 
-  private def fromConfig[F[_]: Async: Tracking, SinkConfig](
+  private def fromConfig[F[_]: Async: Network:  Tracking, SinkConfig](
     appInfo: AppInfo,
     mkSinks: MkSinks[F, SinkConfig],
     telemetryInfo: TelemetryInfo[F, SinkConfig],
@@ -102,6 +104,7 @@ object Run {
           collectorService
         ).value,
         if (config.ssl.enable) config.ssl.port else config.port,
+        config.experimental.backend,
         config.ssl.enable,
         config.hsts,
         config.networking,

@@ -54,6 +54,7 @@ object Dependencies {
     val collectorPayload  = "com.snowplowanalytics" % "collector-payload-1"                    % V.collectorPayload
     val decline           = "com.monovore"          %% "decline-effect"                        % V.decline
     val emitterHttps      = "com.snowplowanalytics" %% "snowplow-scala-tracker-emitter-http4s" % V.tracker
+    val http4sEmber       = "org.http4s"            %% "http4s-ember-server"                   % V.http4s
     val http4sBlaze       = "org.http4s"            %% "http4s-blaze-server"                   % V.blaze
     val http4sClient      = "org.http4s"            %% "http4s-blaze-client"                   % V.blaze
     val http4sDsl         = "org.http4s"            %% "http4s-dsl"                            % V.http4s

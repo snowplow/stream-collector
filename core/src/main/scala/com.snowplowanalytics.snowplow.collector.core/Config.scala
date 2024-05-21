@@ -42,7 +42,8 @@ case class Config[+SinkConfig](
   redirectDomains: Set[String],
   preTerminationPeriod: FiniteDuration,
   license: Config.License,
-  debug: Config.Debug.Debug
+  debug: Config.Debug.Debug,
+  experimental: Config.Experimental
 )
 
 object Config {
@@ -175,6 +176,15 @@ object Config {
     case class Debug(http: Http)
   }
 
+  case class Experimental(backend: Experimental.Backend)
+  object Experimental {
+    sealed trait Backend
+    object Backend {
+      case object Blaze extends Backend
+      case object Ember extends Backend
+    }
+  }
+
   implicit def decoder[SinkConfig: Decoder]: Decoder[Config[SinkConfig]] = {
     implicit val license: Decoder[License] = {
       val truthy = Set("true", "yes", "on", "1")
@@ -211,6 +221,12 @@ object Config {
     implicit val debug            = deriveDecoder[Debug.Debug]
     implicit val sinkConfig       = newDecoder[SinkConfig].or(legacyDecoder[SinkConfig])
     implicit val streams          = deriveDecoder[Streams[SinkConfig]]
+    implicit val backend: Decoder[Experimental.Backend] = Decoder[String].emap {
+      case s if s.toLowerCase() == "blaze" => Right(Experimental.Backend.Blaze)
+      case s if s.toLowerCase() == "ember" => Right(Experimental.Backend.Ember)
+      case other                           => Left(s"Invalid backend $other")
+    }
+    implicit val experimental = deriveDecoder[Experimental]
 
     deriveDecoder[Config[SinkConfig]]
   }

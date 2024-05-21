@@ -17,6 +17,10 @@ import com.avast.datadog4s.extension.http4s.DatadogMetricsOps
 import com.avast.datadog4s.{StatsDMetricFactory, StatsDMetricFactoryConfig}
 import org.http4s.{HttpApp, HttpRoutes}
 import org.http4s.blaze.server.BlazeServerBuilder
+import org.http4s.ember.server._
+import com.comcast.ip4s._
+import fs2.io.net.Network
+import fs2.io.net.tls.TLSContext
 import org.http4s.headers.`Strict-Transport-Security`
 import org.http4s.server.Server
 import org.http4s.server.middleware.{HSTS, Logger => LoggerMiddleware, Metrics, Timeout}
@@ -31,9 +35,10 @@ object HttpServer {
 
   implicit private def logger[F[_]: Async]: Logger[F] = Slf4jLogger.getLogger[F]
 
-  def build[F[_]: Async](
+  def build[F[_]: Async: Network](
     routes: HttpRoutes[F],
     port: Int,
+    backend: Config.Experimental.Backend,
     secure: Boolean,
     hsts: Config.HSTS,
     networking: Config.Networking,
@@ -42,7 +47,7 @@ object HttpServer {
   ): Resource[F, Server] =
     for {
       withMetricsMiddleware <- createMetricsMiddleware(routes, metricsConfig)
-      server                <- buildBlazeServer[F](withMetricsMiddleware, port, secure, hsts, networking, debugHttp)
+      server                <- buildServer(backend)(withMetricsMiddleware, port, secure, hsts, networking, debugHttp)
     } yield server
 
   private def createMetricsMiddleware[F[_]: Async](
@@ -58,6 +63,17 @@ object HttpServer {
       Resource.pure(routes)
     }
 
+  private def buildServer[F[_]: Async: Network](backend: Config.Experimental.Backend)(
+    routes: HttpRoutes[F],
+    port: Int,
+    secure: Boolean,
+    hsts: Config.HSTS,
+    networking: Config.Networking,
+    debugHttp: Config.Debug.Http
+  ) = backend match {
+    case Config.Experimental.Backend.Ember => buildEmberServer(routes, port, secure, hsts, networking, debugHttp)
+    case Config.Experimental.Backend.Blaze => buildBlazeServer(routes, port, secure, hsts, networking, debugHttp)
+  }
   private def createStatsdConfig(metricsConfig: Config.Metrics): StatsDMetricFactoryConfig = {
     val server = InetSocketAddress.createUnresolved(metricsConfig.statsd.hostname, metricsConfig.statsd.port)
     val tags   = metricsConfig.statsd.tags.toVector.map { case (name, value) => Tag.of(name, value) }
@@ -105,6 +121,28 @@ object HttpServer {
         )
         .cond(secure, _.withSslContext(SSLContext.getDefault))
         .resource
+
+  private def buildEmberServer[F[_]: Async: Network](
+    routes: HttpRoutes[F],
+    port: Int,
+    secure: Boolean,
+    hsts: Config.HSTS,
+    networking: Config.Networking,
+    debugHttp: Config.Debug.Http
+  ): Resource[F, Server] =
+    Resource.eval(TLSContext.Builder.forAsync[F].system).flatMap { tls =>
+      Resource.eval(Logger[F].info("Building blaze server")) >>
+        EmberServerBuilder
+          .default[F]
+          .withHost(ipv4"0.0.0.0")
+          .withPort(Port.fromInt(port).getOrElse(port"9090"))
+          .withHttpApp(
+            loggerMiddleware(timeoutMiddleware(hstsMiddleware(hsts, routes.orNotFound), networking), debugHttp)
+          )
+          .withIdleTimeout(networking.idleTimeout)
+          .cond(secure, _.withTLS(tls))
+          .build
+    }
 
   implicit class ConditionalAction[A](item: A) {
     def cond(cond: Boolean, action: A => A): A =
