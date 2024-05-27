@@ -19,6 +19,7 @@ import org.http4s.{HttpApp, HttpRoutes}
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.netty.server.NettyServerBuilder
+import org.http4s.armeria.server.ArmeriaServerBuilder
 import com.comcast.ip4s._
 import fs2.io.net.Network
 import fs2.io.net.tls.TLSContext
@@ -31,6 +32,13 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import java.net.InetSocketAddress
 import javax.net.ssl.SSLContext
+import io.netty.handler.ssl.{ClientAuth, JdkSslContext}
+import io.netty.handler.ssl.IdentityCipherSuiteFilter
+import io.netty.handler.ssl.ApplicationProtocolConfig
+import java.util.Properties
+import javax.net.ssl.KeyManagerFactory
+import java.security.KeyStore
+import java.io.FileInputStream
 
 object HttpServer {
 
@@ -72,8 +80,10 @@ object HttpServer {
     networking: Config.Networking,
     debugHttp: Config.Debug.Http
   ) = backend match {
-    case Config.Experimental.Backend.Ember => buildEmberServer(routes, port, secure, hsts, networking, debugHttp)
-    case Config.Experimental.Backend.Blaze => buildBlazeServer(routes, port, secure, hsts, networking, debugHttp)
+    case Config.Experimental.Backend.Ember   => buildEmberServer(routes, port, secure, hsts, networking, debugHttp)
+    case Config.Experimental.Backend.Blaze   => buildBlazeServer(routes, port, secure, hsts, networking, debugHttp)
+    case Config.Experimental.Backend.Netty   => buildNettyServer(routes, port, secure, hsts, networking, debugHttp)
+    case Config.Experimental.Backend.Armeria => buildArmeriaServer(routes, port, secure, hsts, networking, debugHttp)
   }
   private def createStatsdConfig(metricsConfig: Config.Metrics): StatsDMetricFactoryConfig = {
     val server = InetSocketAddress.createUnresolved(metricsConfig.statsd.hostname, metricsConfig.statsd.port)
@@ -107,7 +117,7 @@ object HttpServer {
     networking: Config.Networking,
     debugHttp: Config.Debug.Http
   ): Resource[F, Server] =
-    Resource.eval(Logger[F].info("Building blaze server")) >>
+    Resource.eval(Logger[F].info("Building Blaze server")) >>
       BlazeServerBuilder[F]
         .bindSocketAddress(new InetSocketAddress(port))
         .withHttpApp(
@@ -132,7 +142,7 @@ object HttpServer {
     debugHttp: Config.Debug.Http
   ): Resource[F, Server] =
     Resource.eval(TLSContext.Builder.forAsync[F].system).flatMap { tls =>
-      Resource.eval(Logger[F].info("Building blaze server")) >>
+      Resource.eval(Logger[F].info("Building Ember server")) >>
         EmberServerBuilder
           .default[F]
           .withHost(ipv4"0.0.0.0")
@@ -140,12 +150,14 @@ object HttpServer {
           .withHttpApp(
             loggerMiddleware(timeoutMiddleware(hstsMiddleware(hsts, routes.orNotFound), networking), debugHttp)
           )
+          .withMaxConnections(networking.maxConnections)
+          .withMaxHeaderSize(networking.maxHeadersLength)
           .withIdleTimeout(networking.idleTimeout)
           .cond(secure, _.withTLS(tls))
           .build
     }
 
-  private def buildNettyServer[F[_]: Async: Network](
+  private def buildNettyServer[F[_]: Async](
     routes: HttpRoutes[F],
     port: Int,
     secure: Boolean,
@@ -153,18 +165,85 @@ object HttpServer {
     networking: Config.Networking,
     debugHttp: Config.Debug.Http
   ): Resource[F, Server] =
-    Resource.eval(TLSContext.Builder.forAsync[F].system).flatMap { tls =>
-      Resource.eval(Logger[F].info("Building netty server")) >>
-        NettyServerBuilder[F]
-          .bindHttp(port)
-          .withHttpApp(
-            loggerMiddleware(timeoutMiddleware(hstsMiddleware(hsts, routes.orNotFound), networking), debugHttp)
-          )
+    Resource.eval(Logger[F].info(s"Building Netty server")) >>
+      NettyServerBuilder[F]
+        .bindHttp(port, "0.0.0.0")
+        .withHttpApp(
+          loggerMiddleware(timeoutMiddleware(hstsMiddleware(hsts, routes.orNotFound), networking), debugHttp)
+        )
         .withIdleTimeout(networking.idleTimeout)
         .withMaxInitialLineLength(networking.maxRequestLineLength)
-        .cond(secure, _.withSslContext(SSLContext.getDefault))
-        .build
+        .withMaxHeaderSize(networking.maxHeadersLength)
+        .cond(
+          secure,
+          _.withSslContext(
+            sslContext = new JdkSslContext(
+              SSLContext.getDefault,
+              false,
+              null,
+              IdentityCipherSuiteFilter.INSTANCE_DEFAULTING_TO_SUPPORTED_CIPHERS,
+              ApplicationProtocolConfig.DISABLED,
+              ClientAuth.OPTIONAL,
+              null,
+              false
+            )
+          )
+        )
+        .resource
+
+  private def buildArmeriaServer[F[_]: Async](
+    routes: HttpRoutes[F],
+    port: Int,
+    secure: Boolean,
+    hsts: Config.HSTS,
+    networking: Config.Networking,
+    debugHttp: Config.Debug.Http
+  ): Resource[F, Server] = {
+    case class ArmeriaTlsConfig private (ksType: String, ksPath: String, ksPass: String)
+    object ArmeriaTlsConfig {
+      def from(
+        props: Properties
+      ): F[ArmeriaTlsConfig] =
+        (for {
+          t    <- Option(props.getProperty("javax.net.ssl.keyStoreType")).orElse(Some("PKCS12"))
+          cert <- Option(props.getProperty("javax.net.ssl.keyStore"))
+          pass <- Option(props.getProperty("javax.net.ssl.keyStorePassword"))
+        } yield Async[F].delay(ArmeriaTlsConfig(t, cert, pass))).getOrElse(
+          Async[F].raiseError(
+            new IllegalStateException(
+              "Invalid SSL configuration. Missing required JSSE options. See: https://docs.snowplow.io/docs/pipeline-components-and-applications/stream-collector/configure/#tls-port-binding-and-certificate-240"
+            )
+          )
+        )
     }
+
+    def mkTls(secure: Boolean): Resource[F, Option[KeyManagerFactory]] =
+      if (secure) {
+        for {
+          tlsConfig <- Resource.eval(ArmeriaTlsConfig.from(System.getProperties()))
+          kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm)
+          ks  = KeyStore.getInstance(tlsConfig.ksType)
+          _ <- Resource.eval(Async[F].delay(ks.load(new FileInputStream(tlsConfig.ksPath), tlsConfig.ksPass.toArray)))
+          _ <- Resource.eval(Async[F].delay(kmf.init(ks, tlsConfig.ksPass.toArray)))
+        } yield Some(kmf)
+      } else Resource.pure(None)
+
+    for {
+      _   <- Resource.eval(Logger[F].info(s"Building Armeria server"))
+      kmf <- mkTls(secure)
+      server <- ArmeriaServerBuilder[F]
+        .cond(!secure, _.withHttp(port))
+        .cond(secure, _.withHttps(port))
+        .withHttpApp(
+          "/",
+          loggerMiddleware(timeoutMiddleware(hstsMiddleware(hsts, routes.orNotFound), networking), debugHttp)
+        )
+        .cond(secure && kmf.isDefined, _.withTls(kmf.get))
+        .withIdleTimeout(networking.idleTimeout)
+        .withRequestTimeout(networking.responseHeaderTimeout)
+        .resource
+    } yield server
+  }
 
   implicit class ConditionalAction[A](item: A) {
     def cond(cond: Boolean, action: A => A): A =

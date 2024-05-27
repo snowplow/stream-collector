@@ -183,6 +183,7 @@ object Config {
       case object Blaze extends Backend
       case object Ember extends Backend
       case object Netty extends Backend
+      case object Armeria extends Backend
     }
   }
 
@@ -223,10 +224,11 @@ object Config {
     implicit val sinkConfig       = newDecoder[SinkConfig].or(legacyDecoder[SinkConfig])
     implicit val streams          = deriveDecoder[Streams[SinkConfig]]
     implicit val backend: Decoder[Experimental.Backend] = Decoder[String].emap {
-      case s if s.toLowerCase() == "blaze" => Right(Experimental.Backend.Blaze)
-      case s if s.toLowerCase() == "ember" => Right(Experimental.Backend.Ember)
-      case s if s.toLowerCase() == "netty" => Right(Experimental.Backend.Netty)
-      case other                           => Left(s"Invalid backend $other")
+      case s if s.toLowerCase() == "blaze"   => Right(Experimental.Backend.Blaze)
+      case s if s.toLowerCase() == "ember"   => Right(Experimental.Backend.Ember)
+      case s if s.toLowerCase() == "netty"   => Right(Experimental.Backend.Netty)
+      case s if s.toLowerCase() == "armeria" => Right(Experimental.Backend.Armeria)
+      case other                             => Left(s"Invalid backend $other")
     }
     implicit val experimental = deriveDecoder[Experimental]
 

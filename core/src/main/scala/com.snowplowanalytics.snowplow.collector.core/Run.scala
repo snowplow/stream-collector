@@ -82,7 +82,7 @@ object Run {
         )
     }
 
-  private def fromConfig[F[_]: Async: Network:  Tracking, SinkConfig](
+  private def fromConfig[F[_]: Async: Network: Tracking, SinkConfig](
     appInfo: AppInfo,
     mkSinks: MkSinks[F, SinkConfig],
     telemetryInfo: TelemetryInfo[F, SinkConfig],
