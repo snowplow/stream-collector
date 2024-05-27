@@ -24,6 +24,7 @@ object Dependencies {
     val decline          = "2.4.1"
     val fs2PubSub        = "0.22.0"
     val http4s           = "0.23.23"
+    val http4sNetty      = "0.5.16"
     val jackson          = "2.12.7" // force this version to mitigate security vulnerabilities
     val fs2Kafka         = "2.6.1"
     val log4cats         = "2.6.0"
@@ -54,6 +55,7 @@ object Dependencies {
     val collectorPayload  = "com.snowplowanalytics" % "collector-payload-1"                    % V.collectorPayload
     val decline           = "com.monovore"          %% "decline-effect"                        % V.decline
     val emitterHttps      = "com.snowplowanalytics" %% "snowplow-scala-tracker-emitter-http4s" % V.tracker
+    val http4sNetty       = "org.http4s"            %% "http4s-netty-server"                   % V.http4sNetty
     val http4sEmber       = "org.http4s"            %% "http4s-ember-server"                   % V.http4s
     val http4sBlaze       = "org.http4s"            %% "http4s-blaze-server"                   % V.blaze
     val http4sClient      = "org.http4s"            %% "http4s-blaze-client"                   % V.blaze

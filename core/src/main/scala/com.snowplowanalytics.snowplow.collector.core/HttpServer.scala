@@ -17,7 +17,8 @@ import com.avast.datadog4s.extension.http4s.DatadogMetricsOps
 import com.avast.datadog4s.{StatsDMetricFactory, StatsDMetricFactoryConfig}
 import org.http4s.{HttpApp, HttpRoutes}
 import org.http4s.blaze.server.BlazeServerBuilder
-import org.http4s.ember.server._
+import org.http4s.ember.server.EmberServerBuilder
+import org.http4s.netty.server.NettyServerBuilder
 import com.comcast.ip4s._
 import fs2.io.net.Network
 import fs2.io.net.tls.TLSContext
@@ -142,6 +143,27 @@ object HttpServer {
           .withIdleTimeout(networking.idleTimeout)
           .cond(secure, _.withTLS(tls))
           .build
+    }
+
+  private def buildNettyServer[F[_]: Async: Network](
+    routes: HttpRoutes[F],
+    port: Int,
+    secure: Boolean,
+    hsts: Config.HSTS,
+    networking: Config.Networking,
+    debugHttp: Config.Debug.Http
+  ): Resource[F, Server] =
+    Resource.eval(TLSContext.Builder.forAsync[F].system).flatMap { tls =>
+      Resource.eval(Logger[F].info("Building netty server")) >>
+        NettyServerBuilder[F]
+          .bindHttp(port)
+          .withHttpApp(
+            loggerMiddleware(timeoutMiddleware(hstsMiddleware(hsts, routes.orNotFound), networking), debugHttp)
+          )
+        .withIdleTimeout(networking.idleTimeout)
+        .withMaxInitialLineLength(networking.maxRequestLineLength)
+        .cond(secure, _.withSslContext(SSLContext.getDefault))
+        .build
     }
 
   implicit class ConditionalAction[A](item: A) {

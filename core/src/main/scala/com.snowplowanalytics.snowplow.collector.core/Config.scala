@@ -182,6 +182,7 @@ object Config {
     object Backend {
       case object Blaze extends Backend
       case object Ember extends Backend
+      case object Netty extends Backend
     }
   }
 
@@ -224,6 +225,7 @@ object Config {
     implicit val backend: Decoder[Experimental.Backend] = Decoder[String].emap {
       case s if s.toLowerCase() == "blaze" => Right(Experimental.Backend.Blaze)
       case s if s.toLowerCase() == "ember" => Right(Experimental.Backend.Ember)
+      case s if s.toLowerCase() == "netty" => Right(Experimental.Backend.Netty)
       case other                           => Left(s"Invalid backend $other")
     }
     implicit val experimental = deriveDecoder[Experimental]
