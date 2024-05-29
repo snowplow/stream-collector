@@ -183,7 +183,7 @@ collector {
     disable  = false
     interval = 1 second
     method = "POST"
-    url = "127.0.0.1"
+    url = "host.docker.internal"
     port = 9191
     secure = false
     userProvidedId = userProvidedIdValue

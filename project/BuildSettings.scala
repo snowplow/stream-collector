@@ -14,8 +14,6 @@ import com.typesafe.sbt.packager.docker.DockerPlugin.autoImport._
 import org.scalafmt.sbt.ScalafmtPlugin.autoImport._
 import sbt.Keys._
 import sbt._
-import sbtassembly.AssemblyPlugin.autoImport._
-import sbtassembly.MergeStrategy
 import sbtbuildinfo.BuildInfoPlugin.autoImport._
 import sbtdynver.DynVerPlugin.autoImport._
 
@@ -37,7 +35,7 @@ object BuildSettings {
     )
   )
 
-  lazy val coreHttp4sSettings = commonSettings ++ sbtAssemblySettings ++ Defaults.itSettings
+  lazy val coreHttp4sSettings = commonSettings ++ Defaults.itSettings
   
   lazy val kinesisSettings =
     commonSinkSettings ++ integrationTestSettings ++ Seq(
@@ -119,7 +117,6 @@ object BuildSettings {
   lazy val commonSinkSettings =
     commonSettings ++
       buildInfoSettings ++
-      sbtAssemblySettings ++
       formatting ++
       dynVerSettings ++
       addExampleConfToTestCp
@@ -134,31 +131,7 @@ object BuildSettings {
     ThisBuild / dynverVTagPrefix := false, // Otherwise git tags required to have v-prefix
     ThisBuild / dynverSeparator := "-" // to be compatible with docker
   )
-  
-  lazy val sbtAssemblySettings = Seq(
-    assembly / assemblyJarName := { s"${moduleName.value}-${version.value}.jar" },
-    assembly / assemblyMergeStrategy := {
-      // merge strategy for fixing netty conflict
-      case PathList("io", "netty", xs @ _*)                     => MergeStrategy.first
-      case x if x.contains("native/lib/libnetty-unix-common.a") => MergeStrategy.first
-      case fileName if fileName.toLowerCase == "reference.conf" => reverseConcat
-      case x if x.endsWith("io.netty.versions.properties")      => MergeStrategy.discard
-      case x if x.endsWith("module-info.class")                 => MergeStrategy.first
-      case x if x.endsWith("paginators-1.json")                 => MergeStrategy.first
-      case x if x.endsWith("service-2.json")                    => MergeStrategy.first
-      case x =>
-        val oldStrategy = (assembly / assemblyMergeStrategy).value
-        oldStrategy(x)
-    }
-  )
 
-  lazy val reverseConcat: MergeStrategy = new MergeStrategy {
-    val name = "reverseConcat"
-
-    def apply(tempDir: File, path: String, files: Seq[File]): Either[String, Seq[(File, String)]] =
-      MergeStrategy.concat(tempDir, path, files.reverse)
-  }
-  
   lazy val formatting = Seq(
     scalafmtConfig := file(".scalafmt.conf"),
     scalafmtOnCompile := true
