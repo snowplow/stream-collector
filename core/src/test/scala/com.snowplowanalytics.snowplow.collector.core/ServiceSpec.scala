@@ -535,15 +535,16 @@ class ServiceSpec extends Specification {
         res.headers shouldEqual testHeaders
       }
       "send back ok otherwise" in {
+        val headers = testHeaders.put(`Content-Type`(MediaType.text.plain))
         val res = service.buildHttpResponse(
           queryParams   = Map.empty,
-          headers       = testHeaders,
+          headers       = headers,
           redirect      = false,
           pixelExpected = false,
           shouldBounce  = false
         )
         res.status shouldEqual Status.Ok
-        res.headers shouldEqual testHeaders
+        res.headers shouldEqual headers
         res.bodyText.compile.toList.unsafeRunSync() shouldEqual List("ok")
       }
     }
@@ -560,13 +561,14 @@ class ServiceSpec extends Specification {
         res.body.compile.toList.unsafeRunSync().toArray shouldEqual Service.pixel
       }
       "send back ok otherwise" in {
+        val headers = testHeaders.put(`Content-Type`(MediaType.text.plain))
         val res = service.buildUsualHttpResponse(
-          headers       = testHeaders,
+          headers       = headers,
           pixelExpected = false,
           shouldBounce  = false
         )
         res.status shouldEqual Status.Ok
-        res.headers shouldEqual testHeaders
+        res.headers shouldEqual headers
         res.bodyText.compile.toList.unsafeRunSync() shouldEqual List("ok")
       }
     }

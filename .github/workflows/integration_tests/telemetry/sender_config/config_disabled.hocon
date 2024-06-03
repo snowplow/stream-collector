@@ -183,7 +183,7 @@ collector {
     disable  = true
     interval = "1 second"
     method = "POST"
-    url = "127.0.0.1"
+    url = "host.docker.internal"
     port = 9191
     userProvidedId = Disabled
     moduleName = Disabled

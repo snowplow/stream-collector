@@ -179,6 +179,7 @@ object KafkaConfigSpec {
     license = Config.License(accept = true),
     debug = Config
       .Debug
-      .Debug(Config.Debug.Http(enable = false, logHeaders = true, logBody = false, redactHeaders = List.empty))
+      .Debug(Config.Debug.Http(enable = false, logHeaders = true, logBody = false, redactHeaders = List.empty)),
+    experimental = Config.Experimental(backend = Config.Experimental.Backend.Blaze)
   )
 }

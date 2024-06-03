@@ -20,6 +20,9 @@ lazy val core = project
     libraryDependencies ++= Seq(
       Dependencies.Libraries.http4sDsl,
       Dependencies.Libraries.http4sBlaze,
+      Dependencies.Libraries.http4sEmber,
+      Dependencies.Libraries.http4sNetty,
+      Dependencies.Libraries.http4sArmeria,
       Dependencies.Libraries.http4sClient,
       Dependencies.Libraries.log4cats,
       Dependencies.Libraries.thrift,

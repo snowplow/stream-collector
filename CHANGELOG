@@ -1,3 +1,12 @@
+Release 3.3.0 (2024-06-03)
++--------------------------
+Return Content-Type for POST requests (#422)
+Experimental: Adds Ameria backend (#424)
+Experimental: Add netty backend (#424)
+Experimental: Add option to select http4s backend (#424)
+Bump sbt-snowplow-release to 0.3.2
+Remove fatjar distribution
+
 Release 3.2.0 (2024-03-11)
 +--------------------------
 Bump transitive jnr-posix to 3.1.8 (#419)

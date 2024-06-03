@@ -18,8 +18,7 @@ jobs:
           python-version: '3.8'
       - name: build
         run: |
-          sbt "project stdout" assembly
-          find $(pwd) -name "*.jar"
+          sbt stdout/docker:publishLocal
       - name: run micro
         run: >
           docker run -d
@@ -29,13 +28,11 @@ jobs:
           --collector-config /config/config.hocon
           --iglu /config/iglu.json
       - name: run collectors
-        run: |
-          java -jar $(pwd)/stdout/target/scala-*/*.jar --config $(pwd)/.github/workflows/integration_tests/telemetry/sender_config/config.hocon &
-          PID_C1=$!
-          java -jar $(pwd)/stdout/target/scala-*/*.jar --config $(pwd)/.github/workflows/integration_tests/telemetry/sender_config/config_disabled.hocon &
-          PID_C2=$!
-          sleep 30
-          kill $PID_C1 $PID_C2
+        run: >-
+          docker run -d --name enabled --add-host=host.docker.internal:host-gateway -v ${PWD}/.github/workflows/integration_tests/telemetry/sender_config/config.hocon:/snowplow/config.hocon -p 9292:9292 snowplow/scala-stream-collector-stdout --config /snowplow/config.hocon;
+          docker run -d --name disabled --add-host=host.docker.internal:host-gateway -v ${PWD}/.github/workflows/integration_tests/telemetry/sender_config/config_disabled.hocon:/snowplow/config.hocon -p 10292:10292 snowplow/scala-stream-collector-stdout --config /snowplow/config.hocon;
+          sleep 30;
+          docker kill enabled && docker kill disabled
       - name: assess result
         run: |
           pip install requests

@@ -261,7 +261,7 @@ class Service[F[_]: Sync](
       case _ =>
         Response[F](
           status  = Ok,
-          headers = headers,
+          headers = headers.put(`Content-Type`(MediaType.text.plain)),
           body    = Stream.emit("ok").through(fs2.text.utf8.encode)
         )
     }
