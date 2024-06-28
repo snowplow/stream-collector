@@ -176,7 +176,7 @@ object Config {
     case class Debug(http: Http)
   }
 
-  case class Experimental(backend: Experimental.Backend)
+  case class Experimental(backend: Experimental.Backend, warmup: Experimental.Warmup)
   object Experimental {
     sealed trait Backend
     object Backend {
@@ -185,6 +185,7 @@ object Config {
       case object Netty extends Backend
       case object Armeria extends Backend
     }
+    case class Warmup(enable: Boolean, numRequests: Int, maxCycles: Long)
   }
 
   implicit def decoder[SinkConfig: Decoder]: Decoder[Config[SinkConfig]] = {
@@ -206,23 +207,24 @@ object Config {
         case Left(err) => Left(err)
       }
     }
-    implicit val cookie           = deriveDecoder[Cookie]
-    implicit val doNotTrackCookie = deriveDecoder[DoNotTrackCookie]
-    implicit val cookieBounce     = deriveDecoder[CookieBounce]
-    implicit val redirectMacro    = deriveDecoder[RedirectMacro]
-    implicit val rootResponse     = deriveDecoder[RootResponse]
-    implicit val cors             = deriveDecoder[CORS]
-    implicit val statsd           = deriveDecoder[Statsd]
-    implicit val metrics          = deriveDecoder[Metrics]
-    implicit val monitoring       = deriveDecoder[Monitoring]
-    implicit val ssl              = deriveDecoder[SSL]
-    implicit val hsts             = deriveDecoder[HSTS]
-    implicit val telemetry        = deriveDecoder[Telemetry]
-    implicit val networking       = deriveDecoder[Networking]
-    implicit val http             = deriveDecoder[Debug.Http]
-    implicit val debug            = deriveDecoder[Debug.Debug]
-    implicit val sinkConfig       = newDecoder[SinkConfig].or(legacyDecoder[SinkConfig])
-    implicit val streams          = deriveDecoder[Streams[SinkConfig]]
+    implicit val cookie                               = deriveDecoder[Cookie]
+    implicit val doNotTrackCookie                     = deriveDecoder[DoNotTrackCookie]
+    implicit val cookieBounce                         = deriveDecoder[CookieBounce]
+    implicit val redirectMacro                        = deriveDecoder[RedirectMacro]
+    implicit val rootResponse                         = deriveDecoder[RootResponse]
+    implicit val cors                                 = deriveDecoder[CORS]
+    implicit val statsd                               = deriveDecoder[Statsd]
+    implicit val metrics                              = deriveDecoder[Metrics]
+    implicit val monitoring                           = deriveDecoder[Monitoring]
+    implicit val ssl                                  = deriveDecoder[SSL]
+    implicit val hsts                                 = deriveDecoder[HSTS]
+    implicit val telemetry                            = deriveDecoder[Telemetry]
+    implicit val networking                           = deriveDecoder[Networking]
+    implicit val http                                 = deriveDecoder[Debug.Http]
+    implicit val debug                                = deriveDecoder[Debug.Debug]
+    implicit val sinkConfig                           = newDecoder[SinkConfig].or(legacyDecoder[SinkConfig])
+    implicit val streams                              = deriveDecoder[Streams[SinkConfig]]
+    implicit val warmup: Decoder[Experimental.Warmup] = deriveDecoder[Experimental.Warmup]
     implicit val backend: Decoder[Experimental.Backend] = Decoder[String].emap {
       case s if s.toLowerCase() == "blaze"   => Right(Experimental.Backend.Blaze)
       case s if s.toLowerCase() == "ember"   => Right(Experimental.Backend.Ember)
