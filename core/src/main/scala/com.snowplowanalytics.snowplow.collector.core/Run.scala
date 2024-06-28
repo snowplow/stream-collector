@@ -15,7 +15,7 @@ import java.nio.file.Path
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
 
 import cats.implicits._
 import cats.data.EitherT
@@ -23,6 +23,7 @@ import cats.data.EitherT
 import cats.effect.{Async, ExitCode, Sync}
 import cats.effect.kernel.Resource
 
+import fs2.Stream
 import fs2.io.net.Network
 
 import org.http4s.blaze.client.BlazeClientBuilder
@@ -117,11 +118,37 @@ object Run {
 
     resources.use { httpClient =>
       val appId = java.util.UUID.randomUUID.toString
-      Telemetry
+      val warmup = if (config.experimental.warmup.enable) {
+        Stream
+          .emits(1 to config.experimental.warmup.numRequests)
+          .evalMap(_ =>
+            httpClient
+              .expect[String](
+                s"""${if (config.ssl.enable) "https" else "http"}://${config.interface}:${if (config.ssl.enable)
+                  config.ssl.port
+                else config.port}/health"""
+              )
+              .recover { case _ => "error" }
+          )
+          .fold((0, 0))((acc, cur) => if (cur == "error") (acc._1 + 1, acc._2) else (acc._1, acc._2 + 1))
+          .evalTap(status =>
+            Logger[F].info(s"Warmup pass complete. Successful requests: ${status._2}, failures: ${status._1}")
+          )
+          .repeatN(config.experimental.warmup.maxCycles)
+          .fold((0, 0))((acc, cur) => (acc._1 + acc._2, cur._1 + cur._2))
+          .onComplete(Stream.eval(Logger[F].info("Warmup completed.")))
+          .compile
+          .drain
+
+      } else {
+        Sync[F].unit
+      }
+      warmup *> Telemetry
         .run(config.telemetry, httpClient, appInfo, appId, telemetryInfo(config.streams))
         .compile
         .drain
         .flatMap(_ => Async[F].never[ExitCode])
+
     }
   }
 
