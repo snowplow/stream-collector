@@ -35,6 +35,9 @@ import io.circe.Decoder
 import com.snowplowanalytics.snowplow.scalatracker.Tracking
 
 import com.snowplowanalytics.snowplow.collector.core.model.Sinks
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
+import javax.net.ssl.{SSLContext, X509TrustManager}
 
 object Run {
 
@@ -112,8 +115,18 @@ object Run {
         config.monitoring.metrics,
         config.debug.http
       )
-      _          <- withGracefulShutdown(config.preTerminationPeriod)(httpServer)
-      httpClient <- BlazeClientBuilder[F].resource
+      _ <- withGracefulShutdown(config.preTerminationPeriod)(httpServer)
+      trustingCtx: SSLContext = {
+        val trustManager = new X509TrustManager {
+          def getAcceptedIssuers(): Array[X509Certificate]                              = Array.empty
+          def checkClientTrusted(certs: Array[X509Certificate], authType: String): Unit = {}
+          def checkServerTrusted(certs: Array[X509Certificate], authType: String): Unit = {}
+        }
+        val sslContext = SSLContext.getInstance("TLS")
+        sslContext.init(null, Array(trustManager), new SecureRandom)
+        sslContext
+      }
+      httpClient <- BlazeClientBuilder[F].withSslContext(trustingCtx).withCheckEndpointAuthentication(false).resource
     } yield httpClient
 
     resources.use { httpClient =>
@@ -121,7 +134,7 @@ object Run {
       val warmup = if (config.experimental.warmup.enable) {
         Stream
           .emits(1 to config.experimental.warmup.numRequests)
-          .evalMap(_ =>
+          .evalMap { _ =>
             httpClient
               .expect[String](
                 s"""${if (config.ssl.enable) "https" else "http"}://${config.interface}:${if (config.ssl.enable)
@@ -129,7 +142,7 @@ object Run {
                 else config.port}/health"""
               )
               .recover { case _ => "error" }
-          )
+          }
           .fold((0, 0))((acc, cur) => if (cur == "error") (acc._1 + 1, acc._2) else (acc._1, acc._2 + 1))
           .evalTap(status =>
             Logger[F].info(s"Warmup pass complete. Successful requests: ${status._2}, failures: ${status._1}")
