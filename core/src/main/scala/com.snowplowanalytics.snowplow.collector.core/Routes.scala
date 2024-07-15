@@ -28,9 +28,10 @@ class Routes[F[_]: Async](
 
   implicit val dns: Dns[F] = Dns.forSync[F]
 
-  private val healthRoutes = HttpRoutes.of[F] {
+  private val healthRoutes = HttpRoutes.strict[F] {
     case GET -> Root / "health" =>
       Ok("ok")
+  } <+> HttpRoutes.of[F] {
     case GET -> Root / "sink-health" =>
       service
         .sinksHealthy
