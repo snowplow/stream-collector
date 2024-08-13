@@ -28,20 +28,6 @@ class Routes[F[_]: Async](
 
   implicit val dns: Dns[F] = Dns.forSync[F]
 
-  private val healthRoutes = HttpRoutes.of[F] {
-    case GET -> Root / "health" =>
-      Ok("ok")
-    case GET -> Root / "sink-health" =>
-      service
-        .sinksHealthy
-        .ifM(
-          ifTrue  = Ok("ok"),
-          ifFalse = ServiceUnavailable("Service Unavailable")
-        )
-    case GET -> Root / "robots.txt" =>
-      Ok("User-agent: *\nDisallow: /\n\nUser-agent: Googlebot\nDisallow: /\n\nUser-agent: AdsBot-Google\nDisallow: /")
-  }
-
   private val corsRoute = HttpRoutes.of[F] {
     case req @ OPTIONS -> _ =>
       service.preflightResponse(req)
@@ -93,8 +79,22 @@ class Routes[F[_]: Async](
       service.crossdomainResponse
   }
 
+  val health = HttpRoutes.of[F] {
+    case GET -> Root / "health" =>
+      Ok("ok")
+    case GET -> Root / "sink-health" =>
+      service
+        .sinksHealthy
+        .ifM(
+          ifTrue  = Ok("ok"),
+          ifFalse = ServiceUnavailable("Service Unavailable")
+        )
+    case GET -> Root / "robots.txt" =>
+      Ok("User-agent: *\nDisallow: /\n\nUser-agent: Googlebot\nDisallow: /\n\nUser-agent: AdsBot-Google\nDisallow: /")
+  }
+
   val value: HttpRoutes[F] = {
-    val routes = healthRoutes <+> corsRoute <+> cookieRoutes <+> rootRoute <+> crossdomainRoute
+    val routes = corsRoute <+> cookieRoutes <+> rootRoute <+> crossdomainRoute
     if (enableDefaultRedirect) routes else rejectRedirect <+> routes
   }
 }

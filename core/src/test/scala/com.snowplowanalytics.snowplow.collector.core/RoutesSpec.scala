@@ -5,6 +5,7 @@ import cats.data.NonEmptyList
 import scala.collection.mutable.ListBuffer
 import org.specs2.mutable.Specification
 import cats.effect.IO
+import cats.syntax.all._
 import cats.effect.unsafe.implicits.global
 import org.http4s.implicits._
 import org.http4s._
@@ -74,9 +75,7 @@ class RoutesSpec extends Specification {
     val service = new TestService()
     val routes =
       new Routes(enabledDefaultRedirect, enableRootResponse, enableCrossdomainTracking, 500.millis, service)
-        .value
-        .orNotFound
-    val routesWithHsts = HttpServer.hstsMiddleware(Config.HSTS(enableHsts, 180.days), routes)
+    val routesWithHsts = HttpServer.hstsApp(Config.HSTS(enableHsts, 180.days), (routes.value <+> routes.health))
     (service, routesWithHsts)
   }
 
