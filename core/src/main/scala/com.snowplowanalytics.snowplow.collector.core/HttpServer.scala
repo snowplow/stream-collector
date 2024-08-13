@@ -33,6 +33,7 @@ object HttpServer {
 
   def build[F[_]: Async](
     routes: HttpRoutes[F],
+    healthRoutes: HttpRoutes[F],
     port: Int,
     secure: Boolean,
     hsts: Config.HSTS,
@@ -42,7 +43,7 @@ object HttpServer {
   ): Resource[F, Server] =
     for {
       withMetricsMiddleware <- createMetricsMiddleware(routes, metricsConfig)
-      server                <- buildBlazeServer[F](withMetricsMiddleware, port, secure, hsts, networking, debugHttp)
+      server                <- buildBlazeServer[F](withMetricsMiddleware, healthRoutes, port, secure, hsts, networking, debugHttp)
     } yield server
 
   private def createMetricsMiddleware[F[_]: Async](
@@ -64,14 +65,14 @@ object HttpServer {
     StatsDMetricFactoryConfig(Some(metricsConfig.statsd.prefix), server, defaultTags = tags)
   }
 
-  private[core] def hstsMiddleware[F[_]: Async](hsts: Config.HSTS, routes: HttpApp[F]): HttpApp[F] =
+  private[core] def hstsApp[F[_]: Async](hsts: Config.HSTS, routes: HttpRoutes[F]): HttpApp[F] =
     if (hsts.enable)
-      HSTS(routes, `Strict-Transport-Security`.unsafeFromDuration(hsts.maxAge))
-    else routes
+      HSTS(routes.orNotFound, `Strict-Transport-Security`.unsafeFromDuration(hsts.maxAge))
+    else routes.orNotFound
 
-  private def loggerMiddleware[F[_]: Async](routes: HttpApp[F], config: Config.Debug.Http): HttpApp[F] =
+  private def loggerMiddleware[F[_]: Async](routes: HttpRoutes[F], config: Config.Debug.Http): HttpRoutes[F] =
     if (config.enable) {
-      LoggerMiddleware.httpApp[F](
+      LoggerMiddleware.httpRoutes[F](
         logHeaders        = config.logHeaders,
         logBody           = config.logBody,
         redactHeadersWhen = config.redactHeaders.map(CIString(_)).contains(_),
@@ -79,11 +80,12 @@ object HttpServer {
       )(routes)
     } else routes
 
-  private def timeoutMiddleware[F[_]: Async](routes: HttpApp[F], networking: Config.Networking): HttpApp[F] =
-    Timeout.httpApp[F](timeout = networking.responseHeaderTimeout)(routes)
+  private def timeoutMiddleware[F[_]: Async](routes: HttpRoutes[F], networking: Config.Networking): HttpRoutes[F] =
+    Timeout.httpRoutes[F](timeout = networking.responseHeaderTimeout)(routes)
 
   private def buildBlazeServer[F[_]: Async](
     routes: HttpRoutes[F],
+    healthRoutes: HttpRoutes[F],
     port: Int,
     secure: Boolean,
     hsts: Config.HSTS,
@@ -94,7 +96,10 @@ object HttpServer {
       BlazeServerBuilder[F]
         .bindSocketAddress(new InetSocketAddress(port))
         .withHttpApp(
-          loggerMiddleware(timeoutMiddleware(hstsMiddleware(hsts, routes.orNotFound), networking), debugHttp)
+          hstsApp(
+            hsts,
+            loggerMiddleware(timeoutMiddleware(routes, networking) <+> healthRoutes, debugHttp)
+          )
         )
         .withIdleTimeout(networking.idleTimeout)
         .withMaxConnections(networking.maxConnections)
