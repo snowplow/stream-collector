@@ -93,13 +93,15 @@ object Run {
         Sinks(sinks.good, sinks.bad),
         appInfo
       )
+      routes = new Routes[F](
+        config.enableDefaultRedirect,
+        config.rootResponse.enabled,
+        config.crossDomain.enabled,
+        collectorService
+      )
       httpServer = HttpServer.build[F](
-        new Routes[F](
-          config.enableDefaultRedirect,
-          config.rootResponse.enabled,
-          config.crossDomain.enabled,
-          collectorService
-        ).value,
+        routes.value,
+        routes.health,
         if (config.ssl.enable) config.ssl.port else config.port,
         config.ssl.enable,
         config.hsts,
