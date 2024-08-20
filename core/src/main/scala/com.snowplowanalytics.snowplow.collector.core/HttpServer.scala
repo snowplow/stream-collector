@@ -19,7 +19,7 @@ import org.http4s.{HttpApp, HttpRoutes}
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.headers.`Strict-Transport-Security`
 import org.http4s.server.Server
-import org.http4s.server.middleware.{HSTS, Metrics, Timeout}
+import org.http4s.server.middleware.{EntityLimiter, HSTS, Metrics, Timeout}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
@@ -76,7 +76,7 @@ object HttpServer {
     networking: Config.Networking
   ): HttpApp[F] = hstsApp(
     hsts,
-    timeoutMiddleware(routes, networking) <+> healthRoutes
+    timeoutMiddleware(entityLimiter(routes, networking.dropPayloadSize), networking) <+> healthRoutes
   )
 
   private def createMetricsMiddleware[F[_]: Async](
@@ -102,6 +102,12 @@ object HttpServer {
     if (hsts.enable)
       HSTS(routes.orNotFound, `Strict-Transport-Security`.unsafeFromDuration(hsts.maxAge))
     else routes.orNotFound
+
+  private def entityLimiter[F[_]: Async](routes: HttpRoutes[F], dropPayloadSize: Long): HttpRoutes[F] =
+    EntityLimiter.httpRoutes[F](routes, dropPayloadSize).recover {
+      case _: EntityLimiter.EntityTooLarge =>
+        Response[F](Status.PayloadTooLarge)
+    }
 
   private def timeoutMiddleware[F[_]: Async](routes: HttpRoutes[F], networking: Config.Networking): HttpRoutes[F] =
     Timeout.httpRoutes[F](timeout = networking.responseHeaderTimeout)(routes).map {

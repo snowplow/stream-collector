@@ -161,7 +161,9 @@ object Config {
     idleTimeout: FiniteDuration,
     responseHeaderTimeout: FiniteDuration,
     maxRequestLineLength: Int,
-    maxHeadersLength: Int
+    maxHeadersLength: Int,
+    maxPayloadSize: Long,
+    dropPayloadSize: Long
   )
 
   case class License(

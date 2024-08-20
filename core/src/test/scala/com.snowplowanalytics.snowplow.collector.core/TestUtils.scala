@@ -122,7 +122,9 @@ object TestUtils {
       610.seconds,
       30.seconds,
       20480,
-      40960
+      40960,
+      1048576,
+      2097152
     ),
     enableDefaultRedirect = false,
     redirectDomains       = Set.empty[String],

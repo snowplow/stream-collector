@@ -77,32 +77,45 @@ case class SplitBatch(appInfo: AppInfo) {
     * @param event Incoming CollectorPayload
     * @return a List of Good and Bad events
     */
-  def splitAndSerializePayload(event: CollectorPayload, maxBytes: Int): EventSerializeResult = {
+  def splitAndSerializePayload(payload: CollectorPayload, maxBytes: Int, maxPayloadSize: Long): EventSerializeResult = {
     val serializer           = ThriftSerializer.get()
-    val everythingSerialized = serializer.serialize(event)
-    val wholeEventBytes      = getSize(everythingSerialized)
+    val everythingSerialized = serializer.serialize(payload)
+    val wholePayloadBytes    = getSize(everythingSerialized)
 
     // If the event is below the size limit, no splitting is necessary
-    if (wholeEventBytes < maxBytes) {
+    if (wholePayloadBytes < maxBytes) {
       EventSerializeResult(List(everythingSerialized), Nil)
+      // If the event is above max payload size it is turned into SizeViolation
+    } else if (wholePayloadBytes > maxPayloadSize) {
+      EventSerializeResult(
+        Nil,
+        List(
+          oversizedPayload(
+            payload,
+            wholePayloadBytes,
+            maxPayloadSize.toInt,
+            s"Payload exceeds max size of $maxPayloadSize. Actual length: $wholePayloadBytes"
+          )
+        )
+      )
     } else {
       (for {
-        body     <- Option(event.getBody).toRight("GET requests cannot be split")
+        body     <- Option(payload.getBody).toRight("GET requests cannot be split")
         children <- splitBody(body)
         initialBodyDataBytes = getSize(Json.arr(children._2: _*).noSpaces)
         _ <- Either.cond[String, Unit](
-          wholeEventBytes - initialBodyDataBytes < maxBytes,
+          wholePayloadBytes - initialBodyDataBytes < maxBytes,
           (),
           "cannot split this POST request because event without \"data\" field is still too big"
         )
-        splitted       = split(children._2, maxBytes - wholeEventBytes + initialBodyDataBytes)
-        goodSerialized = serializeBatch(serializer, event, splitted.goodBatches, children._1)
+        splitted       = split(children._2, maxBytes - wholePayloadBytes + initialBodyDataBytes)
+        goodSerialized = serializeBatch(serializer, payload, splitted.goodBatches, children._1)
         badList = splitted.failedBigEvents.map { e =>
           val msg = "this POST request split is still too large"
-          oversizedPayload(event, getSize(e), maxBytes, msg)
+          oversizedPayload(payload, getSize(e), maxBytes, msg)
         }
       } yield EventSerializeResult(goodSerialized, badList)).fold({ msg =>
-        val tooBigPayload = oversizedPayload(event, wholeEventBytes, maxBytes, msg)
+        val tooBigPayload = oversizedPayload(payload, wholePayloadBytes, maxBytes, msg)
         EventSerializeResult(Nil, List(tooBigPayload))
       }, identity)
     }
