@@ -54,7 +54,7 @@ class SplitBatchSpec extends Specification {
 
   "SplitBatch.splitAndSerializePayload" should {
     "Serialize an empty CollectorPayload" in {
-      val actual = splitBatch.splitAndSerializePayload(new CollectorPayload(), 100)
+      val actual = splitBatch.splitAndSerializePayload(new CollectorPayload(), 100, 101L)
       val target = new CollectorPayload()
       new TDeserializer().deserialize(target, actual.good.head)
       target must_== new CollectorPayload()
@@ -63,7 +63,7 @@ class SplitBatchSpec extends Specification {
     "Reject an oversized GET CollectorPayload" in {
       val payload = new CollectorPayload()
       payload.setQuerystring("x" * 1000)
-      val actual   = splitBatch.splitAndSerializePayload(payload, 100)
+      val actual   = splitBatch.splitAndSerializePayload(payload, 100, 1020L)
       val res      = parse(new String(actual.bad.head)).toOption.get
       val selfDesc = SelfDescribingData.parse(res).toOption.get
       val badRow   = selfDesc.data.as[BadRow].toOption.get
@@ -77,10 +77,30 @@ class SplitBatchSpec extends Specification {
       actual.good must_== Nil
     }
 
+    "Reject an oversized POST CollectorPayload when exceeds max payload size" in {
+      val payload = new CollectorPayload()
+      payload.setBody("s" * 1010)
+      val actual   = splitBatch.splitAndSerializePayload(payload, 1000, 1000L)
+      val res      = parse(new String(actual.bad.head)).toOption.get
+      val selfDesc = SelfDescribingData.parse(res).toOption.get
+      val badRow   = selfDesc.data.as[BadRow].toOption.get
+      badRow must beAnInstanceOf[BadRow.SizeViolation]
+      val sizeViolation = badRow.asInstanceOf[BadRow.SizeViolation]
+      sizeViolation.failure.maximumAllowedSizeBytes must_== 1000
+      sizeViolation.failure.actualSizeBytes must_== 1029
+      sizeViolation
+        .failure
+        .expectation must_== "oversized collector payload: Payload exceeds max size of 1000. Actual length: 1029"
+      sizeViolation
+        .payload
+        .event must_== "CollectorPayload(schema:null, ipAddress:null, timestamp:0, encoding:null, collector:null, body:sssss"
+      sizeViolation.processor shouldEqual Processor(TestUtils.appName, TestUtils.appVersion)
+    }
+
     "Reject an oversized POST CollectorPayload with an unparseable body" in {
       val payload = new CollectorPayload()
       payload.setBody("s" * 1000)
-      val actual   = splitBatch.splitAndSerializePayload(payload, 100)
+      val actual   = splitBatch.splitAndSerializePayload(payload, 100, 1020L)
       val res      = parse(new String(actual.bad.head)).toOption.get
       val selfDesc = SelfDescribingData.parse(res).toOption.get
       val badRow   = selfDesc.data.as[BadRow].toOption.get
@@ -106,7 +126,7 @@ class SplitBatchSpec extends Specification {
       )
       payload.setBody(data.noSpaces)
       payload.setPath("p" * 1000)
-      val actual = splitBatch.splitAndSerializePayload(payload, 1000)
+      val actual = splitBatch.splitAndSerializePayload(payload, 1000, 2000L)
       actual.bad.size must_== 1
       val res      = parse(new String(actual.bad.head)).toOption.get
       val selfDesc = SelfDescribingData.parse(res).toOption.get
@@ -139,7 +159,7 @@ class SplitBatchSpec extends Specification {
         )
       )
       payload.setBody(data.noSpaces)
-      val actual = splitBatch.splitAndSerializePayload(payload, 1000)
+      val actual = splitBatch.splitAndSerializePayload(payload, 1000, 10000)
       actual.bad.size must_== 4
       actual.good.size must_== 2
     }
