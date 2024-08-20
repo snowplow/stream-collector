@@ -26,6 +26,8 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import java.net.InetSocketAddress
 import javax.net.ssl.SSLContext
+import org.http4s.Response
+import org.http4s.Status
 
 object HttpServer {
 
@@ -40,11 +42,45 @@ object HttpServer {
     networking: Config.Networking,
     metricsConfig: Config.Metrics,
     debugHttp: Config.Debug.Http
+  )(
+    mkServer: ((HttpApp[F], Int, Boolean, Config.Networking) => Resource[F, Server])
   ): Resource[F, Server] =
     for {
       withMetricsMiddleware <- createMetricsMiddleware(routes, metricsConfig)
-      server                <- buildBlazeServer[F](withMetricsMiddleware, healthRoutes, port, secure, hsts, networking, debugHttp)
+      httpApp               <- Resource.pure(httpApp(withMetricsMiddleware, healthRoutes, hsts, networking, debugHttp))
+      server                <- mkServer(httpApp, port, secure, networking)
     } yield server
+
+  def buildBlazeServer[F[_]: Async](
+    httpApp: HttpApp[F],
+    port: Int,
+    secure: Boolean,
+    networking: Config.Networking
+  ): Resource[F, Server] =
+    Resource.eval(Logger[F].info("Building blaze server")) >>
+      BlazeServerBuilder[F]
+        .bindSocketAddress(new InetSocketAddress(port))
+        .withHttpApp(httpApp)
+        .withIdleTimeout(networking.idleTimeout)
+        .withMaxConnections(networking.maxConnections)
+        .withResponseHeaderTimeout(networking.responseHeaderTimeout)
+        .withLengthLimits(
+          maxRequestLineLen = networking.maxRequestLineLength,
+          maxHeadersLen     = networking.maxHeadersLength
+        )
+        .cond(secure, _.withSslContext(SSLContext.getDefault))
+        .resource
+
+  def httpApp[F[_]: Async](
+    routes: HttpRoutes[F],
+    healthRoutes: HttpRoutes[F],
+    hsts: Config.HSTS,
+    networking: Config.Networking,
+    debugHttp: Config.Debug.Http
+  ): HttpApp[F] = hstsApp(
+    hsts,
+    loggerMiddleware(timeoutMiddleware(routes, networking) <+> healthRoutes, debugHttp)
+  )
 
   private def createMetricsMiddleware[F[_]: Async](
     routes: HttpRoutes[F],
@@ -81,36 +117,11 @@ object HttpServer {
     } else routes
 
   private def timeoutMiddleware[F[_]: Async](routes: HttpRoutes[F], networking: Config.Networking): HttpRoutes[F] =
-    Timeout.httpRoutes[F](timeout = networking.responseHeaderTimeout)(routes)
-
-  private def buildBlazeServer[F[_]: Async](
-    routes: HttpRoutes[F],
-    healthRoutes: HttpRoutes[F],
-    port: Int,
-    secure: Boolean,
-    hsts: Config.HSTS,
-    networking: Config.Networking,
-    debugHttp: Config.Debug.Http
-  ): Resource[F, Server] =
-    Resource.eval(Logger[F].info("Building blaze server")) >>
-      BlazeServerBuilder[F]
-        .bindSocketAddress(new InetSocketAddress(port))
-        .withHttpApp(
-          hstsApp(
-            hsts,
-            loggerMiddleware(timeoutMiddleware(routes, networking), debugHttp)
-              <+> loggerMiddleware(healthRoutes, debugHttp)
-          )
-        )
-        .withIdleTimeout(networking.idleTimeout)
-        .withMaxConnections(networking.maxConnections)
-        .withResponseHeaderTimeout(networking.responseHeaderTimeout)
-        .withLengthLimits(
-          maxRequestLineLen = networking.maxRequestLineLength,
-          maxHeadersLen     = networking.maxHeadersLength
-        )
-        .cond(secure, _.withSslContext(SSLContext.getDefault))
-        .resource
+    Timeout.httpRoutes[F](timeout = networking.responseHeaderTimeout)(routes).map {
+      case Response(Status.ServiceUnavailable, httpVersion, headers, body, attributes) =>
+        Response[F](Status.RequestTimeout, httpVersion, headers, body, attributes)
+      case response => response
+    }
 
   implicit class ConditionalAction[A](item: A) {
     def cond(cond: Boolean, action: A => A): A =
