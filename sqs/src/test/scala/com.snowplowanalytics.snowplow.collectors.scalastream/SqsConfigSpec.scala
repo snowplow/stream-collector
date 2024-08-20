@@ -115,7 +115,7 @@ object SqsConfigSpec {
     networking = Config.Networking(
       maxConnections        = 1024,
       idleTimeout           = 610.seconds,
-      responseHeaderTimeout = 5.seconds,
+      responseHeaderTimeout = 30.seconds,
       maxRequestLineLength  = 20480,
       maxHeadersLength      = 40960
     ),
