@@ -323,7 +323,9 @@ class Service[F[_]: Sync](
   ): F[Unit] =
     for {
       // Split events into Good and Bad
-      eventSplit <- Sync[F].delay(splitBatch.splitAndSerializePayload(event, sinks.good.maxBytes))
+      eventSplit <- Sync[F].delay(
+        splitBatch.splitAndSerializePayload(event, sinks.good.maxBytes, config.networking.maxPayloadSize)
+      )
       // Send events to respective sinks
       _ <- sinks.good.storeRawEvents(eventSplit.good, partitionKey)
       _ <- sinks.bad.storeRawEvents(eventSplit.bad, partitionKey)
