@@ -108,7 +108,7 @@ object Run {
         config.networking,
         config.monitoring.metrics,
         config.debug.http
-      )
+      )(HttpServer.buildBlazeServer)
       _          <- withGracefulShutdown(config.preTerminationPeriod)(httpServer)
       httpClient <- BlazeClientBuilder[F].resource
     } yield httpClient
