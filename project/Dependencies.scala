@@ -13,7 +13,7 @@ import sbt._
 object Dependencies {
 
   object V {
-    val awsSdk           = "1.12.327"
+    val awsSdk           = "1.12.769"
     val badRows          = "2.2.1"
     val blaze            = "0.23.15"
     val catsRetry        = "3.1.0"
