@@ -41,7 +41,7 @@ object Dependencies {
     val tracker          = "2.0.0"
     val dataDog4s        = "0.32.0"
     val jnrPosix         = "3.1.8"  // force this version to mitigate security vulnerabilities
-    val azureIdentity    = "1.11.0"
+    val azureIdentity    = "1.13.2"
   }
 
   object Libraries {
