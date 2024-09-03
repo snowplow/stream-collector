@@ -161,7 +161,6 @@ object Config {
     maxConnections: Int,
     idleTimeout: FiniteDuration,
     responseHeaderTimeout: FiniteDuration,
-    bodyReadTimeout: FiniteDuration,
     maxRequestLineLength: Int,
     maxHeadersLength: Int
   )

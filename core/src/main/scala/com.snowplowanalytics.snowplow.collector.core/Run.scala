@@ -98,7 +98,6 @@ object Run {
           config.enableDefaultRedirect,
           config.rootResponse.enabled,
           config.crossDomain.enabled,
-          config.networking.responseHeaderTimeout,
           collectorService
         ).value,
         if (config.ssl.enable) config.ssl.port else config.port,
