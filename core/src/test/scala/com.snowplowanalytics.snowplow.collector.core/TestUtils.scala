@@ -121,7 +121,6 @@ object TestUtils {
       1024,
       610.seconds,
       5.seconds,
-      1.second,
       20480,
       40960
     ),
