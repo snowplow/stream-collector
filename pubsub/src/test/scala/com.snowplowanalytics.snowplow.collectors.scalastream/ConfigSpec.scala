@@ -115,7 +115,6 @@ object ConfigSpec {
       maxConnections        = 1024,
       idleTimeout           = 610.seconds,
       responseHeaderTimeout = 5.seconds,
-      bodyReadTimeout       = 1.second,
       maxRequestLineLength  = 20480,
       maxHeadersLength      = 40960
     ),

@@ -10,7 +10,6 @@
   */
 package com.snowplowanalytics.snowplow.collector.core
 
-import scala.concurrent.duration.FiniteDuration
 import cats.implicits._
 import cats.effect.{Async, Sync}
 import org.http4s._
@@ -22,7 +21,6 @@ class Routes[F[_]: Async](
   enableDefaultRedirect: Boolean,
   enableRootResponse: Boolean,
   enableCrossdomainTracking: Boolean,
-  bodyReadTimeout: FiniteDuration,
   service: IService[F]
 ) extends Http4sDsl[F] {
 
@@ -51,7 +49,7 @@ class Routes[F[_]: Async](
     case req @ POST -> Root / vendor / version =>
       val path = service.determinePath(vendor, version)
       service.cookie(
-        body          = req.bodyText.through(Pipes.timeoutOnIdle(bodyReadTimeout)).compile.string.map(Some(_)),
+        body          = req.bodyText.compile.string.map(Some(_)),
         path          = path,
         request       = req,
         pixelExpected = false,

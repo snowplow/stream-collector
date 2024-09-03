@@ -33,7 +33,6 @@ collector {
 
   networking {
     responseHeaderTimeout = 10 seconds
-    bodyReadTimeout = 2 seconds
   }
 
   "cookie": {
