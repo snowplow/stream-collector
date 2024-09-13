@@ -1,5 +1,38 @@
-Release 3.2.0 (2024-03-11)
-+--------------------------
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+### Added
+### Changed
+### Deprecated
+### Removed
+### Fixed
+### Security
+
+## [3.2.1] - 2024-09-??
+
+### Changed
+Explicitly return 408 when timeout is hit (#427)
+Extend default timeouts to match upstream defaults (#422)
+Return Content-Type for POST requests (#422)
+
+### Removed
+Remove body read timeout feature (#429)
+
+### Fixed
+Disable timeouts on healthcheck calls (#426)
+
+### Security
+Bump aws sdk to 1.12.769 (#428)
+Bump azure-identity to 1.13.2 (#428)
+Bump sbt-snowplow-release to 0.3.2 (#422)
+
+
+## [3.2.0] - 2024-03-11
 Bump transitive jnr-posix to 3.1.8 (#419)
 Add snowman job for tag builds
 Prevent Kafka sink from blocking (#418)
