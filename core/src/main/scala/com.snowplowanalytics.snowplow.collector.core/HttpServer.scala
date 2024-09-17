@@ -19,15 +19,13 @@ import org.http4s.{HttpApp, HttpRoutes}
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.headers.`Strict-Transport-Security`
 import org.http4s.server.Server
-import org.http4s.server.middleware.{HSTS, Logger => LoggerMiddleware, Metrics, Timeout}
+import org.http4s.server.middleware.{HSTS, Logger => LoggerMiddleware, Metrics}
 import org.typelevel.ci.CIString
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import java.net.InetSocketAddress
 import javax.net.ssl.SSLContext
-import org.http4s.Response
-import org.http4s.Status
 
 object HttpServer {
 
@@ -47,7 +45,7 @@ object HttpServer {
   ): Resource[F, Server] =
     for {
       withMetricsMiddleware <- createMetricsMiddleware(routes, metricsConfig)
-      httpApp               <- Resource.pure(httpApp(withMetricsMiddleware, healthRoutes, hsts, networking, debugHttp))
+      httpApp               <- Resource.pure(httpApp(withMetricsMiddleware, healthRoutes, hsts, debugHttp))
       server                <- mkServer(httpApp, port, secure, networking)
     } yield server
 
@@ -63,7 +61,6 @@ object HttpServer {
         .withHttpApp(httpApp)
         .withIdleTimeout(networking.idleTimeout)
         .withMaxConnections(networking.maxConnections)
-        .withResponseHeaderTimeout(networking.responseHeaderTimeout)
         .withLengthLimits(
           maxRequestLineLen = networking.maxRequestLineLength,
           maxHeadersLen     = networking.maxHeadersLength
@@ -75,11 +72,10 @@ object HttpServer {
     routes: HttpRoutes[F],
     healthRoutes: HttpRoutes[F],
     hsts: Config.HSTS,
-    networking: Config.Networking,
     debugHttp: Config.Debug.Http
   ): HttpApp[F] = hstsApp(
     hsts,
-    loggerMiddleware(timeoutMiddleware(routes, networking) <+> healthRoutes, debugHttp)
+    loggerMiddleware(routes <+> healthRoutes, debugHttp)
   )
 
   private def createMetricsMiddleware[F[_]: Async](
@@ -115,13 +111,6 @@ object HttpServer {
         logAction         = Some((msg: String) => Logger[F].debug(msg))
       )(routes)
     } else routes
-
-  private def timeoutMiddleware[F[_]: Async](routes: HttpRoutes[F], networking: Config.Networking): HttpRoutes[F] =
-    Timeout.httpRoutes[F](timeout = networking.responseHeaderTimeout)(routes).map {
-      case Response(Status.ServiceUnavailable, httpVersion, headers, body, attributes) =>
-        Response[F](Status.RequestTimeout, httpVersion, headers, body, attributes)
-      case response => response
-    }
 
   implicit class ConditionalAction[A](item: A) {
     def cond(cond: Boolean, action: A => A): A =
