@@ -175,9 +175,6 @@ object KafkaConfigSpec {
       maxRequestLineLength  = 20480,
       maxHeadersLength      = 40960
     ),
-    license = Config.License(accept = true),
-    debug = Config
-      .Debug
-      .Debug(Config.Debug.Http(enable = false, logHeaders = true, logBody = false, redactHeaders = List.empty))
+    license = Config.License(accept = true)
   )
 }
