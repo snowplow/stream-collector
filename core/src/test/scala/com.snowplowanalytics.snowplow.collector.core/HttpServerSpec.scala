@@ -33,8 +33,7 @@ class HttpServerSpec extends Specification with CatsEffect {
           routes,
           healthRoutes,
           config.hsts,
-          config.networking,
-          config.debug.http
+          config.networking
         )
         val client: Client[IO]   = Client.fromHttpApp(httpApp)
         val request: Request[IO] = Request(method = Method.GET, uri = uri"/never")
