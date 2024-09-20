@@ -19,8 +19,7 @@ import org.http4s.{HttpApp, HttpRoutes}
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.headers.`Strict-Transport-Security`
 import org.http4s.server.Server
-import org.http4s.server.middleware.{HSTS, Logger => LoggerMiddleware, Metrics}
-import org.typelevel.ci.CIString
+import org.http4s.server.middleware.{HSTS, Metrics}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
@@ -38,14 +37,13 @@ object HttpServer {
     secure: Boolean,
     hsts: Config.HSTS,
     networking: Config.Networking,
-    metricsConfig: Config.Metrics,
-    debugHttp: Config.Debug.Http
+    metricsConfig: Config.Metrics
   )(
     mkServer: ((HttpApp[F], Int, Boolean, Config.Networking) => Resource[F, Server])
   ): Resource[F, Server] =
     for {
       withMetricsMiddleware <- createMetricsMiddleware(routes, metricsConfig)
-      httpApp               <- Resource.pure(httpApp(withMetricsMiddleware, healthRoutes, hsts, debugHttp))
+      httpApp               <- Resource.pure(httpApp(withMetricsMiddleware, healthRoutes, hsts))
       server                <- mkServer(httpApp, port, secure, networking)
     } yield server
 
@@ -67,11 +65,10 @@ object HttpServer {
   def httpApp[F[_]: Async](
     routes: HttpRoutes[F],
     healthRoutes: HttpRoutes[F],
-    hsts: Config.HSTS,
-    debugHttp: Config.Debug.Http
+    hsts: Config.HSTS
   ): HttpApp[F] = hstsApp(
     hsts,
-    loggerMiddleware(routes <+> healthRoutes, debugHttp)
+    routes <+> healthRoutes
   )
 
   private def createMetricsMiddleware[F[_]: Async](
@@ -97,16 +94,6 @@ object HttpServer {
     if (hsts.enable)
       HSTS(routes.orNotFound, `Strict-Transport-Security`.unsafeFromDuration(hsts.maxAge))
     else routes.orNotFound
-
-  private def loggerMiddleware[F[_]: Async](routes: HttpRoutes[F], config: Config.Debug.Http): HttpRoutes[F] =
-    if (config.enable) {
-      LoggerMiddleware.httpRoutes[F](
-        logHeaders        = config.logHeaders,
-        logBody           = config.logBody,
-        redactHeadersWhen = config.redactHeaders.map(CIString(_)).contains(_),
-        logAction         = Some((msg: String) => Logger[F].debug(msg))
-      )(routes)
-    } else routes
 
   implicit class ConditionalAction[A](item: A) {
     def cond(cond: Boolean, action: A => A): A =
