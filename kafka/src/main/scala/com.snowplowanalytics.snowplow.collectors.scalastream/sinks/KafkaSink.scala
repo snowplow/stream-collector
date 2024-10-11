@@ -77,6 +77,7 @@ object KafkaSink {
       "retries"                           -> kafkaConfig.retries.toString,
       "buffer.memory"                     -> bufferConfig.byteLimit.toString,
       "linger.ms"                         -> bufferConfig.timeLimit.toString,
+      "max.request.size"                  -> kafkaConfig.maxBytes.toString,
       "key.serializer"                    -> "org.apache.kafka.common.serialization.StringSerializer",
       "value.serializer"                  -> "org.apache.kafka.common.serialization.ByteArraySerializer",
       "sasl.login.callback.handler.class" -> authCallbackClass
