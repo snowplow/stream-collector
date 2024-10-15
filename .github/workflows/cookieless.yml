@@ -12,6 +12,8 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 11
+      - name: Install sbt
+        uses: sbt/setup-sbt@v1
       - name: Publish Docker image
         run: sbt 'project stdout; set Docker / version := "0.0.0"' docker:publishLocal
       - name: Run Docker image
