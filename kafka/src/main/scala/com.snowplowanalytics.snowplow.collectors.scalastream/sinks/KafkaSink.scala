@@ -13,24 +13,23 @@ package sinks
 
 import cats.implicits._
 import cats.effect._
-
-import org.slf4j.LoggerFactory
-
-import fs2.kafka._
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.apache.kafka.clients.producer.{Callback, KafkaProducer, ProducerRecord, RecordMetadata}
 
 import com.snowplowanalytics.snowplow.collector.core.{Config, Sink}
+
+import scala.jdk.CollectionConverters._
 
 /**
   * Kafka Sink for the Scala Stream Collector
   */
-class KafkaSink[F[_]: Async](
+class KafkaSink[F[_]: Async: Logger](
   val maxBytes: Int,
   isHealthyState: Ref[F, Boolean],
-  kafkaProducer: KafkaProducer[F, String, Array[Byte]],
+  kafkaProducer: KafkaProducer[String, Array[Byte]],
   topicName: String
 ) extends Sink[F] {
-
-  private lazy val log = LoggerFactory.getLogger(getClass())
 
   override def isHealthy: F[Boolean] = isHealthyState.get
 
@@ -40,16 +39,39 @@ class KafkaSink[F[_]: Async](
     * @param events The list of events to send
     * @param key The partition key to use
     */
-  override def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit] = {
-    log.debug(s"Writing ${events.size} Thrift records to Kafka topic $topicName at key $key")
-    val records = ProducerRecords(events.map(e => (ProducerRecord(topicName, key, e))))
-    kafkaProducer.produce(records).onError { case _: Throwable => isHealthyState.set(false) } *> isHealthyState.set(
-      true
-    )
-  }
+  override def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit] =
+    Logger[F].debug(s"Writing ${events.size} Thrift records to Kafka topic $topicName at key $key") *>
+      events.traverse_ { e =>
+        def go: F[Unit] =
+          Async[F]
+            .async_[Unit] { cb =>
+              val record = new ProducerRecord(topicName, key, e)
+              kafkaProducer.send(record, callback(cb))
+              ()
+            }
+            .handleErrorWith { e =>
+              handlePublishError(e) >> go
+            }
+        go
+      } *> isHealthyState.set(true)
+
+  private def callback(asyncCallback: Either[Throwable, Unit] => Unit): Callback =
+    new Callback {
+      def onCompletion(metadata: RecordMetadata, exception: Exception): Unit =
+        Option(exception) match {
+          case Some(e) => asyncCallback(Left(e))
+          case None    => asyncCallback(Right(()))
+        }
+    }
+
+  private def handlePublishError(error: Throwable): F[Unit] =
+    isHealthyState.set(false) *> Logger[F].error(s"Publishing to Kafka failed with message ${error.getMessage}")
 }
 
 object KafkaSink {
+
+  implicit private def unsafeLogger[F[_]: Sync]: Logger[F] =
+    Slf4jLogger.getLogger[F]
 
   def create[F[_]: Async](
     sinkConfig: Config.Sink[KafkaSinkConfig],
@@ -58,8 +80,12 @@ object KafkaSink {
     for {
       isHealthyState <- Resource.eval(Ref.of[F, Boolean](false))
       kafkaProducer  <- createProducer(sinkConfig.config, sinkConfig.buffer, authCallbackClass)
-      kafkaSink = new KafkaSink(sinkConfig.config.maxBytes, isHealthyState, kafkaProducer, sinkConfig.name)
-    } yield kafkaSink
+    } yield new KafkaSink(
+      sinkConfig.config.maxBytes,
+      isHealthyState,
+      kafkaProducer,
+      sinkConfig.name
+    )
 
   /**
     * Creates a new Kafka Producer with the given
@@ -71,20 +97,20 @@ object KafkaSink {
     kafkaConfig: KafkaSinkConfig,
     bufferConfig: Config.Buffer,
     authCallbackClass: String
-  ): Resource[F, KafkaProducer[F, String, Array[Byte]]] = {
+  ): Resource[F, KafkaProducer[String, Array[Byte]]] = {
     val props = Map(
+      "bootstrap.servers"                 -> kafkaConfig.brokers,
       "acks"                              -> "all",
       "retries"                           -> kafkaConfig.retries.toString,
-      "buffer.memory"                     -> bufferConfig.byteLimit.toString,
       "linger.ms"                         -> bufferConfig.timeLimit.toString,
       "key.serializer"                    -> "org.apache.kafka.common.serialization.StringSerializer",
       "value.serializer"                  -> "org.apache.kafka.common.serialization.ByteArraySerializer",
       "sasl.login.callback.handler.class" -> authCallbackClass
-    ) ++ kafkaConfig.producerConf.getOrElse(Map.empty)
+    ) ++ kafkaConfig.producerConf.getOrElse(Map.empty) + ("buffer.memory" -> Long.MaxValue.toString)
 
-    val producerSettings =
-      ProducerSettings[F, String, Array[Byte]].withBootstrapServers(kafkaConfig.brokers).withProperties(props)
-
-    KafkaProducer.resource(producerSettings)
+    val make = Sync[F].delay {
+      new KafkaProducer[String, Array[Byte]]((props: Map[String, AnyRef]).asJava)
+    }
+    Resource.make(make)(p => Sync[F].blocking(p.close))
   }
 }
