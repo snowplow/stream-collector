@@ -87,7 +87,7 @@ object BuildSettings {
       moduleName := "snowplow-stream-collector-kafka",
       Docker / packageName := "scala-stream-collector-kafka",
       libraryDependencies ++= Seq(
-        Dependencies.Libraries.fs2Kafka,
+        Dependencies.Libraries.kafka,
         Dependencies.Libraries.mskAuth,
         Dependencies.Libraries.azureIdentity,
 
