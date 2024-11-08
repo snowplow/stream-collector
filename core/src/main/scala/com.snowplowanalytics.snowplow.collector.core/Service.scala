@@ -305,7 +305,7 @@ class Service[F[_]: Sync](
         case ci"X-Forwarded-For" | ci"X-Real-Ip" | ci"Cookie" if spAnonymous.isDefined => None
         // FIXME: This is a temporary backport of old akka behaviour we will remove by
         //        adapting enrich to support a CIString header names as per RFC7230#Section-3.2
-        case ci"Cookie" => Some(s"Cookie: ${h.value}")
+        case ci"Cookie" => Rfc6265Cookie.parse(h.value).map(c => s"Cookie: $c")
         case _          => Some(h.toString())
       }
     }

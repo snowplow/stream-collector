@@ -249,7 +249,7 @@ class ServiceSpec extends Specification {
           "Content-Type: application/json",
           "X-Forwarded-For: 192.0.2.3",
           "Access-Control-Allow-Credentials: true",
-          "Cookie: cookie=value; sp=dfdb716e-ecf9-4d00-8b10-44edfbc8a108",
+          "Cookie: cookie=value;sp=dfdb716e-ecf9-4d00-8b10-44edfbc8a108",
           "image/gif"
         ).asJava
         e.contentType shouldEqual "image/gif"
