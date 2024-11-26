@@ -94,7 +94,8 @@ object Config {
   )
 
   case class CORS(
-    accessControlMaxAge: FiniteDuration
+    accessControlMaxAge: FiniteDuration,
+    allowedCorsHeaders: List[String]
   )
 
   case class Streams[+SinkConfig](
