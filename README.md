@@ -45,7 +45,7 @@ Licensed under the [Snowplow Limited Use License Agreement][license]. _(If you a
 [release-image]: https://img.shields.io/github/v/release/snowplow/stream-collector?sort=semver&style=flat
 [releases]: https://github.com/snowplow/stream-collector
 
-[license]: https://docs.snowplow.io/limited-use-license-1.0
-[license-image]: https://img.shields.io/badge/license-Snowplow--Limited-Use-blue.svg?style=flat
+[license]: https://docs.snowplow.io/limited-use-license-1.1
+[license-image]: https://img.shields.io/badge/license-Snowplow--Limited--Use-blue.svg?style=flat
 
 [faq]: https://docs.snowplow.io/docs/contributing/limited-use-license-faq/

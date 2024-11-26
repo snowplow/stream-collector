@@ -1,0 +1,3 @@
+examples/config.hocon.sample:hashicorp-tf-password:365
+.github/workflows/integration_tests/telemetry/sender_config/config_disabled.hocon:hashicorp-tf-password:234
+.github/workflows/integration_tests/telemetry/sender_config/config.hocon:hashicorp-tf-password:235
