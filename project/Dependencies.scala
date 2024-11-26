@@ -3,8 +3,8 @@
  * All rights reserved.
  *
  * This software is made available by Snowplow Analytics, Ltd.,
- * under the terms of the Snowplow Limited Use License Agreement, Version 1.0
- * located at https://docs.snowplow.io/limited-use-license-1.0
+ * under the terms of the Snowplow Limited Use License Agreement, Version 1.1
+ * located at https://docs.snowplow.io/limited-use-license-1.1
  * BY INSTALLING, DOWNLOADING, ACCESSING, USING OR DISTRIBUTING ANY PORTION
  * OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
  */
@@ -24,14 +24,15 @@ object Dependencies {
     val decline          = "2.4.1"
     val fs2PubSub        = "0.22.0"
     val http4s           = "0.23.23"
-    val jackson          = "2.12.7" // force this version to mitigate security vulnerabilities
-    val kafka            = "3.8.1"
+    val jackson          = "2.15.2"
+    val jacksonCbor      = "2.12.7" // force this version to mitigate security vulnerabilities
+    val kafka            = "3.9.0"
     val log4cats         = "2.6.0"
     val log4j            = "2.17.2" // CVE-2021-44228
     val mskAuth          = "1.1.1"
-    val nettyAll         = "4.1.95.Final" // to fix nsq dependency
+    val nettyAll         = "4.1.115.Final" // to fix nsq dependency
     val nsqClient        = "1.3.0"
-    val pubsub           = "1.125.11" // force this version to mitigate security vulnerabilities
+    val pubsub           = "1.134.2" // force this version to mitigate security vulnerabilities
     val rabbitMQ         = "5.15.0"
     val slf4j            = "1.7.32"
     val specs2           = "4.11.0"
@@ -40,7 +41,7 @@ object Dependencies {
     val thrift           = "0.15.0" // force this version to mitigate security vulnerabilities
     val tracker          = "2.0.0"
     val dataDog4s        = "0.32.0"
-    val jnrPosix         = "3.1.8"  // force this version to mitigate security vulnerabilities
+    val jnrPosix         = "3.1.20"  // force this version to mitigate security vulnerabilities
     val azureIdentity    = "1.13.2"
   }
 
@@ -66,12 +67,13 @@ object Dependencies {
     val jnrPosix          = "com.github.jnr"        % "jnr-posix"                              % V.jnrPosix
 
     //sinks
-    val fs2PubSub      = "com.permutive"              %% "fs2-google-pubsub-grpc"     % V.fs2PubSub
-    val jackson        = "com.fasterxml.jackson.core" % "jackson-databind"            % V.jackson
-    val kafka          = "org.apache.kafka"           % "kafka-clients"               % V.kafka
-    val kinesis        = "com.amazonaws"              % "aws-java-sdk-kinesis"        % V.awsSdk
-    val log4j          = "org.apache.logging.log4j"   % "log4j-core"                  % V.log4j
-    val mskAuth        = "software.amazon.msk"        % "aws-msk-iam-auth"            % V.mskAuth % Runtime // Enables AWS MSK IAM authentication https://github.com/snowplow/stream-collector/pull/214
+    val fs2PubSub      = "com.permutive"                    %% "fs2-google-pubsub-grpc"     % V.fs2PubSub
+    val jackson        = "com.fasterxml.jackson.core"       % "jackson-databind"            % V.jackson
+    val jacksonCbor    = "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor"     % V.jackson
+    val kafka          = "org.apache.kafka"                 % "kafka-clients"               % V.kafka
+    val kinesis        = "com.amazonaws"                    % "aws-java-sdk-kinesis"        % V.awsSdk
+    val log4j          = "org.apache.logging.log4j"         % "log4j-core"                  % V.log4j
+    val mskAuth        = "software.amazon.msk"              % "aws-msk-iam-auth"            % V.mskAuth % Runtime // Enables AWS MSK IAM authentication https://github.com/snowplow/stream-collector/pull/214
     val nettyAll       = "io.netty"                   % "netty-all"                   % V.nettyAll
     val nsqClient      = "com.snowplowanalytics"      % "nsq-java-client"             % V.nsqClient
     val pubsub         = "com.google.cloud"           % "google-cloud-pubsub"         % V.pubsub
