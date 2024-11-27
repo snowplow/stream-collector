@@ -4,7 +4,7 @@
  *
  * This software is made available by Snowplow Analytics, Ltd.,
  * under the terms of the Snowplow Limited Use License Agreement, Version 1.0
- * located at https://docs.snowplow.io/limited-use-license-1.0
+ * located at https://docs.snowplow.io/limited-use-license-1.1
  * BY INSTALLING, DOWNLOADING, ACCESSING, USING OR DISTRIBUTING ANY PORTION
  * OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
  */
@@ -27,7 +27,6 @@ object BuildSettings {
     name           := "snowplow-stream-collector",
     description    := "Scala Stream Collector for Snowplow raw events",
     scalaVersion   := "2.13.12",
-    crossScalaVersions := Seq("2.13.12", "2.12.14"),
     scalacOptions ++= Seq("-Ywarn-macros:after"),
     javacOptions   := Seq("-source", "11", "-target", "11"),
     resolvers     ++= Seq(
