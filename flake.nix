@@ -35,13 +35,18 @@
                 jre
                 metals
                 sbt
-                # pkgs.nodePackages.snyk
                 pkgs.kubernetes-helm
                 # (pkgs.wrapHelm pkgs.kubernetes-helm {plugins = [pkgs.kubernetes-helmPlugins.helm-diff];})
                 # pkgs.google-cloud-sdk.withExtraComponents( with pkgs.google-cloud-sdk.components [ gke-gcloud-auth-plugin ]);
                 (pkgs.google-cloud-sdk.withExtraComponents [pkgs.google-cloud-sdk.components.gke-gcloud-auth-plugin])
                 # pkgs.google-cloud-sdk-gce
+                pkgs.snyk
               ];
+              scripts = {
+                snyk-check.exec = ''
+                  for p in kinesis pubsub kafka nsq; do sbt "project ''${p}Distroless; set version := \"latest\"; Docker / publishLocal"; snyk container test --platform=linux/arm64 --app-vulns snowplow/scala-stream-collector-''${p}:latest-distroless; done
+                '';
+              };
               languages.nix.enable = true;
               pre-commit.hooks = {
                 alejandra.enable = true;
