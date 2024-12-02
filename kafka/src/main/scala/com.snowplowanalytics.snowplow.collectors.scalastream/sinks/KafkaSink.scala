@@ -12,6 +12,7 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 package sinks
 
 import cats.implicits._
+import cats.effect.implicits._
 import cats.effect._
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
@@ -20,6 +21,8 @@ import org.apache.kafka.clients.producer.{Callback, KafkaProducer, ProducerRecor
 import com.snowplowanalytics.snowplow.collector.core.{Config, Sink}
 
 import scala.jdk.CollectionConverters._
+import scala.concurrent.ExecutionContext
+import java.util.concurrent.Executors
 
 /**
   * Kafka Sink for the Scala Stream Collector
@@ -28,7 +31,8 @@ class KafkaSink[F[_]: Async: Logger](
   val maxBytes: Int,
   isHealthyState: Ref[F, Boolean],
   kafkaProducer: KafkaProducer[String, Array[Byte]],
-  topicName: String
+  topicName: String,
+  ec: ExecutionContext
 ) extends Sink[F] {
 
   override def isHealthy: F[Boolean] = isHealthyState.get
@@ -40,14 +44,20 @@ class KafkaSink[F[_]: Async: Logger](
     * @param key The partition key to use
     */
   override def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit] =
+    storeRawEventsAndWait(events, key).start.void
+
+  private def storeRawEventsAndWait(events: List[Array[Byte]], key: String): F[Unit] =
     Logger[F].debug(s"Writing ${events.size} Thrift records to Kafka topic $topicName at key $key") *>
-      events.traverse_ { e =>
+      events.parTraverse_ { e =>
         def go: F[Unit] =
           Async[F]
-            .async_[Unit] { cb =>
-              val record = new ProducerRecord(topicName, key, e)
-              kafkaProducer.send(record, callback(cb))
-              ()
+            .async[Unit] { cb =>
+              val blockingSend = Sync[F].delay {
+                val record = new ProducerRecord(topicName, key, e)
+                kafkaProducer.send(record, callback(cb))
+                Option.empty[F[Unit]]
+              }
+              Async[F].startOn(blockingSend, ec).map(f => Some(f.cancel))
             }
             .handleErrorWith { e =>
               handlePublishError(e) >> go
@@ -80,11 +90,13 @@ object KafkaSink {
     for {
       isHealthyState <- Resource.eval(Ref.of[F, Boolean](false))
       kafkaProducer  <- createProducer(sinkConfig.config, sinkConfig.buffer, authCallbackClass)
+      ec             <- createExecutionContext
     } yield new KafkaSink(
       sinkConfig.config.maxBytes,
       isHealthyState,
       kafkaProducer,
-      sinkConfig.name
+      sinkConfig.name,
+      ec
     )
 
   /**
@@ -113,4 +125,12 @@ object KafkaSink {
     }
     Resource.make(make)(p => Sync[F].blocking(p.close))
   }
+
+  def createExecutionContext[F[_]: Sync]: Resource[F, ExecutionContext] = {
+    val make = Sync[F].delay {
+      Executors.newSingleThreadExecutor
+    }
+    Resource.make(make)(e => Sync[F].blocking(e.shutdown)).map(ExecutionContext.fromExecutorService(_))
+  }
+
 }
