@@ -72,7 +72,8 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 11
-
+      - name: Install sbt
+        uses: sbt/setup-sbt@v1
       - name: Get current version
         id: ver
         run: |
@@ -162,6 +163,8 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 11
+      - name: Install sbt
+        uses: sbt/setup-sbt@v1
       - name: Get current version
         id: ver
         run: |
