@@ -68,7 +68,7 @@ object Containers {
         "TOPIC_BAD" -> topicBad,
         "GOOGLE_PROJECT_ID" -> projectId,
         "MAX_BYTES" -> Integer.MAX_VALUE.toString,
-        "JDK_JAVA_OPTIONS" -> "-Dorg.slf4j.simpleLogger.log.com.snowplowanalytics.snowplow.collectors.scalastream.sinks.GooglePubSubSink=warn",
+        "JDK_JAVA_OPTIONS" -> "-Dlogger.level.com.snowplowanalytics.snowplow.collectors.scalastream.sinks.GooglePubSubSink=WARN",
         "HTTP4S_BACKEND" -> "BLAZE"
       ) ++ envs,
       exposedPorts = Seq(collectorPort),

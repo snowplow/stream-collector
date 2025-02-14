@@ -1,0 +1,28 @@
+<configuration>
+
+    <!-- Console Appender with dynamic log format -->
+    <appender name="consoleAppender" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>%level  %logger{36} - %msg%n</pattern> <!-- Simple logger style -->
+        </encoder>
+    </appender>
+
+    <!-- JSON Log Appender -->
+    <appender name="jsonConsoleAppender" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder"/>
+    </appender>
+
+    <!-- Async Appender -->
+    <appender name="asyncAppender" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>500</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <includeCallerData>false</includeCallerData>
+        <appender-ref ref="${logback.asyncAppender:-consoleAppender}"/>
+    </appender>
+
+    <!-- Root Logger (Controls all classes by default) -->
+    <root level="${logger.level.root:-INFO}">
+        <appender-ref ref="${logback.async:-jsonConsoleAppender}"/>
+    </root>
+
+</configuration>
