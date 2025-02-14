@@ -14,6 +14,7 @@ import scala.concurrent.duration._
 
 import org.apache.thrift.TDeserializer
 
+import ch.qos.logback.classic.Logger
 import org.slf4j.LoggerFactory
 
 import org.testcontainers.containers.GenericContainer
@@ -70,7 +71,7 @@ object utils {
     loggerName: String
   ): GenericContainer[_] = {
     container.start()
-    val logger = LoggerFactory.getLogger(loggerName)
+    val logger = LoggerFactory.getLogger(loggerName).asInstanceOf[Logger]
     val logs = new Slf4jLogConsumer(logger)
     container.followOutput(logs)
     container

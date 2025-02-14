@@ -42,7 +42,7 @@ object Collector {
         "REGION" -> Localstack.region,
         "KINESIS_ENDPOINT" -> Localstack.privateEndpoint,
         "MAX_BYTES" -> maxBytes.toString,
-        "JDK_JAVA_OPTIONS" -> "-Dorg.slf4j.simpleLogger.log.com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink=warn",
+        "JDK_JAVA_OPTIONS" -> "-Dlogger.level.com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink=WARN",
         "HTTP4S_BACKEND" -> "BLAZE"
       ) ++ configParameters(additionalConfig),
       exposedPorts = Seq(port),

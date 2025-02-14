@@ -5,3 +5,9 @@ target
 src/main/resources/application.conf
 
 .bsp
+
+.bloop
+.metals
+.vscode
+
+metals.sbt
