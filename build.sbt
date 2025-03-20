@@ -37,6 +37,7 @@ lazy val core = project
       Dependencies.Libraries.specs2CE,
       Dependencies.Libraries.ceTestkit,
       Dependencies.Libraries.jnrPosix,
+      Dependencies.Libraries.httpClient,
 
       //Integration tests
       Dependencies.Libraries.IntegrationTests.testcontainers,

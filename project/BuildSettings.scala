@@ -91,6 +91,9 @@ object BuildSettings {
         Dependencies.Libraries.mskAuth,
         Dependencies.Libraries.azureIdentity,
         Dependencies.Libraries.jacksonCbor,
+        Dependencies.Libraries.jsonSmart,
+        Dependencies.Libraries.nettyCommon,
+        Dependencies.Libraries.nettyHandler,
 
         // integration tests dependencies
         Dependencies.Libraries.IntegrationTests.specs2,
