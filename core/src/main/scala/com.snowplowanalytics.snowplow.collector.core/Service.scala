@@ -106,17 +106,22 @@ class Service[F[_]: Sync](
         headers(request, spAnonymous)
       )
       now <- Clock[F].realTime
-      setCookie = cookieHeader(
-        headers         = request.headers,
-        cookieConfig    = config.cookie,
-        networkUserId   = nuid,
-        doNotTrack      = doNotTrack,
-        spAnonymous     = spAnonymous,
-        now             = now,
-        cookieInRequest = cookie.isDefined
-      )
+      createCookieHeader = { c: Config.Cookie =>
+        cookieHeader(
+          headers         = request.headers,
+          cookieConfig    = c,
+          networkUserId   = nuid,
+          doNotTrack      = doNotTrack,
+          spAnonymous     = spAnonymous,
+          now             = now,
+          cookieInRequest = cookie.isDefined
+        )
+      }
+      setCookieHeader       = createCookieHeader(config.cookie)
+      clientSetCookieHeader = config.cookie.clientCookie.flatMap(createCookieHeader)
       headerList = List(
-        setCookie.map(_.toRaw1),
+        setCookieHeader.map(_.toRaw1),
+        clientSetCookieHeader.map(_.toRaw1),
         cacheControl(pixelExpected).map(_.toRaw1),
         accessControlAllowOriginHeader(request).some,
         `Access-Control-Allow-Credentials`().toRaw1.some

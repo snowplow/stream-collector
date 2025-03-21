@@ -71,14 +71,15 @@ class ServiceSpec extends Specification {
     "cookie" in {
       "set a cookie with empty content and expiration in the past if SP-Anonymous is present and request contains a cookie" in {
         val testCookieConfig = Config.Cookie(
-          enabled        = true,
-          name           = "sp",
-          expiration     = 5.seconds,
-          domains        = List("domain"),
-          fallbackDomain = None,
-          secure         = false,
-          httpOnly       = false,
-          sameSite       = None
+          enabled          = true,
+          name             = "sp",
+          expiration       = 5.seconds,
+          domains          = List("domain"),
+          fallbackDomain   = None,
+          secure           = false,
+          httpOnly         = false,
+          sameSite         = None,
+          clientCookieName = None
         )
         val now  = Clock[IO].realTime.unsafeRunSync()
         val nuid = UUID.randomUUID().toString
@@ -99,14 +100,15 @@ class ServiceSpec extends Specification {
       }
       "not set a cookie if SP-Anonymous is present and the request doesn't contain a cookie" in {
         val testCookieConfig = Config.Cookie(
-          enabled        = true,
-          name           = "sp",
-          expiration     = 5.seconds,
-          domains        = List("domain"),
-          fallbackDomain = None,
-          secure         = false,
-          httpOnly       = false,
-          sameSite       = None
+          enabled          = true,
+          name             = "sp",
+          expiration       = 5.seconds,
+          domains          = List("domain"),
+          fallbackDomain   = None,
+          secure           = false,
+          httpOnly         = false,
+          sameSite         = None,
+          clientCookieName = None
         )
         val now  = Clock[IO].realTime.unsafeRunSync()
         val nuid = UUID.randomUUID().toString
@@ -444,6 +446,165 @@ class ServiceSpec extends Specification {
         good.storedRawEvents must have size 1
         bad.storedRawEvents must have size 0
       }
+
+      "return client cookie if client cookie name is configured" in {
+        val clientCookieName = "sp_client"
+        val testConf = TestUtils
+          .testConfig
+          .copy(
+            cookie = TestUtils.testConfig.cookie.copy(clientCookieName = Some(clientCookieName))
+          )
+        val ProbeService(service, good, bad) = probeService(config = testConf)
+        val nuid                             = UUID.randomUUID().toString
+        val req = Request[IO](
+          method = Method.POST
+        ).addCookie(TestUtils.testConfig.cookie.name, nuid)
+        val r = service
+          .cookie(
+            body          = IO.pure(Some("b")),
+            path          = "p",
+            request       = req,
+            pixelExpected = false,
+            contentType   = Some("image/gif")
+          )
+          .unsafeRunSync()
+
+        r.status mustEqual Status.Ok
+        val cookies                        = r.headers.get[`Set-Cookie`].get
+        val `Set-Cookie`(clientCookieResp) = cookies.find(_.cookie.name == clientCookieName).get
+        val `Set-Cookie`(cookieResp)       = cookies.find(_.cookie.name == TestUtils.testConfig.cookie.name).get
+        good.storedRawEvents must have size 1
+        bad.storedRawEvents must have size 0
+        cookies.toList must haveSize(2)
+        clientCookieResp.content must beEqualTo(nuid)
+        clientCookieResp must beEqualTo(cookieResp.copy(httpOnly = false, name = clientCookieName))
+      }
+
+      "not return client cookie if client cookie name isn't configured" in {
+        val testConf = TestUtils
+          .testConfig
+          .copy(
+            cookie = TestUtils.testConfig.cookie.copy(clientCookieName = None)
+          )
+        val ProbeService(service, good, bad) = probeService(config = testConf)
+        val nuid                             = UUID.randomUUID().toString
+        val req = Request[IO](
+          method = Method.POST
+        ).addCookie(TestUtils.testConfig.cookie.name, nuid)
+        val r = service
+          .cookie(
+            body          = IO.pure(Some("b")),
+            path          = "p",
+            request       = req,
+            pixelExpected = false,
+            contentType   = Some("image/gif")
+          )
+          .unsafeRunSync()
+
+        r.status mustEqual Status.Ok
+        val cookies    = r.headers.get[`Set-Cookie`].get
+        val cookieResp = cookies.find(_.cookie.name == TestUtils.testConfig.cookie.name)
+        good.storedRawEvents must have size 1
+        bad.storedRawEvents must have size 0
+        cookies.toList must haveSize(1)
+        cookieResp must beSome
+      }
+
+      "not return client cookie if cookie isn't enabled" in {
+        val testConf = TestUtils
+          .testConfig
+          .copy(
+            cookie = TestUtils.testConfig.cookie.copy(enabled = false)
+          )
+        val ProbeService(service, good, bad) = probeService(config = testConf)
+        val nuid                             = UUID.randomUUID().toString
+        val req = Request[IO](
+          method = Method.POST
+        ).addCookie(TestUtils.testConfig.cookie.name, nuid)
+        val r = service
+          .cookie(
+            body          = IO.pure(Some("b")),
+            path          = "p",
+            request       = req,
+            pixelExpected = false,
+            contentType   = Some("image/gif")
+          )
+          .unsafeRunSync()
+
+        r.status mustEqual Status.Ok
+        val cookies = r.headers.get[`Set-Cookie`]
+        good.storedRawEvents must have size 1
+        bad.storedRawEvents must have size 0
+        cookies must beNone
+      }
+
+      "return a client cookie with empty content and expiration in the past if SP-Anonymous is present and nuid is set in request" in {
+        val clientCookieName = "sp_client"
+        val testConf = TestUtils
+          .testConfig
+          .copy(
+            cookie = TestUtils.testConfig.cookie.copy(clientCookieName = Some(clientCookieName))
+          )
+        val ProbeService(service, good, bad) = probeService(config = testConf)
+        val nuid                             = UUID.randomUUID().toString
+        val now                              = Clock[IO].realTime.unsafeRunSync()
+        val req = Request[IO](
+          method  = Method.POST,
+          headers = testHeaders.put(Header.Raw(ci"SP-Anonymous", "*"))
+        ).addCookie(TestUtils.testConfig.cookie.name, nuid)
+        val r = service
+          .cookie(
+            body          = IO.pure(Some("b")),
+            path          = "p",
+            request       = req,
+            pixelExpected = false,
+            contentType   = Some("image/gif")
+          )
+          .unsafeRunSync()
+
+        r.status mustEqual Status.Ok
+        val cookies                        = r.headers.get[`Set-Cookie`].get
+        val `Set-Cookie`(clientCookieResp) = cookies.find(_.cookie.name == clientCookieName).get
+        val `Set-Cookie`(cookieResp)       = cookies.find(_.cookie.name == TestUtils.testConfig.cookie.name).get
+        good.storedRawEvents must have size 1
+        bad.storedRawEvents must have size 0
+        cookies.toList must haveSize(2)
+        clientCookieResp must beEqualTo(cookieResp.copy(httpOnly = false, name = clientCookieName))
+        clientCookieResp.content must beEqualTo("")
+        (now - clientCookieResp.expires.get.toDuration).toMillis must beCloseTo(
+          TestUtils.testConfig.cookie.expiration.toMillis,
+          1000L
+        )
+      }
+
+      "not return a client cookie with empty content and expiration in the past if SP-Anonymous is present and nuid is not set in request" in {
+        val clientCookieName = "sp_client"
+        val testConf = TestUtils
+          .testConfig
+          .copy(
+            cookie = TestUtils.testConfig.cookie.copy(clientCookieName = Some(clientCookieName))
+          )
+        val ProbeService(service, good, bad) = probeService(config = testConf)
+        val req = Request[IO](
+          method  = Method.POST,
+          headers = testHeaders.put(Header.Raw(ci"SP-Anonymous", "*"))
+        )
+        val r = service
+          .cookie(
+            body          = IO.pure(Some("b")),
+            path          = "p",
+            request       = req,
+            pixelExpected = false,
+            contentType   = Some("image/gif")
+          )
+          .unsafeRunSync()
+
+        r.status mustEqual Status.Ok
+        val cookies = r.headers.get[`Set-Cookie`]
+        good.storedRawEvents must have size 1
+        bad.storedRawEvents must have size 0
+        cookies must beNone
+      }
     }
 
     "preflightResponse" in {
@@ -690,14 +851,15 @@ class ServiceSpec extends Specification {
 
     "cookieHeader" in {
       val testCookieConfig = Config.Cookie(
-        enabled        = true,
-        name           = "name",
-        expiration     = 5.seconds,
-        domains        = List("domain"),
-        fallbackDomain = None,
-        secure         = false,
-        httpOnly       = false,
-        sameSite       = None
+        enabled          = true,
+        name             = "name",
+        expiration       = 5.seconds,
+        domains          = List("domain"),
+        fallbackDomain   = None,
+        secure           = false,
+        httpOnly         = false,
+        sameSite         = None,
+        clientCookieName = None
       )
       val now = Clock[IO].realTime.unsafeRunSync()
 
@@ -921,14 +1083,15 @@ class ServiceSpec extends Specification {
 
     "cookieDomain" in {
       val testCookieConfig = Config.Cookie(
-        enabled        = true,
-        name           = "name",
-        expiration     = 5.seconds,
-        domains        = List.empty,
-        fallbackDomain = None,
-        secure         = false,
-        httpOnly       = false,
-        sameSite       = None
+        enabled          = true,
+        name             = "name",
+        expiration       = 5.seconds,
+        domains          = List.empty,
+        fallbackDomain   = None,
+        secure           = false,
+        httpOnly         = false,
+        sameSite         = None,
+        clientCookieName = None
       )
       "not return a domain" in {
         "if a list of domains is not supplied in the config and there is no fallback domain" in {

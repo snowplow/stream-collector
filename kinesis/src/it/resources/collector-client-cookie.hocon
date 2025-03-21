@@ -1,0 +1,47 @@
+collector {
+  license { accept = true }
+  interface = "0.0.0.0"
+  port = ${PORT}
+
+  streams {
+    good {
+      name = ${STREAM_GOOD}
+      region = ${REGION}
+      customEndpoint = ${KINESIS_ENDPOINT}
+
+      aws {
+        accessKey = env
+        secretKey = env
+      }
+
+      maxBytes = ${MAX_BYTES}
+    } 
+       
+    bad {
+      name = ${STREAM_BAD}
+      region = ${REGION}
+      customEndpoint = ${KINESIS_ENDPOINT}
+
+      aws {
+        accessKey = env
+        secretKey = env
+      }
+
+      maxBytes = ${MAX_BYTES}
+    }
+  }
+
+  networking {
+    responseHeaderTimeout = 10 seconds
+  }
+
+  "cookie": {
+    "enabled": true,
+    "name": ${SERVER_COOKIE_NAME},
+    "expiration": "365 days",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "None"
+    "clientCookieName": ${CLIENT_COOKIE_NAME}
+  }
+}
