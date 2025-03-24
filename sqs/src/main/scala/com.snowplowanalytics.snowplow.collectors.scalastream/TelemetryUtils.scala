@@ -1,6 +1,7 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import cats.effect.{IO, Resource}
+import software.amazon.awssdk.services.sqs.model._
 import com.snowplowanalytics.snowplow.collector.core.Config
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks._
 
@@ -10,10 +11,11 @@ object TelemetryUtils {
     Resource
       .make(
         IO(SqsSink.createSqsClient(config.good.config.region)).rethrow
-      )(c => IO(c.shutdown()))
+      )(c => IO(c.close()))
       .use { client =>
         IO {
-          val sqsQueueUrl = client.getQueueUrl(config.good.name).getQueueUrl
+          val req         = GetQueueUrlRequest.builder().queueName(config.good.name).build()
+          val sqsQueueUrl = client.getQueueUrl(req).queueUrl()
           Some(extractAccountId(sqsQueueUrl))
         }
       }

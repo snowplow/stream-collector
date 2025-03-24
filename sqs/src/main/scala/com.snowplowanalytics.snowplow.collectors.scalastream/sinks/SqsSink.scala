@@ -27,14 +27,15 @@ import scala.jdk.CollectionConverters._
 
 import cats.syntax.either._
 
-import com.amazonaws.services.sqs.{AmazonSQS, AmazonSQSClientBuilder}
-import com.amazonaws.services.sqs.model.{MessageAttributeValue, SendMessageBatchRequest, SendMessageBatchRequestEntry}
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.sqs.SqsClient
+import software.amazon.awssdk.services.sqs.model._
 
 import com.snowplowanalytics.snowplow.collector.core.{Config, Sink}
 
 class SqsSink[F[_]: Sync] private (
   val maxBytes: Int,
-  client: AmazonSQS,
+  client: SqsClient,
   sqsConfig: SqsSinkConfig,
   bufferConfig: Config.Buffer,
   queueName: String,
@@ -176,20 +177,20 @@ class SqsSink[F[_]: Sync] private (
         .flatMap { msgGroup =>
           val entries = msgGroup.map(_._2)
           val batchRequest =
-            new SendMessageBatchRequest().withQueueUrl(queueName).withEntries(entries.asJava)
+            SendMessageBatchRequest.builder().queueUrl(queueName).entries(entries.asJava).build()
           val response = client.sendMessageBatch(batchRequest)
           val failures = response
-            .getFailed
+            .failed()
             .asScala
             .toList
             .map { bree =>
-              (bree.getId, BatchResultErrorInfo(bree.getCode, bree.getMessage))
+              (bree.id(), BatchResultErrorInfo(bree.code(), bree.message()))
             }
             .toMap
           // Events to retry and reasons for failure
           msgGroup.collect {
-            case (e, m) if failures.contains(m.getId) =>
-              (e, failures(m.getId))
+            case (e, m) if failures.contains(m.id()) =>
+              (e, failures(m.id()))
           }
         }
         .toList
@@ -199,12 +200,16 @@ class SqsSink[F[_]: Sync] private (
     events.map(e =>
       (
         e,
-        new SendMessageBatchRequestEntry(UUID.randomUUID.toString, b64Encode(e.payloads)).withMessageAttributes(
-          Map(
-            "kinesisKey" ->
-              new MessageAttributeValue().withDataType("String").withStringValue(e.key)
-          ).asJava
-        )
+        SendMessageBatchRequestEntry
+          .builder
+          .id(UUID.randomUUID.toString)
+          .messageBody(b64Encode(e.payloads))
+          .messageAttributes(
+            Map(
+              "kinesisKey" -> MessageAttributeValue.builder().dataType("String").stringValue(e.key).build()
+            ).asJava
+          )
+          .build()
       )
     )
 
@@ -247,7 +252,8 @@ class SqsSink[F[_]: Sync] private (
       override def run(): Unit =
         while (!sqsHealthy) {
           Try {
-            client.getQueueUrl(queueName)
+            val req = GetQueueUrlRequest.builder().queueName(queueName).build()
+            client.getQueueUrl(req)
           } match {
             case Success(_) =>
               log.info(s"SQS queue $queueName exists")
@@ -292,9 +298,9 @@ object SqsSink {
     Resource.make(acquire)(release)
   }
 
-  def createSqsClient(region: String): Either[Throwable, AmazonSQS] =
+  def createSqsClient(region: String): Either[Throwable, SqsClient] =
     Either.catchNonFatal(
-      AmazonSQSClientBuilder.standard().withRegion(region).build
+      SqsClient.builder().region(Region.of(region)).build
     )
 
   /**

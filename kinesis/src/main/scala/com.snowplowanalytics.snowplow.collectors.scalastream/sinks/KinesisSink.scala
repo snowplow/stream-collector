@@ -14,11 +14,12 @@ package sinks
 import cats.effect.{Resource, Sync}
 import cats.implicits.catsSyntaxMonadErrorRethrow
 import cats.syntax.either._
-import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
-import com.amazonaws.services.kinesis.model._
-import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClientBuilder}
-import com.amazonaws.services.sqs.model.{MessageAttributeValue, SendMessageBatchRequest, SendMessageBatchRequestEntry}
-import com.amazonaws.services.sqs.{AmazonSQS, AmazonSQSClientBuilder}
+import software.amazon.awssdk.core.SdkBytes
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.kinesis.KinesisClient
+import software.amazon.awssdk.services.kinesis.model._
+import software.amazon.awssdk.services.sqs.SqsClient
+import software.amazon.awssdk.services.sqs.model._
 import com.snowplowanalytics.snowplow.collector.core.{Config, Sink}
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink._
 import org.slf4j.LoggerFactory
@@ -26,6 +27,7 @@ import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.util.UUID
 import java.util.concurrent.ScheduledExecutorService
+import java.net.URI
 import scala.jdk.CollectionConverters._
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
@@ -34,7 +36,7 @@ import scala.util.{Failure, Success, Try}
 
 class KinesisSink[F[_]: Sync] private (
   val maxBytes: Int,
-  client: AmazonKinesis,
+  client: KinesisClient,
   kinesisConfig: KinesisSinkConfig,
   bufferConfig: Config.Buffer,
   streamName: String,
@@ -152,15 +154,15 @@ class KinesisSink[F[_]: Sync] private (
     writeBatchToKinesis(batch).onComplete {
       case Success(s) =>
         kinesisHealthy = true
-        val results      = s.getRecords.asScala.toList
-        val failurePairs = batch.zip(results).filter(_._2.getErrorMessage != null)
+        val results      = s.records().asScala.toList
+        val failurePairs = batch.zip(results).filter(_._2.errorMessage() != null)
         log.info(
           s"Successfully wrote ${batch.size - failurePairs.size} out of ${batch.size} records to Kinesis stream $streamName"
         )
         if (failurePairs.nonEmpty) {
-          failurePairs.groupBy(_._2.getErrorCode).foreach {
+          failurePairs.groupBy(_._2.errorCode()).foreach {
             case (errorCode, items) =>
-              val exampleMsg = items.map(_._2.getErrorMessage).find(_.nonEmpty).getOrElse("")
+              val exampleMsg = items.map(_._2.errorMessage()).find(_.nonEmpty).getOrElse("")
               log.error(
                 s"Writing ${items.size} records (out of ${batch.size}) to Kinesis stream $streamName failed with error code [$errorCode] and example message: $exampleMsg"
               )
@@ -262,19 +264,17 @@ class KinesisSink[F[_]: Sync] private (
       writeBatchToKinesisWithRetries(failedRecords, minBackoff, maxRetries)
     }
 
-  def writeBatchToKinesis(batch: List[Events]): Future[PutRecordsResult] =
+  def writeBatchToKinesis(batch: List[Events]): Future[PutRecordsResponse] =
     Future {
       val putRecordsRequest = {
-        val prr = new PutRecordsRequest()
-        prr.setStreamName(streamName)
         val putRecordsRequestEntryList = batch.map { event =>
-          val prre = new PutRecordsRequestEntry()
-          prre.setPartitionKey(event.key)
-          prre.setData(ByteBuffer.wrap(event.payloads))
-          prre
+          PutRecordsRequestEntry
+            .builder()
+            .partitionKey(event.key)
+            .data(SdkBytes.fromByteArrayUnsafe(event.payloads))
+            .build()
         }
-        prr.setRecords(putRecordsRequestEntryList.asJava)
-        prr
+        PutRecordsRequest.builder().streamName(streamName).records(putRecordsRequestEntryList.asJava).build()
       }
       client.putRecords(putRecordsRequest)
     }
@@ -289,20 +289,20 @@ class KinesisSink[F[_]: Sync] private (
       splitBatch.map(toSqsMessages).flatMap { msgGroup =>
         val entries = msgGroup.map(_._2)
         val batchRequest =
-          new SendMessageBatchRequest().withQueueUrl(sqs.bufferName).withEntries(entries.asJava)
+          SendMessageBatchRequest.builder().queueUrl(sqs.bufferName).entries(entries.asJava).build()
         val response = sqs.client.sendMessageBatch(batchRequest)
         val failures = response
-          .getFailed
+          .failed()
           .asScala
           .toList
           .map { bree =>
-            (bree.getId, BatchResultErrorInfo(bree.getCode, bree.getMessage))
+            (bree.id(), BatchResultErrorInfo(bree.code(), bree.message()))
           }
           .toMap
         // Events to retry and reasons for failure
         msgGroup.collect {
-          case (e, m) if failures.contains(m.getId) =>
-            (e, failures(m.getId))
+          case (e, m) if failures.contains(m.id()) =>
+            (e, failures(m.id()))
         }
       }
     }
@@ -311,12 +311,16 @@ class KinesisSink[F[_]: Sync] private (
     events.map(e =>
       (
         e,
-        new SendMessageBatchRequestEntry(UUID.randomUUID.toString, b64Encode(e.payloads)).withMessageAttributes(
-          Map(
-            "kinesisKey" ->
-              new MessageAttributeValue().withDataType("String").withStringValue(e.key)
-          ).asJava
-        )
+        SendMessageBatchRequestEntry
+          .builder()
+          .id(UUID.randomUUID.toString)
+          .messageBody(b64Encode(e.payloads))
+          .messageAttributes(
+            Map(
+              "kinesisKey" -> MessageAttributeValue.builder().dataType("String").stringValue(e.key).build()
+            ).asJava
+          )
+          .build()
       )
     )
 
@@ -378,7 +382,7 @@ class KinesisSink[F[_]: Sync] private (
         while (!kinesisHealthy) {
           Try {
             val streamDescription = describeStream(client, streamName)
-            streamDescription.getStreamStatus()
+            streamDescription.streamStatusAsString()
           } match {
             case Success("ACTIVE") =>
               log.info(s"Stream $streamName ACTIVE")
@@ -402,7 +406,8 @@ class KinesisSink[F[_]: Sync] private (
         log.info(s"Starting background check for SQS buffer ${sqs.bufferName}")
         while (!sqsHealthy) {
           Try {
-            sqs.client.getQueueUrl(sqs.bufferName)
+            val req = GetQueueUrlRequest.builder().queueName(sqs.bufferName).build()
+            sqs.client.getQueueUrl(req)
           } match {
             case Success(_) =>
               log.info(s"SQS buffer ${sqs.bufferName} exists")
@@ -423,7 +428,7 @@ object KinesisSink {
 
   sealed trait Target
   final case object Kinesis extends Target
-  final case class Sqs(client: AmazonSQS, bufferName: String, maxBytes: Int) extends Target
+  final case class Sqs(client: SqsClient, bufferName: String, maxBytes: Int) extends Target
 
   /**
     * Events to be written to Kinesis or SQS.
@@ -466,21 +471,23 @@ object KinesisSink {
     * @return the initialized AmazonKinesisClient
     */
   def createKinesisClient(
-    endpoint: String,
+    customEndpoint: Option[String],
     region: String
-  ): Either[Throwable, AmazonKinesis] =
-    Either.catchNonFatal(
-      AmazonKinesisClientBuilder
-        .standard()
-        .withEndpointConfiguration(new EndpointConfiguration(endpoint, region))
-        .build()
-    )
+  ): Either[Throwable, KinesisClient] =
+    Either.catchNonFatal {
+      val endpointUri = customEndpoint.map(URI.create)
+      val builder     = KinesisClient.builder().region(Region.of(region))
+      val withEndpointOverride = endpointUri match {
+        case None    => builder
+        case Some(e) => builder.endpointOverride(e)
+      }
+      withEndpointOverride.build()
+    }
 
-  def describeStream(client: AmazonKinesis, streamName: String) = {
-    val describeRequest = new DescribeStreamSummaryRequest()
-    describeRequest.setStreamName(streamName)
-    val describeResult = client.describeStreamSummary(describeRequest)
-    describeResult.getStreamDescriptionSummary()
+  def describeStream(client: KinesisClient, streamName: String) = {
+    val describeRequest = DescribeStreamSummaryRequest.builder().streamName(streamName).build()
+    val describeResult  = client.describeStreamSummary(describeRequest)
+    describeResult.streamDescriptionSummary()
   }
 
   /**
@@ -528,9 +535,9 @@ object KinesisSink {
       case None => None.asRight
     }
 
-  private def createSqsClient(region: String): Either[Throwable, AmazonSQS] =
+  private def createSqsClient(region: String): Either[Throwable, SqsClient] =
     Either.catchNonFatal(
-      AmazonSQSClientBuilder.standard().withRegion(region).build
+      SqsClient.builder().region(Region.of(region)).build()
     )
 
   /**
