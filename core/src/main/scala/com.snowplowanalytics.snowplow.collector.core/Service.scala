@@ -80,7 +80,7 @@ class Service[F[_]: Sync](
       hostname        = extractHostname(request)
       userAgent       = extractHeader(request, "User-Agent")
       refererUri      = extractHeader(request, "Referer")
-      spAnonymous     = extractHeader(request, "SP-Anonymous")
+      spAnonymous     = extractHeader(request, "SP-Anonymous").isDefined
       ip              = extractIp(request, spAnonymous)
       queryString     = Some(request.queryString)
       cookie          = extractCookie(request)
@@ -107,12 +107,13 @@ class Service[F[_]: Sync](
       )
       now <- Clock[F].realTime
       setCookie = cookieHeader(
-        headers       = request.headers,
-        cookieConfig  = config.cookie,
-        networkUserId = nuid,
-        doNotTrack    = doNotTrack,
-        spAnonymous   = spAnonymous,
-        now           = now
+        headers         = request.headers,
+        cookieConfig    = config.cookie,
+        networkUserId   = nuid,
+        doNotTrack      = doNotTrack,
+        spAnonymous     = spAnonymous,
+        now             = now,
+        cookieInRequest = cookie.isDefined
       )
       headerList = List(
         setCookie.map(_.toRaw1),
@@ -198,11 +199,9 @@ class Service[F[_]: Sync](
   def extractHostname(req: Request[F]): Option[String] =
     req.uri.authority.map(_.host.renderString) // Hostname is extracted like this in Akka-Http as well
 
-  def extractIp(req: Request[F], spAnonymous: Option[String]): Option[String] =
-    spAnonymous match {
-      case None    => req.from.map(_.toUriString)
-      case Some(_) => None
-    }
+  def extractIp(req: Request[F], spAnonymous: Boolean): Option[String] =
+    if (spAnonymous) None
+    else req.from.map(_.toUriString)
 
   /** Builds a raw event from an Http request. */
   def buildEvent(
@@ -299,10 +298,10 @@ class Service[F[_]: Sync](
     * If the SP-Anonymous header is present, additionally filters out the
     * X-Forwarded-For, X-Real-IP and Cookie headers as well.
     */
-  def headers(request: Request[F], spAnonymous: Option[String]): List[String] =
+  def headers(request: Request[F], spAnonymous: Boolean): List[String] =
     request.headers.headers.flatMap { h =>
       h.name match {
-        case ci"X-Forwarded-For" | ci"X-Real-Ip" | ci"Cookie" if spAnonymous.isDefined => None
+        case ci"X-Forwarded-For" | ci"X-Real-Ip" | ci"Cookie" if spAnonymous => None
         // FIXME: This is a temporary backport of old akka behaviour we will remove by
         //        adapting enrich to support a CIString header names as per RFC7230#Section-3.2
         case ci"Cookie" => Rfc6265Cookie.parse(h.value).map(c => s"Cookie: $c")
@@ -344,13 +343,27 @@ class Service[F[_]: Sync](
     cookieConfig: Config.Cookie,
     networkUserId: String,
     doNotTrack: Boolean,
-    spAnonymous: Option[String],
-    now: FiniteDuration
+    spAnonymous: Boolean,
+    now: FiniteDuration,
+    cookieInRequest: Boolean
   ): Option[`Set-Cookie`] =
     (doNotTrack, cookieConfig.enabled, spAnonymous) match {
-      case (true, _, _)    => None
-      case (_, false, _)   => None
-      case (_, _, Some(_)) => None
+      case (true, _, _)  => None
+      case (_, false, _) => None
+      case (_, _, true) =>
+        if (cookieInRequest) {
+          val responseCookie = ResponseCookie(
+            name     = cookieConfig.name,
+            content  = "",
+            expires  = HttpDate.fromEpochSecond((now - cookieConfig.expiration).toSeconds).toOption,
+            domain   = cookieDomain(headers, cookieConfig.domains, cookieConfig.fallbackDomain),
+            path     = Some("/"),
+            sameSite = cookieConfig.sameSite,
+            secure   = cookieConfig.secure,
+            httpOnly = cookieConfig.httpOnly
+          )
+          Some(`Set-Cookie`(responseCookie))
+        } else None
       case _ =>
         val responseCookie = ResponseCookie(
           name     = cookieConfig.name,
@@ -453,12 +466,10 @@ class Service[F[_]: Sync](
   def networkUserId(
     request: Request[F],
     requestCookie: Option[RequestCookie],
-    spAnonymous: Option[String]
+    spAnonymous: Boolean
   ): Option[String] =
-    spAnonymous match {
-      case Some(_) => Some(Service.spAnonymousNuid)
-      case None    => request.uri.query.params.get("nuid").orElse(requestCookie.map(_.content))
-    }
+    if (spAnonymous) Some(Service.spAnonymousNuid)
+    else request.uri.query.params.get("nuid").orElse(requestCookie.map(_.content))
 
   /**
     * Builds a location header redirecting to itself to check if third-party cookies are blocked.

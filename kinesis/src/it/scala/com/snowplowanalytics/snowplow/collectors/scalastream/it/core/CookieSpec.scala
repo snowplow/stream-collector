@@ -14,7 +14,7 @@ import cats.effect.IO
 import cats.effect.testing.specs2.CatsEffect
 import com.snowplowanalytics.snowplow.collectors.scalastream.it.{EventGenerator, Http}
 import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers._
-import org.http4s.{Header, SameSite}
+import org.http4s.{Header, RequestCookie, SameSite}
 import org.specs2.mutable.Specification
 import org.typelevel.ci.CIStringSyntax
 
@@ -88,7 +88,7 @@ class CookieSpec extends Specification with Localstack with CatsEffect {
       }
     }
 
-    "not set cookie if the request sets SP-Anonymous header" in {
+    "set cookie if SP-Anonymous is present and request contains a cookie" in {
       val testName = "cookie-anonymous"
       val streamGood = s"$testName-raw"
       val streamBad = s"$testName-bad-1"
@@ -101,11 +101,24 @@ class CookieSpec extends Specification with Localstack with CatsEffect {
       ).use { collector =>
         val request = EventGenerator.mkTp2Event(collector.host, collector.port)
           .withHeaders(Header.Raw(ci"SP-Anonymous", "*"))
+          .addCookie(RequestCookie("sp", "test-nuid"))
 
         for {
           resp <- Http.response(request)
+          now <- IO.realTime
         } yield {
-          resp.cookies should beEmpty
+          resp.cookies match {
+            case List(cookie) =>
+              cookie.name must beEqualTo("sp")
+              cookie.content must beEqualTo("")
+              cookie.expires match {
+                case Some(expiry) =>
+                  expiry.epochSecond should beCloseTo((now - 365.days).toSeconds, 100L)
+                case None =>
+                  ko(s"Cookie [$cookie] doesn't contain the expiry date")
+              }
+            case _ => ko(s"There is not 1 cookie but ${resp.cookies.size}")
+          }
         }
       }
     }

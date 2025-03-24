@@ -24,6 +24,8 @@ import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPa
 
 import com.snowplowanalytics.snowplow.collector.core.model._
 
+import java.util.UUID
+
 class ServiceSpec extends Specification {
   case class ProbeService(service: Service[IO], good: TestSink, bad: TestSink)
 
@@ -67,26 +69,60 @@ class ServiceSpec extends Specification {
 
   "The collector service" should {
     "cookie" in {
-      "not set a cookie if SP-Anonymous is present" in {
-        val request = Request[IO](
-          headers = Headers(
-            Header.Raw(ci"SP-Anonymous", "*")
-          )
+      "set a cookie with empty content and expiration in the past if SP-Anonymous is present and request contains a cookie" in {
+        val testCookieConfig = Config.Cookie(
+          enabled        = true,
+          name           = "sp",
+          expiration     = 5.seconds,
+          domains        = List("domain"),
+          fallbackDomain = None,
+          secure         = false,
+          httpOnly       = false,
+          sameSite       = None
         )
-        val r = service
-          .cookie(
-            body          = IO.pure(Some("b")),
-            path          = "p",
-            request       = request,
-            pixelExpected = false,
-            contentType   = None
-          )
-          .unsafeRunSync()
-        r.headers.get(ci"Set-Cookie") must beNone
+        val now  = Clock[IO].realTime.unsafeRunSync()
+        val nuid = UUID.randomUUID().toString
+        val Some(`Set-Cookie`(cookie)) = service.cookieHeader(
+          headers         = Headers.empty,
+          cookieConfig    = testCookieConfig,
+          networkUserId   = nuid,
+          doNotTrack      = false,
+          spAnonymous     = true,
+          now             = now,
+          cookieInRequest = true
+        )
+
+        cookie.name shouldEqual testCookieConfig.name
+        cookie.content shouldEqual ""
+        cookie.expires must beSome
+        (now - cookie.expires.get.toDuration).toMillis must beCloseTo(testCookieConfig.expiration.toMillis, 1000L)
+      }
+      "not set a cookie if SP-Anonymous is present and the request doesn't contain a cookie" in {
+        val testCookieConfig = Config.Cookie(
+          enabled        = true,
+          name           = "sp",
+          expiration     = 5.seconds,
+          domains        = List("domain"),
+          fallbackDomain = None,
+          secure         = false,
+          httpOnly       = false,
+          sameSite       = None
+        )
+        val now  = Clock[IO].realTime.unsafeRunSync()
+        val nuid = UUID.randomUUID().toString
+        service.cookieHeader(
+          headers         = Headers.empty,
+          cookieConfig    = testCookieConfig,
+          networkUserId   = nuid,
+          doNotTrack      = false,
+          spAnonymous     = true,
+          now             = now,
+          cookieInRequest = false
+        ) shouldEqual None
       }
       "not set a network_userid from cookie if SP-Anonymous is present" in {
         val ProbeService(service, good, bad) = probeService()
-        val nuid                             = "test-nuid"
+        val nuid                             = UUID.randomUUID().toString
         val req = Request[IO](
           method = Method.POST,
           headers = Headers(
@@ -112,7 +148,7 @@ class ServiceSpec extends Specification {
       }
       "network_userid from cookie should persist if SP-Anonymous is not present" in {
         val ProbeService(service, good, bad) = probeService()
-        val nuid                             = "test-nuid"
+        val nuid                             = UUID.randomUUID().toString
         val req = Request[IO](
           method = Method.POST
         ).addCookie(TestUtils.testConfig.cookie.name, nuid)
@@ -131,7 +167,7 @@ class ServiceSpec extends Specification {
         bad.storedRawEvents must have size 0
         val e = emptyCollectorPayload
         deserializer.deserialize(e, good.storedRawEvents.head)
-        e.networkUserId shouldEqual "test-nuid"
+        e.networkUserId shouldEqual nuid
       }
       "use the ip address from 'X-Forwarded-For' header if it exists" in {
         val ProbeService(service, good, bad) = probeService()
@@ -426,6 +462,7 @@ class ServiceSpec extends Specification {
       "fill the correct values" in {
         val ct      = Some("image/gif")
         val headers = List("X-Forwarded-For", "X-Real-Ip")
+        val nuid    = UUID.randomUUID().toString
         val e = service.buildEvent(
           Some("q"),
           Some("b"),
@@ -434,7 +471,7 @@ class ServiceSpec extends Specification {
           Some("ref"),
           Some("h"),
           "ip",
-          "nuid",
+          nuid,
           ct,
           headers
         )
@@ -448,13 +485,14 @@ class ServiceSpec extends Specification {
         e.userAgent shouldEqual "ua"
         e.refererUri shouldEqual "ref"
         e.hostname shouldEqual "h"
-        e.networkUserId shouldEqual "nuid"
+        e.networkUserId shouldEqual nuid
         e.headers shouldEqual (headers ::: ct.toList).asJava
         e.contentType shouldEqual ct.get
       }
 
       "set fields to null if they aren't set" in {
         val headers = List()
+        val nuid    = UUID.randomUUID().toString
         val e = service.buildEvent(
           None,
           None,
@@ -463,7 +501,7 @@ class ServiceSpec extends Specification {
           None,
           None,
           "ip",
-          "nuid",
+          nuid,
           None,
           headers
         )
@@ -477,7 +515,7 @@ class ServiceSpec extends Specification {
         e.userAgent shouldEqual null
         e.refererUri shouldEqual null
         e.hostname shouldEqual null
-        e.networkUserId shouldEqual "nuid"
+        e.networkUserId shouldEqual nuid
         e.headers shouldEqual headers.asJava
         e.contentType shouldEqual null
       }
@@ -664,14 +702,15 @@ class ServiceSpec extends Specification {
       val now = Clock[IO].realTime.unsafeRunSync()
 
       "give back a cookie header with the appropriate configuration" in {
-        val nuid = "nuid"
+        val nuid = UUID.randomUUID().toString
         val Some(`Set-Cookie`(cookie)) = service.cookieHeader(
-          headers       = Headers.empty,
-          cookieConfig  = testCookieConfig,
-          networkUserId = nuid,
-          doNotTrack    = false,
-          spAnonymous   = None,
-          now           = now
+          headers         = Headers.empty,
+          cookieConfig    = testCookieConfig,
+          networkUserId   = nuid,
+          doNotTrack      = false,
+          spAnonymous     = false,
+          now             = now,
+          cookieInRequest = false
         )
 
         cookie.name shouldEqual testCookieConfig.name
@@ -686,36 +725,39 @@ class ServiceSpec extends Specification {
       }
       "give back None if cookie is not enabled" in {
         service.cookieHeader(
-          headers       = Headers.empty,
-          cookieConfig  = testCookieConfig.copy(enabled = false),
-          networkUserId = "nuid",
-          spAnonymous   = None,
-          doNotTrack    = true,
-          now           = now
+          headers         = Headers.empty,
+          cookieConfig    = testCookieConfig.copy(enabled = false),
+          networkUserId   = UUID.randomUUID().toString,
+          spAnonymous     = false,
+          doNotTrack      = true,
+          now             = now,
+          cookieInRequest = false
         ) shouldEqual None
       }
       "give back None if doNoTrack is true" in {
         service.cookieHeader(
-          headers       = Headers.empty,
-          cookieConfig  = testCookieConfig,
-          networkUserId = "nuid",
-          spAnonymous   = None,
-          doNotTrack    = true,
-          now           = now
+          headers         = Headers.empty,
+          cookieConfig    = testCookieConfig,
+          networkUserId   = UUID.randomUUID().toString,
+          spAnonymous     = false,
+          doNotTrack      = true,
+          now             = now,
+          cookieInRequest = false
         ) shouldEqual None
       }
       "give back None if SP-Anonymous header is present" in {
         service.cookieHeader(
-          headers       = Headers.empty,
-          cookieConfig  = testCookieConfig,
-          networkUserId = "nuid",
-          spAnonymous   = Some("*"),
-          doNotTrack    = true,
-          now           = now
+          headers         = Headers.empty,
+          cookieConfig    = testCookieConfig,
+          networkUserId   = UUID.randomUUID().toString,
+          spAnonymous     = true,
+          doNotTrack      = true,
+          now             = now,
+          cookieInRequest = false
         ) shouldEqual None
       }
       "give back a cookie header with Secure, HttpOnly and SameSite=None" in {
-        val nuid = "nuid"
+        val nuid = UUID.randomUUID().toString
         val conf = testCookieConfig.copy(
           secure   = true,
           httpOnly = true,
@@ -723,24 +765,26 @@ class ServiceSpec extends Specification {
         )
         val Some(`Set-Cookie`(cookie)) =
           service.cookieHeader(
-            headers       = Headers.empty,
-            cookieConfig  = conf,
-            networkUserId = nuid,
-            spAnonymous   = None,
-            doNotTrack    = false,
-            now           = now
+            headers         = Headers.empty,
+            cookieConfig    = conf,
+            networkUserId   = nuid,
+            spAnonymous     = false,
+            doNotTrack      = false,
+            now             = now,
+            cookieInRequest = false
           )
         cookie.secure must beTrue
         cookie.httpOnly must beTrue
         cookie.sameSite must beSome[SameSite](SameSite.None)
         cookie.extension must beNone
         service.cookieHeader(
-          headers       = Headers.empty,
-          cookieConfig  = conf,
-          networkUserId = nuid,
-          doNotTrack    = true,
-          spAnonymous   = None,
-          now           = now
+          headers         = Headers.empty,
+          cookieConfig    = conf,
+          networkUserId   = nuid,
+          doNotTrack      = true,
+          spAnonymous     = false,
+          now             = now,
+          cookieInRequest = false
         ) shouldEqual None
       }
     }
@@ -761,7 +805,7 @@ class ServiceSpec extends Specification {
           "X-Real-Ip: 127.0.0.1",
           "Cookie: cookie=value"
         )
-        service.headers(request, None) shouldEqual expected
+        service.headers(request, spAnonymous = false) shouldEqual expected
       }
       "filter out the headers if SP-Anonymous is present" in {
         val request = Request[IO](
@@ -775,55 +819,61 @@ class ServiceSpec extends Specification {
         val expected = List(
           "User-Agent: testUserAgent"
         )
-        service.headers(request, Some("*")) shouldEqual expected
+        service.headers(request, spAnonymous = true) shouldEqual expected
       }
     }
 
     "networkUserId" in {
       "with SP-Anonymous header not present" in {
         "give back the nuid query param if present" in {
+          val nuid1 = UUID.randomUUID().toString
+          val nuid2 = UUID.randomUUID().toString
           service.networkUserId(
-            Request[IO]().withUri(Uri().withQueryParam("nuid", "12")),
-            Some(RequestCookie("nuid", "13")),
-            None
-          ) shouldEqual Some("12")
+            Request[IO]().withUri(Uri().withQueryParam("nuid", nuid1)),
+            Some(RequestCookie("nuid", nuid2)),
+            spAnonymous = false
+          ) shouldEqual Some(nuid1)
         }
         "give back the request cookie if there no nuid query param" in {
+          val nuid = UUID.randomUUID().toString
           service.networkUserId(
             Request[IO](),
-            Some(RequestCookie("nuid", "13")),
-            None
-          ) shouldEqual Some("13")
+            Some(RequestCookie("nuid", nuid)),
+            spAnonymous = false
+          ) shouldEqual Some(nuid)
         }
         "give back none otherwise" in {
           service.networkUserId(
             Request[IO](),
             None,
-            None
+            spAnonymous = false
           ) shouldEqual None
         }
       }
 
       "with SP-Anonymous header present give back the dummy nuid" in {
         "if query param is present" in {
+          val nuid1 = UUID.randomUUID().toString
+          val nuid2 = UUID.randomUUID().toString
           service.networkUserId(
-            Request[IO]().withUri(Uri().withQueryParam("nuid", "12")),
-            Some(RequestCookie("nuid", "13")),
-            Some("*")
+            Request[IO]().withUri(Uri().withQueryParam("nuid", nuid1)),
+            Some(RequestCookie("nuid", nuid2)),
+            spAnonymous = true
           ) shouldEqual Some("00000000-0000-0000-0000-000000000000")
         }
         "if the request cookie can be used in place of a missing nuid query param" in {
+          val nuid = UUID.randomUUID().toString
           service.networkUserId(
             Request[IO](),
-            Some(RequestCookie("nuid", "13")),
-            Some("*")
+            Some(RequestCookie("nuid", nuid)),
+            spAnonymous = true
           ) shouldEqual Some("00000000-0000-0000-0000-000000000000")
         }
         "in any other case" in {
           service.networkUserId(
             Request[IO](),
             None,
-            Some("*")
+            spAnonymous = true
           ) shouldEqual Some("00000000-0000-0000-0000-000000000000")
         }
       }
