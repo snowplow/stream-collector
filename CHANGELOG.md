@@ -13,6 +13,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 ### Security
 
+## [3.4.0] - 2025-04-01
+### Added
+- Add option to create second cookie to store networkUserID that is not http only [snowplow/stream-collector-private#10]
+
+### Changed
+- Kinesis: allow larger payloads when SQS buffer is enabled [snowplow/stream-collector-private#6]
+- Unset network_userid when SP-Anonymous header is present [snowplow/stream-collector-private#7]
+- Bump AWS SDK to v2 [snowplow/stream-collector-private#11]
+
+### Fixed
+- Fix execution of QA tests [snowplow/stream-collector-private#6]
+
+### Security
+- Bump dependencies [snowplow/stream-collector-private#9]
+- Run snyk for kafka collector [snowplow/stream-collector-private#8]
+
 ## [3.3.0] - 2024-12-18
 ### Changed
 - Kafka sink use a dedicated thread for potentially blocking send [snowplow/stream-collector-private#3]
@@ -572,7 +588,8 @@ Ensure docker image has latest libfreetype6 version [#247]
 - Scala Stream Collector, Scala Kinesis Enrich: replaced stream list with describe to tighten permissions, thanks @pkallos! [snowplow/snowplow#535]
 
 
-[Unreleased]: https://github.com/snowplow/stream-collector/compare/3.3.0...HEAD
+[Unreleased]: https://github.com/snowplow/stream-collector/compare/3.4.0...HEAD
+[3.4.0]: https://github.com/snowplow/stream-collector/compare/3.3.0...3.4.0
 [3.3.0]: https://github.com/snowplow/stream-collector/compare/3.2.1...3.3.0
 [3.2.1]: https://github.com/snowplow/stream-collector/compare/3.2.0...3.2.1
 [3.2.0]: https://github.com/snowplow/stream-collector/compare/3.1.2...3.2.0
