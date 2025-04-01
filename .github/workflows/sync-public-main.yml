@@ -1,0 +1,55 @@
+name: Sync to Public Repo
+
+on:
+  workflow_dispatch:  
+
+jobs:
+  sync:
+    if: ${{ github.event.repository.private == true }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout private repo (public-main)
+        uses: actions/checkout@v4
+        with:
+          ref: public-main
+          fetch-depth: 0 
+          persist-credentials: false
+
+      - name: Generate GitHub App Token for Snowplow Incubator Org
+        id: generate_token
+        run: |
+          echo "Using Snowplow Incubator org token"
+          echo "installation_id=${{ secrets.GH_APP_INSTALLATION_ID }}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate GitHub App Token
+        id: auth_token
+        uses: tibdex/github-app-token@v1
+        with:
+          app_id: ${{ secrets.GH_APP_ID }}
+          private_key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          installation_id: ${{ steps.generate_token.outputs.installation_id }}
+
+      - name: Set up Git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "bot@snowplow.io"
+
+      - name: Add public repo as remote
+        run: |
+          if ! git remote | grep -q "public-origin"; then
+            git remote add public-origin https://x-access-token:${{ steps.auth_token.outputs.token }}@github.com/snowplow/stream-collector.git
+          fi
+          git fetch public-origin
+
+      - name: Fast-forward merge to master
+        run: |
+          git checkout -b public-origin/master || git checkout public-origin/master
+          git merge --ff-only public-main || echo "Fast-forward merge not possible; skipping."
+
+      - name: Push Changes to Public Repo
+        run: |
+          if ! git push public-origin public-main:master; then
+            echo "Push failed; check for conflicts or diverged branches."
+            exit 1
+          fi
