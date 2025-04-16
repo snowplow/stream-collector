@@ -7,6 +7,7 @@ on:
 
 jobs:
   deploy_to_github:
+    if: ${{ github.event.repository.private == true }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -48,6 +49,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy_to_docker:
+    if: ${{ github.event.repository.private == true }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -156,6 +158,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
   qa_framework:
+    if: ${{ github.event.repository.private == true }}
     runs-on: ubuntu-latest
     needs: deploy_to_docker
     steps:

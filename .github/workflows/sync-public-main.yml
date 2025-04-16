@@ -1,12 +1,21 @@
 name: Sync to Public Repo
 
 on:
-  workflow_dispatch:  
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MAIN_BRANCH: master
+  PUBLIC_REPO: https://github.com/snowplow/stream-collector-private.git
 
 jobs:
   sync:
     if: ${{ github.event.repository.private == true }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout private repo (public-main)
@@ -36,20 +45,36 @@ jobs:
           git config user.email "bot@snowplow.io"
 
       - name: Add public repo as remote
+        env:
+          PUBLIC_REPO: ${{ env.PUBLIC_REPO }}
         run: |
+          REPO_URL="${PUBLIC_REPO#https://}"
           if ! git remote | grep -q "public-origin"; then
-            git remote add public-origin https://x-access-token:${{ steps.auth_token.outputs.token }}@github.com/snowplow/stream-collector.git
+            git remote add public-origin https://x-access-token:${{ steps.auth_token.outputs.token }}@$REPO_URL
           fi
           git fetch public-origin
 
-      - name: Fast-forward merge to master
+      - name: Fast-forward merge to main
         run: |
-          git checkout -b public-origin/master || git checkout public-origin/master
+          git checkout -b public-origin/${{ env.MAIN_BRANCH }} || git checkout public-origin/${{ env.MAIN_BRANCH }}
           git merge --ff-only public-main || echo "Fast-forward merge not possible; skipping."
 
       - name: Push Changes to Public Repo
         run: |
-          if ! git push public-origin public-main:master; then
+          if ! git push public-origin public-main:${{ env.MAIN_BRANCH }}; then
             echo "Push failed; check for conflicts or diverged branches."
             exit 1
           fi
+
+      - name: Push missing tags to Public Repo
+        run: |
+          TAGS_TO_PUSH=$(git log public-main --pretty=format:"%D" | grep -o 'tag: [0-9]\+\.[0-9]\+\.[0-9]\+' | sed 's/tag: //')
+
+          for TAG in $TAGS_TO_PUSH; do
+            git ls-remote --tags public-origin | grep -q "refs/tags/$TAG" && continue
+
+            git push public-origin $TAG || {
+              echo "Push failed for tag $TAG; check for conflicts or invalid tag state."
+              exit 1
+            }
+          done
