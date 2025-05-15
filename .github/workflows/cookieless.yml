@@ -16,6 +16,11 @@ jobs:
           distribution: 'temurin'
       - name: Install sbt
         uses: sbt/setup-sbt@v1
+      - name: Install Thrift
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libthrift-java thrift-compiler
+          version: 1.0
       - name: Publish Docker image
         run: sbt 'project stdout; set Docker / version := "0.0.0"' docker:publishLocal
       - name: Run Docker image

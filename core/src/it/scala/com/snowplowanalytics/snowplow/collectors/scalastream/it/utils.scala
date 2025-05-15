@@ -33,7 +33,7 @@ import com.snowplowanalytics.snowplow.badrows.BadRow
 import com.snowplowanalytics.iglu.core.SelfDescribingData
 import com.snowplowanalytics.iglu.core.circe.implicits._
 
-import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
+import com.snowplowanalytics.snowplow.collector.thrift.CollectorPayload
 
 object utils {
 

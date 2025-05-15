@@ -5,14 +5,15 @@ import org.apache.thrift.TDeserializer
 import io.circe.Json
 import io.circe.parser._
 import io.circe.syntax._
+import java.nio.charset.StandardCharsets
+import java.nio.ByteBuffer
 
 import com.snowplowanalytics.iglu.core.circe.implicits._
 import com.snowplowanalytics.iglu.core.SelfDescribingData
 
-import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
-
 import com.snowplowanalytics.snowplow.badrows._
 
+import com.snowplowanalytics.snowplow.collector.thrift.CollectorPayload
 import com.snowplowanalytics.snowplow.collector.core.model.SplitBatchResult
 
 import org.specs2.mutable.Specification
@@ -60,6 +61,26 @@ class SplitBatchSpec extends Specification {
       target must_== new CollectorPayload()
     }
 
+    "Serialize a CollectorPayload with a UTF-8 String body" in {
+      val bodyString = "ABC123😊扫雪机"
+      val input      = new CollectorPayload
+      input.setBody(ByteBuffer.wrap(bodyString.getBytes(StandardCharsets.UTF_8)))
+      val actual = splitBatch.splitAndSerializePayload(input, 100, 101L)
+      val target = new CollectorPayload()
+      new TDeserializer().deserialize(target, actual.good.head)
+      new String(target.getBody, StandardCharsets.UTF_8) must_== bodyString
+    }
+
+    "Serialize a CollectorPayload with binary body that is not UTF-8" in {
+      val body  = Array(192.toByte, 193.toByte, 245.toByte) // None of these bytes appear in valid UTF-8
+      val input = new CollectorPayload
+      input.setBody(ByteBuffer.wrap(body))
+      val actual = splitBatch.splitAndSerializePayload(input, 100, 101L)
+      val target = new CollectorPayload()
+      new TDeserializer().deserialize(target, actual.good.head)
+      target.bufferForBody() must_== input.bufferForBody()
+    }
+
     "Reject an oversized GET CollectorPayload" in {
       val payload = new CollectorPayload()
       payload.setQuerystring("x" * 1000)
@@ -79,7 +100,7 @@ class SplitBatchSpec extends Specification {
 
     "Reject an oversized POST CollectorPayload when exceeds max payload size" in {
       val payload = new CollectorPayload()
-      payload.setBody("s" * 1010)
+      payload.setBody(("s" * 1010).getBytes(StandardCharsets.UTF_8))
       val actual   = splitBatch.splitAndSerializePayload(payload, 1000, 1000L)
       val res      = parse(new String(actual.bad.head)).toOption.get
       val selfDesc = SelfDescribingData.parse(res).toOption.get
@@ -93,13 +114,13 @@ class SplitBatchSpec extends Specification {
         .expectation must_== "oversized collector payload: Payload exceeds max size of 1000. Actual length: 1029"
       sizeViolation
         .payload
-        .event must_== "CollectorPayload(schema:null, ipAddress:null, timestamp:0, encoding:null, collector:null, body:sssss"
+        .event must_== "CollectorPayload(schema:null, ipAddress:null, timestamp:0, encoding:null, collector:null, body:73 73"
       sizeViolation.processor shouldEqual Processor(TestUtils.appName, TestUtils.appVersion)
     }
 
     "Reject an oversized POST CollectorPayload with an unparseable body" in {
       val payload = new CollectorPayload()
-      payload.setBody("s" * 1000)
+      payload.setBody(("s" * 1000).getBytes(StandardCharsets.UTF_8))
       val actual   = splitBatch.splitAndSerializePayload(payload, 100, 1020L)
       val res      = parse(new String(actual.bad.head)).toOption.get
       val selfDesc = SelfDescribingData.parse(res).toOption.get
@@ -115,6 +136,25 @@ class SplitBatchSpec extends Specification {
       sizeViolation.processor shouldEqual Processor(TestUtils.appName, TestUtils.appVersion)
     }
 
+    "Reject an oversized POST CollectorPayload with a binary body that is not valid UTF-8" in {
+      val payload = new CollectorPayload()
+      val body    = Array.fill(1000)(192.toByte) // 192.toByte is not valid UTF-8
+      payload.setBody(body)
+      val actual   = splitBatch.splitAndSerializePayload(payload, 100, 1020L)
+      val res      = parse(new String(actual.bad.head)).toOption.get
+      val selfDesc = SelfDescribingData.parse(res).toOption.get
+      val badRow   = selfDesc.data.as[BadRow].toOption.get
+      badRow must beAnInstanceOf[BadRow.SizeViolation]
+      val sizeViolation = badRow.asInstanceOf[BadRow.SizeViolation]
+      sizeViolation.failure.maximumAllowedSizeBytes must_== 100
+      sizeViolation.failure.actualSizeBytes must_== 1019
+      sizeViolation
+        .failure
+        .expectation must_== "oversized collector payload: cannot split POST requests which are not json expected json value got '������...' (line 1, column 1)"
+      sizeViolation.payload.event must_== "CollectorP"
+      sizeViolation.processor shouldEqual Processor(TestUtils.appName, TestUtils.appVersion)
+    }
+
     "Reject an oversized POST CollectorPayload which would be oversized even without its body" in {
       val payload = new CollectorPayload()
       val data = Json.obj(
@@ -124,7 +164,7 @@ class SplitBatchSpec extends Specification {
           Json.obj("e" := "se", "tv" := "js")
         )
       )
-      payload.setBody(data.noSpaces)
+      payload.setBody(data.noSpaces.getBytes(StandardCharsets.UTF_8))
       payload.setPath("p" * 1000)
       val actual = splitBatch.splitAndSerializePayload(payload, 1000, 2000L)
       actual.bad.size must_== 1
@@ -158,7 +198,7 @@ class SplitBatchSpec extends Specification {
           Json.obj("e" := "se", "tv" := "y" * 1000)
         )
       )
-      payload.setBody(data.noSpaces)
+      payload.setBody(data.noSpaces.getBytes(StandardCharsets.UTF_8))
       val actual = splitBatch.splitAndSerializePayload(payload, 1000, 10000)
       actual.bad.size must_== 4
       actual.good.size must_== 2

@@ -20,7 +20,7 @@ import software.amazon.awssdk.auth.credentials._
 import software.amazon.awssdk.services.kinesis.KinesisClient
 import software.amazon.awssdk.services.kinesis.model._
 
-import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
+import com.snowplowanalytics.snowplow.collector.thrift.CollectorPayload
 
 import com.snowplowanalytics.snowplow.badrows.BadRow
 

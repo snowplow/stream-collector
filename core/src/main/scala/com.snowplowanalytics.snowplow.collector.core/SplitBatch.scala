@@ -23,7 +23,7 @@ import io.circe.syntax._
 import com.snowplowanalytics.iglu.core._
 import com.snowplowanalytics.iglu.core.circe.CirceIgluCodecs._
 import com.snowplowanalytics.snowplow.badrows._
-import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
+import com.snowplowanalytics.snowplow.collector.thrift.CollectorPayload
 import com.snowplowanalytics.snowplow.collector.core.model._
 
 /** Object handling splitting an array of strings correctly */
@@ -101,7 +101,7 @@ case class SplitBatch(appInfo: AppInfo) {
     } else {
       (for {
         body     <- Option(payload.getBody).toRight("GET requests cannot be split")
-        children <- splitBody(body)
+        children <- splitBody(new String(body, UTF_8))
         initialBodyDataBytes = getSize(Json.arr(children._2: _*).noSpaces)
         _ <- Either.cond[String, Unit](
           wholePayloadBytes - initialBodyDataBytes < maxBytes,
@@ -169,7 +169,7 @@ case class SplitBatch(appInfo: AppInfo) {
     batches.map { batch =>
       val payload = event.deepCopy()
       val body    = SelfDescribingData[Json](schema, Json.arr(batch: _*))
-      payload.setBody(body.asJson.noSpaces)
+      payload.setBody(body.asJson.noSpaces.getBytes(UTF_8))
       serializer.serialize(payload)
     }
 }

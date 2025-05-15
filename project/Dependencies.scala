@@ -20,10 +20,9 @@ object Dependencies {
     val ceTestkit        = "3.4.5"
     val circe            = "0.14.1"
     val circeConfig      = "0.10.0"
-    val collectorPayload = "0.0.0"
     val decline          = "2.4.1"
     val fs2PubSub        = "0.22.0"
-    val http4s           = "0.23.23"
+    val http4s           = "0.23.30"
     val jackson          = "2.15.2"
     val jacksonCbor      = "2.12.7" // force this version to mitigate security vulnerabilities
     val kafka            = "3.9.0"
@@ -54,7 +53,6 @@ object Dependencies {
     val catsRetry         = "com.github.cb372"      %% "cats-retry"                            % V.catsRetry
     val circeConfig       = "io.circe"              %% "circe-config"                          % V.circeConfig
     val circeGeneric      = "io.circe"              %% "circe-generic"                         % V.circe
-    val collectorPayload  = "com.snowplowanalytics" % "collector-payload-1"                    % V.collectorPayload
     val decline           = "com.monovore"          %% "decline-effect"                        % V.decline
     val emitterHttps      = "com.snowplowanalytics" %% "snowplow-scala-tracker-emitter-http4s" % V.tracker
     val http4sBlaze       = "org.http4s"            %% "http4s-blaze-server"                   % V.blaze

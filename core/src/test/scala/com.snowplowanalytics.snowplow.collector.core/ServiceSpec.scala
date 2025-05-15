@@ -2,6 +2,7 @@ package com.snowplowanalytics.snowplow.collector.core
 
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
+import java.nio.charset.StandardCharsets
 
 import org.specs2.mutable.Specification
 
@@ -10,6 +11,7 @@ import org.typelevel.ci._
 import org.apache.thrift.{TDeserializer, TSerializer}
 
 import com.comcast.ip4s.{IpAddress, SocketAddress}
+import scodec.bits.ByteVector
 
 import cats.data.NonEmptyList
 
@@ -20,8 +22,7 @@ import org.http4s._
 import org.http4s.headers._
 import org.http4s.implicits._
 
-import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
-
+import com.snowplowanalytics.snowplow.collector.thrift.CollectorPayload
 import com.snowplowanalytics.snowplow.collector.core.model._
 
 import java.util.UUID
@@ -133,7 +134,7 @@ class ServiceSpec extends Specification {
         ).addCookie(TestUtils.testConfig.cookie.name, nuid)
         val r = service
           .cookie(
-            body          = IO.pure(Some("b")),
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
             request       = req,
             pixelExpected = false,
@@ -156,7 +157,7 @@ class ServiceSpec extends Specification {
         ).addCookie(TestUtils.testConfig.cookie.name, nuid)
         val r = service
           .cookie(
-            body          = IO.pure(Some("b")),
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
             request       = req,
             pixelExpected = false,
@@ -181,7 +182,7 @@ class ServiceSpec extends Specification {
         ).withAttribute(Request.Keys.ConnectionInfo, testConnection)
         val r = service
           .cookie(
-            body          = IO.pure(Some("b")),
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
             request       = req,
             pixelExpected = false,
@@ -203,7 +204,7 @@ class ServiceSpec extends Specification {
         ).withAttribute(Request.Keys.ConnectionInfo, testConnection)
         val r = service
           .cookie(
-            body          = IO.pure(Some("b")),
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
             request       = req,
             pixelExpected = false,
@@ -228,7 +229,7 @@ class ServiceSpec extends Specification {
         ).withAttribute(Request.Keys.ConnectionInfo, testConnection)
         val r = service
           .cookie(
-            body          = IO.pure(Some("b")),
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
             request       = req,
             pixelExpected = false,
@@ -256,7 +257,7 @@ class ServiceSpec extends Specification {
         ).withAttribute(Request.Keys.ConnectionInfo, testConnection).addCookie(TestUtils.testConfig.cookie.name, nuid)
         val r = service
           .cookie(
-            body          = IO.pure(Some("b")),
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
             request       = req,
             pixelExpected = false,
@@ -275,7 +276,7 @@ class ServiceSpec extends Specification {
         e.encoding shouldEqual "UTF-8"
         e.collector shouldEqual s"${TestUtils.appInfo.shortName}-${TestUtils.appVersion}-testsink"
         e.querystring shouldEqual "a=b"
-        e.body shouldEqual "b"
+        new String(e.getBody, StandardCharsets.UTF_8) shouldEqual "b"
         e.path shouldEqual "p"
         e.userAgent shouldEqual "testUserAgent"
         e.refererUri shouldEqual "example.com"
@@ -302,7 +303,7 @@ class ServiceSpec extends Specification {
         )
         val r = service
           .cookie(
-            body          = IO.pure(Some("b")),
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
             request       = req,
             pixelExpected = false,
@@ -335,7 +336,7 @@ class ServiceSpec extends Specification {
         )
         val r = service
           .cookie(
-            body          = IO.pure(Some("b")),
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
             request       = req,
             pixelExpected = false,
@@ -355,7 +356,7 @@ class ServiceSpec extends Specification {
       "return necessary cache control headers and respond with pixel when pixelExpected is true" in {
         val r = service
           .cookie(
-            body          = IO.pure(Some("b")),
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
             request       = Request[IO](),
             pixelExpected = true,
@@ -371,7 +372,7 @@ class ServiceSpec extends Specification {
       "include CORS headers in the response" in {
         val r = service
           .cookie(
-            body          = IO.pure(Some("b")),
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
             request       = Request[IO](),
             pixelExpected = true,
@@ -404,7 +405,7 @@ class ServiceSpec extends Specification {
         val request = Request[IO](headers = headers)
         val r = service
           .cookie(
-            body          = IO.pure(Some("b")),
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
             request       = request,
             pixelExpected = true,
@@ -433,7 +434,7 @@ class ServiceSpec extends Specification {
         )
         val r = service
           .cookie(
-            body          = IO.pure(Some("b")),
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = testPath,
             request       = req,
             pixelExpected = false,
@@ -461,7 +462,7 @@ class ServiceSpec extends Specification {
         ).addCookie(TestUtils.testConfig.cookie.name, nuid)
         val r = service
           .cookie(
-            body          = IO.pure(Some("b")),
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
             request       = req,
             pixelExpected = false,
@@ -493,7 +494,7 @@ class ServiceSpec extends Specification {
         ).addCookie(TestUtils.testConfig.cookie.name, nuid)
         val r = service
           .cookie(
-            body          = IO.pure(Some("b")),
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
             request       = req,
             pixelExpected = false,
@@ -523,7 +524,7 @@ class ServiceSpec extends Specification {
         ).addCookie(TestUtils.testConfig.cookie.name, nuid)
         val r = service
           .cookie(
-            body          = IO.pure(Some("b")),
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
             request       = req,
             pixelExpected = false,
@@ -554,7 +555,7 @@ class ServiceSpec extends Specification {
         ).addCookie(TestUtils.testConfig.cookie.name, nuid)
         val r = service
           .cookie(
-            body          = IO.pure(Some("b")),
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
             request       = req,
             pixelExpected = false,
@@ -591,7 +592,7 @@ class ServiceSpec extends Specification {
         )
         val r = service
           .cookie(
-            body          = IO.pure(Some("b")),
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
             request       = req,
             pixelExpected = false,
@@ -626,7 +627,7 @@ class ServiceSpec extends Specification {
         val nuid    = UUID.randomUUID().toString
         val e = service.buildEvent(
           Some("q"),
-          Some("b"),
+          Some(ByteVector("b".getBytes(StandardCharsets.UTF_8))),
           "p",
           Some("ua"),
           Some("ref"),
@@ -641,7 +642,7 @@ class ServiceSpec extends Specification {
         e.encoding shouldEqual "UTF-8"
         e.collector shouldEqual s"${TestUtils.appInfo.shortName}-${TestUtils.appVersion}-testsink"
         e.querystring shouldEqual "q"
-        e.body shouldEqual "b"
+        new String(e.getBody, StandardCharsets.UTF_8) shouldEqual "b"
         e.path shouldEqual "p"
         e.userAgent shouldEqual "ua"
         e.refererUri shouldEqual "ref"
@@ -1345,7 +1346,7 @@ class ServiceSpec extends Specification {
 
         val r = service
           .cookie(
-            body          = IO.pure(Some("b")),
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
             request       = req,
             pixelExpected = true,
@@ -1367,7 +1368,7 @@ class ServiceSpec extends Specification {
 
         val r = service
           .cookie(
-            body          = IO.pure(Some("b")),
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
             request       = req,
             pixelExpected = true,
@@ -1389,7 +1390,7 @@ class ServiceSpec extends Specification {
 
         val r = service
           .cookie(
-            body          = IO.pure(Some("b")),
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
             request       = req,
             pixelExpected = true,
@@ -1411,7 +1412,7 @@ class ServiceSpec extends Specification {
 
         val r = service
           .cookie(
-            body          = IO.pure(Some("b")),
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
             request       = req,
             pixelExpected = true,

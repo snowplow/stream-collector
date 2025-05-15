@@ -13,13 +13,14 @@ import org.http4s.headers._
 import org.http4s.Status._
 import fs2.{Stream, text}
 import org.typelevel.ci.CIString
+import scodec.bits.ByteVector
 
 import scala.concurrent.duration.DurationInt
 
 class RoutesSpec extends Specification {
 
   case class CookieParams(
-    body: IO[Option[String]],
+    body: IO[Option[ByteVector]],
     path: String,
     request: Request[IO],
     pixelExpected: Boolean,
@@ -43,7 +44,7 @@ class RoutesSpec extends Specification {
       IO.pure(Response(status = Ok, body = Stream.empty))
 
     override def cookie(
-      body: IO[Option[String]],
+      body: IO[Option[ByteVector]],
       path: String,
       request: Request[IO],
       pixelExpected: Boolean,
@@ -134,7 +135,10 @@ class RoutesSpec extends Specification {
       val response = routes.run(request).unsafeRunSync()
 
       val List(cookieParams) = collectorService.getCookieCalls
-      cookieParams.body.unsafeRunSync() shouldEqual Some("testBody")
+      cookieParams.body.unsafeRunSync() should beSome.like {
+        case bv: ByteVector =>
+          bv.decodeUtf8 should beRight("testBody")
+      }
       cookieParams.path shouldEqual "/p3/p4"
       cookieParams.pixelExpected shouldEqual false
       cookieParams.doNotTrack shouldEqual false
@@ -198,7 +202,15 @@ class RoutesSpec extends Specification {
         val response = routes.run(request).unsafeRunSync()
 
         val List(cookieParams) = collectorService.getCookieCalls
-        cookieParams.body.unsafeRunSync() shouldEqual body
+        body match {
+          case None =>
+            cookieParams.body.unsafeRunSync() should beNone
+          case Some(expected) =>
+            cookieParams.body.unsafeRunSync() should beSome.like {
+              case bv: ByteVector =>
+                bv.decodeUtf8 should beRight(expected)
+            }
+        }
         cookieParams.path shouldEqual uri.path.renderString
         method match {
           case Method.POST =>

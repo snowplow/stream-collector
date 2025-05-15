@@ -24,7 +24,6 @@ lazy val core = project
       Dependencies.Libraries.log4cats,
       Dependencies.Libraries.thrift,
       Dependencies.Libraries.badRows,
-      Dependencies.Libraries.collectorPayload,
       Dependencies.Libraries.slf4j,
       Dependencies.Libraries.decline,
       Dependencies.Libraries.circeGeneric,

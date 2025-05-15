@@ -13,6 +13,7 @@ package com.snowplowanalytics.snowplow.collector.core
 import java.util.UUID
 
 import org.apache.commons.codec.binary.Base64
+import scodec.bits.ByteVector
 
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
@@ -29,14 +30,13 @@ import org.http4s.Status._
 
 import org.typelevel.ci._
 
-import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
-
 import com.snowplowanalytics.snowplow.collector.core.model._
+import com.snowplowanalytics.snowplow.collector.thrift.CollectorPayload
 
 trait IService[F[_]] {
   def preflightResponse(req: Request[F]): F[Response[F]]
   def cookie(
-    body: F[Option[String]],
+    body: F[Option[ByteVector]],
     path: String,
     request: Request[F],
     pixelExpected: Boolean,
@@ -68,7 +68,7 @@ class Service[F[_]: Sync](
   private val splitBatch: SplitBatch = SplitBatch(appInfo)
 
   override def cookie(
-    body: F[Option[String]],
+    body: F[Option[ByteVector]],
     path: String,
     request: Request[F],
     pixelExpected: Boolean,
@@ -211,7 +211,7 @@ class Service[F[_]: Sync](
   /** Builds a raw event from an Http request. */
   def buildEvent(
     queryString: Option[String],
-    body: Option[String],
+    body: Option[ByteVector],
     path: String,
     userAgent: Option[String],
     refererUri: Option[String],
@@ -229,7 +229,12 @@ class Service[F[_]: Sync](
       collector
     )
     queryString.foreach(e.querystring = _)
-    body.foreach(e.body               = _)
+
+    // ByteVector's .toByteBufferUnsafe is called unsafe because it does not copy the underlying bytes.
+    // It is safe in this context because we never modify original byte arrays.
+    // Thrift's e.setBody safely copies the ByteBuffer if it is not backed by an array.
+    body.foreach(bv => e.setBody(bv.toByteBufferUnsafe))
+
     e.path = path
     userAgent.foreach(e.userAgent   = _)
     refererUri.foreach(e.refererUri = _)

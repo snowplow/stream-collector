@@ -31,10 +31,10 @@ object BuildSettings {
     scalacOptions ++= Seq("-Ywarn-macros:after"),
     javacOptions   := Seq("-source", "11", "-target", "11"),
     resolvers     ++= Seq(
-      "Snowplow Analytics Maven repo".at("http://maven.snplow.com/releases/").withAllowInsecureProtocol(true),
       // For uaParser utils
       "user-agent-parser repo".at("https://clojars.org/repo/")
-    )
+    ),
+    Compile / packageDoc / publishArtifact := false
   )
 
   lazy val coreHttp4sSettings = commonSettings ++ sbtAssemblySettings ++ Defaults.itSettings

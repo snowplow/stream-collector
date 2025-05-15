@@ -19,6 +19,11 @@ jobs:
           distribution: 'temurin'
       - name: Install sbt
         uses: sbt/setup-sbt@v1
+      - name: Install Thrift
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libthrift-java thrift-compiler
+          version: 1.0
       - name: Build artifacts
         run: |
           sbt 'project kafka' assembly
@@ -80,6 +85,11 @@ jobs:
           distribution: 'temurin'
       - name: Install sbt
         uses: sbt/setup-sbt@v1
+      - name: Install Thrift
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libthrift-java thrift-compiler
+          version: 1.0
       - name: Get current version
         id: ver
         run: |

@@ -12,7 +12,7 @@ package com.snowplowanalytics.snowplow.collectors.scalastream.it
 
 import com.snowplowanalytics.snowplow.badrows.BadRow
 
-import com.snowplowanalytics.snowplow.CollectorPayload.thrift.model1.CollectorPayload
+import com.snowplowanalytics.snowplow.collector.thrift.CollectorPayload
 
 case class CollectorOutput(
   good: List[CollectorPayload],

@@ -16,6 +16,7 @@ import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.implicits._
 import com.comcast.ip4s.Dns
+import scodec.bits.ByteVector
 
 class Routes[F[_]: Async](
   enableDefaultRedirect: Boolean,
@@ -35,7 +36,7 @@ class Routes[F[_]: Async](
     case req @ POST -> Root / vendor / version =>
       val path = service.determinePath(vendor, version)
       service.cookie(
-        body          = req.bodyText.compile.string.map(Some(_)),
+        body          = req.body.compile.to(ByteVector).map(Some(_)),
         path          = path,
         request       = req,
         pixelExpected = false,
