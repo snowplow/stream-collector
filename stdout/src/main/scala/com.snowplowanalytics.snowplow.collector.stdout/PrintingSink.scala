@@ -18,7 +18,7 @@ class PrintingSink[F[_]: Sync](
   override val maxBytes: Int         = maxByteS
   override def isHealthy: F[Boolean] = Sync[F].pure(true)
 
-  override def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit] =
+  override def storeRawEvents(events: List[Array[Byte]]): F[Unit] =
     events.traverse_ { event =>
       Sync[F].delay {
         stream.println(encoder.encodeToString(event))

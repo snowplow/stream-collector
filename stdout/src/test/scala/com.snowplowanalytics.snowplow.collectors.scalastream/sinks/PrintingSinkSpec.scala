@@ -18,7 +18,7 @@ class PrintingSinkSpec extends Specification {
       val sink  = new PrintingSink[IO](Integer.MAX_VALUE, new PrintStream(baos))
       val input = "Something"
 
-      sink.storeRawEvents(List(input.getBytes(StandardCharsets.UTF_8)), "key").unsafeRunSync()
+      sink.storeRawEvents(List(input.getBytes(StandardCharsets.UTF_8))).unsafeRunSync()
 
       baos.toString(StandardCharsets.UTF_8) must beEqualTo("U29tZXRoaW5n\n") // base64 of 'Something' + newline
     }

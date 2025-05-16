@@ -11,9 +11,8 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 package sinks
 
+import cats.implicits._
 import cats.effect.{Resource, Sync}
-import cats.implicits.catsSyntaxMonadErrorRethrow
-import cats.syntax.either._
 import software.amazon.awssdk.core.SdkBytes
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.kinesis.KinesisClient
@@ -24,7 +23,6 @@ import com.snowplowanalytics.snowplow.collector.core.{Config, Sink}
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink._
 import org.slf4j.LoggerFactory
 
-import java.nio.ByteBuffer
 import java.util.UUID
 import java.util.concurrent.ScheduledExecutorService
 import java.net.URI
@@ -73,8 +71,13 @@ class KinesisSink[F[_]: Sync] private (
   @volatile private var sqsHealthy: Boolean     = false
   override def isHealthy: F[Boolean]            = Sync[F].pure(kinesisHealthy || sqsHealthy)
 
-  override def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit] =
-    Sync[F].delay(events.foreach(e => EventStorage.store(e, key)))
+  override def storeRawEvents(events: List[Array[Byte]]): F[Unit] =
+    events.traverse_ { e =>
+      for {
+        uuid <- Sync[F].delay(UUID.randomUUID)
+        _    <- Sync[F].delay(EventStorage.store(e, uuid.toString))
+      } yield ()
+    }
 
   object EventStorage {
     private val storedEvents              = ListBuffer.empty[Events]
@@ -82,14 +85,13 @@ class KinesisSink[F[_]: Sync] private (
     @volatile private var lastFlushedTime = 0L
 
     def store(event: Array[Byte], key: String): Unit = {
-      val eventBytes = ByteBuffer.wrap(event)
-      val eventSize  = eventBytes.capacity
+      val eventSize = event.size
 
       synchronized {
         if (storedEvents.size + 1 > RecordThreshold || byteCount + eventSize > ByteThreshold) {
           flush()
         }
-        storedEvents += Events(eventBytes.array(), key)
+        storedEvents += Events(event, key)
         byteCount += eventSize
       }
     }
@@ -285,7 +287,7 @@ class KinesisSink[F[_]: Sync] private (
     */
   def writeBatchToSqs(batch: List[Events], sqs: Sqs): Future[List[(Events, BatchResultErrorInfo)]] =
     Future {
-      val splitBatch = split(batch, getByteSize, MaxSqsBatchSizeN, sqs.maxBytes)
+      val splitBatch = split(batch, MaxSqsBatchSizeN, sqs.maxBytes)
       splitBatch.map(toSqsMessages).flatMap { msgGroup =>
         val entries = msgGroup.map(_._2)
         val batchRequest =
@@ -543,14 +545,12 @@ object KinesisSink {
   /**
     * Splits a Kinesis-sized batch of `Events` into smaller batches that meet the SQS limit.
     * @param batch A batch of up to `KinesisLimit` that must be split into smaller batches.
-    * @param getByteSize How to get the size of a batch.
     * @param maxRecords Max records for the smaller batches.
     * @param maxBytes Max byte size for the smaller batches.
     * @return A batch of smaller batches, each one of which meets the limits.
     */
   def split(
     batch: List[Events],
-    getByteSize: Events => Int,
     maxRecords: Int,
     maxBytes: Int
   ): List[List[Events]] = {
@@ -560,15 +560,14 @@ object KinesisSink {
       (originalBatch, tmpBatch) match {
         case (Nil, Nil) => newBatch
         case (Nil, acc) => acc :: newBatch
-        case (h :: t, acc) if acc.size + 1 > maxRecords || getByteSize(h) + bytes > maxBytes =>
-          bytes = getByteSize(h).toLong
+        case (h :: t, acc) if acc.size + 1 > maxRecords || h.payloads.size + bytes > maxBytes =>
+          bytes = h.payloads.size.toLong
           go(t, h :: Nil, acc :: newBatch)
         case (h :: t, acc) =>
-          bytes += getByteSize(h)
+          bytes += h.payloads.size
           go(t, h :: acc, newBatch)
       }
     go(batch, Nil, Nil).map(_.reverse).reverse.filter(_.nonEmpty)
   }
 
-  def getByteSize(events: Events): Int = ByteBuffer.wrap(events.payloads).capacity
 }

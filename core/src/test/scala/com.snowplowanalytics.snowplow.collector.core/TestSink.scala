@@ -12,7 +12,7 @@ class TestSink extends Sink[IO] {
 
   override def isHealthy: IO[Boolean] = IO.pure(true)
 
-  override def storeRawEvents(events: List[Array[Byte]], key: String): IO[Unit] =
+  override def storeRawEvents(events: List[Array[Byte]]): IO[Unit] =
     IO.delay(buf ++= events)
 
   def storedRawEvents: List[Array[Byte]] = buf.toList

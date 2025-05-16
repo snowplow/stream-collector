@@ -39,7 +39,7 @@ class PubSubSink[F[_]: Async: Parallel: Logger] private (
   topicName: String
 ) extends Sink[F] {
 
-  override def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit] =
+  override def storeRawEvents(events: List[Array[Byte]]): F[Unit] =
     produceBatch(events).start.void
 
   override def isHealthy: F[Boolean] = isHealthyState.get

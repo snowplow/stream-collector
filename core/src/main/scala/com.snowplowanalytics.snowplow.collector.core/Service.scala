@@ -91,8 +91,7 @@ class Service[F[_]: Sync](
         if (alreadyBouncing) config.cookieBounce.fallbackNetworkUserId
         else UUID.randomUUID().toString
       }
-      shouldBounce              = config.cookieBounce.enabled && nuidOpt.isEmpty && !alreadyBouncing && pixelExpected && !redirect
-      (ipAddress, partitionKey) = ipAndPartitionKey(ip, config.streams.useIpAddressAsPartitionKey)
+      shouldBounce = config.cookieBounce.enabled && nuidOpt.isEmpty && !alreadyBouncing && pixelExpected && !redirect
       event = buildEvent(
         queryString,
         body,
@@ -100,7 +99,7 @@ class Service[F[_]: Sync](
         userAgent,
         refererUri,
         hostname,
-        ipAddress,
+        ip.getOrElse("unknown"),
         nuid,
         contentType,
         headers(request, spAnonymous)
@@ -127,7 +126,7 @@ class Service[F[_]: Sync](
         `Access-Control-Allow-Credentials`().toRaw1.some
       ).flatten
       responseHeaders = Headers(headerList ++ bounceLocationHeaders(config.cookieBounce, shouldBounce, request))
-      _ <- if (!doNotTrack && !shouldBounce) sinkEvent(event, partitionKey) else Sync[F].unit
+      _ <- if (!doNotTrack && !shouldBounce) sinkEvent(event) else Sync[F].unit
       resp = buildHttpResponse(
         queryParams   = request.uri.query.params,
         headers       = responseHeaders,
@@ -327,8 +326,7 @@ class Service[F[_]: Sync](
 
   /** Produces the event to the configured sink. */
   def sinkEvent(
-    event: CollectorPayload,
-    partitionKey: String
+    event: CollectorPayload
   ): F[Unit] =
     for {
       // Split events into Good and Bad
@@ -336,8 +334,8 @@ class Service[F[_]: Sync](
         splitBatch.splitAndSerializePayload(event, sinks.good.maxBytes, config.networking.maxPayloadSize)
       )
       // Send events to respective sinks
-      _ <- sinks.good.storeRawEvents(eventSplit.good, partitionKey)
-      _ <- sinks.bad.storeRawEvents(eventSplit.bad, partitionKey)
+      _ <- sinks.good.storeRawEvents(eventSplit.good)
+      _ <- sinks.bad.storeRawEvents(eventSplit.bad)
     } yield ()
 
   /**
@@ -449,22 +447,6 @@ class Service[F[_]: Sync](
     */
   def validMatch(host: String, domain: String): Boolean =
     host == domain || host.endsWith("." + domain)
-
-  /**
-    * Gets the IP from a RemoteAddress. If ipAsPartitionKey is false, a UUID will be generated.
-    *
-    * @param remoteAddress    Address extracted from an HTTP request
-    * @param ipAsPartitionKey Whether to use the ip as a partition key or a random UUID
-    * @return a tuple of ip (unknown if it couldn't be extracted) and partition key
-    */
-  def ipAndPartitionKey(
-    ipAddress: Option[String],
-    ipAsPartitionKey: Boolean
-  ): (String, String) =
-    ipAddress match {
-      case None     => ("unknown", UUID.randomUUID.toString)
-      case Some(ip) => (ip, if (ipAsPartitionKey) ip else UUID.randomUUID.toString)
-    }
 
   /**
     * Gets the network user id from the query string or the request cookie.

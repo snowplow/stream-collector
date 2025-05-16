@@ -113,7 +113,6 @@ object NsqConfigSpec {
     redirectDomains       = Set.empty,
     preTerminationPeriod  = 10.seconds,
     streams = Config.Streams(
-      useIpAddressAsPartitionKey = false,
       good = Config.Sink(
         name = "good",
         buffer = Config.Buffer(

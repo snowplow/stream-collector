@@ -686,7 +686,7 @@ class ServiceSpec extends Specification {
     "sinkEvent" in {
       "send back the produced events" in {
         val ProbeService(s, good, bad) = probeService()
-        s.sinkEvent(event, "key").unsafeRunSync()
+        s.sinkEvent(event).unsafeRunSync()
         good.storedRawEvents must have size 1
         bad.storedRawEvents must have size 0
         good.storedRawEvents.head.zip(serializer.serialize(event)).forall { case (a, b) => a mustEqual b }
@@ -829,24 +829,6 @@ class ServiceSpec extends Specification {
         )
         res.status shouldEqual Status.Found
         res.headers shouldEqual testHeaders.put(Location(Uri.unsafeFromString("https://unknown.example.com/12")))
-      }
-    }
-
-    "ipAndPartitionkey" in {
-      "give back the ip and partition key as ip if remote address is defined" in {
-        val address = Some("127.0.0.1")
-        service.ipAndPartitionKey(address, true) shouldEqual (("127.0.0.1", "127.0.0.1"))
-      }
-      "give back the ip and a uuid as partition key if ipAsPartitionKey is false" in {
-        val address    = Some("127.0.0.1")
-        val (ip, pkey) = service.ipAndPartitionKey(address, false)
-        ip shouldEqual "127.0.0.1"
-        pkey must beMatching(uuidRegex)
-      }
-      "give back unknown as ip and a random uuid as partition key if the address isn't known" in {
-        val (ip, pkey) = service.ipAndPartitionKey(None, true)
-        ip shouldEqual "unknown"
-        pkey must beMatching(uuidRegex)
       }
     }
 

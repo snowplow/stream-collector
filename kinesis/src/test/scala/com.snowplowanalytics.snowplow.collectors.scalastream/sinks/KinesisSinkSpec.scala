@@ -22,20 +22,20 @@ class KinesisSinkSpec extends Specification {
     "return empty list if given an empty batch" in {
       val emptyBatch = List.empty[Events]
 
-      split(emptyBatch, getByteSize, 1, 10) mustEqual List.empty
-      split(emptyBatch, getByteSize, 10, 1) mustEqual List.empty
+      split(emptyBatch, 1, 10) mustEqual List.empty
+      split(emptyBatch, 10, 1) mustEqual List.empty
       // Edge case that we shouldn't hit. The test simply confirms the behaviour.
-      split(emptyBatch, getByteSize, 0, 0) mustEqual List.empty
+      split(emptyBatch, 0, 0) mustEqual List.empty
     }
 
     "correctly split batches, according to maxRecords setting" in {
       val batch1 = List.fill(10)(event)
       val batch2 = List.fill(1)(event)
 
-      val res1 = split(batch1, getByteSize, 3, 1000)
-      val res2 = split(batch2, getByteSize, 3, 1000)
+      val res1 = split(batch1, 3, 1000)
+      val res2 = split(batch2, 3, 1000)
       // Edge case that we shouldn't hit. The test simply confirms the behaviour.
-      val res3 = split(batch1, getByteSize, 0, 1000)
+      val res3 = split(batch1, 0, 1000)
 
       res1.length mustEqual 4
       res2.length mustEqual 1
@@ -46,10 +46,10 @@ class KinesisSinkSpec extends Specification {
       val batch1 = List.fill(10)(event)
       val batch2 = List.fill(1)(event)
 
-      val res1 = split(batch1, getByteSize, 1000, 3)
-      val res2 = split(batch2, getByteSize, 1000, 3)
+      val res1 = split(batch1, 1000, 3)
+      val res2 = split(batch2, 1000, 3)
       // Edge case that we shouldn't hit. The test simply confirms the behaviour.
-      val res3 = split(batch1, getByteSize, 1000, 0)
+      val res3 = split(batch1, 1000, 0)
 
       res1.length mustEqual 4
       res2.length mustEqual 1

@@ -123,7 +123,6 @@ object SqsConfigSpec {
       dropPayloadSize       = 2097152
     ),
     streams = Config.Streams(
-      useIpAddressAsPartitionKey = false,
       good = Config.Sink(
         name = "good",
         buffer = Config.Buffer(

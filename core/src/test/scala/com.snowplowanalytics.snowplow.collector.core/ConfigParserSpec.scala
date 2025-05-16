@@ -46,8 +46,7 @@ class ConfigParserSpec extends Specification with CatsEffect {
           5000
         ),
         SinkConfig("hello", "world")
-      ),
-      TestUtils.testConfig.streams.useIpAddressAsPartitionKey
+      )
     )
     val expected = TestUtils
       .testConfig

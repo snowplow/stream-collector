@@ -103,8 +103,7 @@ object Config {
 
   case class Streams[+SinkConfig](
     good: Sink[SinkConfig],
-    bad: Sink[SinkConfig],
-    useIpAddressAsPartitionKey: Boolean
+    bad: Sink[SinkConfig]
   )
 
   final case class Sink[+SinkConfig](name: String, buffer: Buffer, config: SinkConfig)

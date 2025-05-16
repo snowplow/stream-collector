@@ -184,10 +184,6 @@ collector {
     #  - a generic_error if a request's querystring cannot be parsed because of illegal characters
     bad = "bad"
 
-    # Whether to use the incoming event's ip as the partition key for the good stream/topic
-    # Note: Nsq does not make use of partition key.
-    useIpAddressAsPartitionKey = false
-
     # Enable the chosen sink by uncommenting the appropriate configuration
     sink {
       # Choose between kinesis, sqs, google-pub-sub, kafka, nsq, or stdout.

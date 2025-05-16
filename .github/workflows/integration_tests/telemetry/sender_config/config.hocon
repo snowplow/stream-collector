@@ -152,10 +152,6 @@ collector {
     # Events that are too big (w.r.t Kinesis 1MB limit) will be stored in the bad stream/topic
     bad = ""
 
-    # Whether to use the incoming event's ip as the partition key for the good stream/topic
-    # Note: Nsq does not make use of partition key.
-    useIpAddressAsPartitionKey = false
-
     # Enable the chosen sink by uncommenting the appropriate configuration
     sink {
       # Choose between kinesis, googlepubsub, kafka, nsq, or stdout.

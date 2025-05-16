@@ -52,7 +52,6 @@ collector {
   streams {
     good = "good"
     bad = "bad"
-    useIpAddressAsPartitionKey = true
 
     sink {
       enabled = "stdout"

@@ -11,11 +11,10 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream.sinks
 
 import cats.effect.{Resource, Sync}
-import cats.implicits.catsSyntaxMonadErrorRethrow
+import cats.implicits._
 
 import org.slf4j.LoggerFactory
 
-import java.nio.ByteBuffer
 import java.util.UUID
 import java.util.concurrent.ScheduledExecutorService
 
@@ -24,8 +23,6 @@ import scala.util.{Failure, Random, Success, Try}
 import scala.concurrent.{ExecutionContextExecutorService, Future}
 import scala.concurrent.duration.MILLISECONDS
 import scala.jdk.CollectionConverters._
-
-import cats.syntax.either._
 
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.sqs.SqsClient
@@ -62,8 +59,13 @@ class SqsSink[F[_]: Sync] private (
   @volatile private var sqsHealthy: Boolean = false
   override def isHealthy: F[Boolean]        = Sync[F].pure(sqsHealthy)
 
-  override def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit] =
-    Sync[F].delay(events.foreach(e => EventStorage.store(e, key)))
+  override def storeRawEvents(events: List[Array[Byte]]): F[Unit] =
+    events.traverse_ { e =>
+      for {
+        uuid <- Sync[F].delay(UUID.randomUUID)
+        _    <- Sync[F].delay(EventStorage.store(e, uuid.toString))
+      } yield ()
+    }
 
   object EventStorage {
     private val storedEvents              = ListBuffer.empty[Events]
@@ -71,14 +73,13 @@ class SqsSink[F[_]: Sync] private (
     @volatile private var lastFlushedTime = 0L
 
     def store(event: Array[Byte], key: String): Unit = {
-      val eventBytes = ByteBuffer.wrap(event)
-      val eventSize  = eventBytes.capacity
+      val eventSize = event.size
 
       synchronized {
         if (storedEvents.size + 1 > RecordThreshold || byteCount + eventSize > ByteThreshold) {
           flush()
         }
-        storedEvents += Events(eventBytes.array(), key)
+        storedEvents += Events(event, key)
         byteCount += eventSize
       }
     }

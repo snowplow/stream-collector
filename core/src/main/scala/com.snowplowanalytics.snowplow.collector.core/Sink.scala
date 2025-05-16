@@ -17,5 +17,5 @@ trait Sink[F[_]] {
   val maxBytes: Int
 
   def isHealthy: F[Boolean]
-  def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit]
+  def storeRawEvents(events: List[Array[Byte]]): F[Unit]
 }

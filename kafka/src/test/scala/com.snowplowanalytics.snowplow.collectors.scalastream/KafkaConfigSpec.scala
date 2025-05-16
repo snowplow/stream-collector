@@ -153,8 +153,7 @@ object KafkaConfigSpec {
             )
           )
         )
-      ),
-      useIpAddressAsPartitionKey = false
+      )
     ),
     telemetry = Config.Telemetry(
       disable         = false,

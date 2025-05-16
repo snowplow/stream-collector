@@ -30,7 +30,7 @@ import java.util.concurrent.Executors
 class KafkaSink[F[_]: Async: Logger](
   val maxBytes: Int,
   isHealthyState: Ref[F, Boolean],
-  kafkaProducer: KafkaProducer[String, Array[Byte]],
+  kafkaProducer: KafkaProducer[Nothing, Array[Byte]],
   topicName: String,
   ec: ExecutionContext
 ) extends Sink[F] {
@@ -41,19 +41,18 @@ class KafkaSink[F[_]: Async: Logger](
     * Store raw events to the topic
     *
     * @param events The list of events to send
-    * @param key The partition key to use
     */
-  override def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit] =
-    storeRawEventsAndWait(events, key).start.void
+  override def storeRawEvents(events: List[Array[Byte]]): F[Unit] =
+    storeRawEventsAndWait(events).start.void
 
-  private def storeRawEventsAndWait(events: List[Array[Byte]], key: String): F[Unit] =
-    Logger[F].debug(s"Writing ${events.size} Thrift records to Kafka topic $topicName at key $key") *>
+  private def storeRawEventsAndWait(events: List[Array[Byte]]): F[Unit] =
+    Logger[F].debug(s"Writing ${events.size} Thrift records to Kafka topic $topicName") *>
       events.parTraverse_ { e =>
         def go: F[Unit] =
           Async[F]
             .async[Unit] { cb =>
               val blockingSend = Sync[F].delay {
-                val record = new ProducerRecord(topicName, key, e)
+                val record = new ProducerRecord(topicName, e)
                 kafkaProducer.send(record, callback(cb))
                 Option.empty[F[Unit]]
               }
@@ -109,19 +108,19 @@ object KafkaSink {
     kafkaConfig: KafkaSinkConfig,
     bufferConfig: Config.Buffer,
     authCallbackClass: String
-  ): Resource[F, KafkaProducer[String, Array[Byte]]] = {
+  ): Resource[F, KafkaProducer[Nothing, Array[Byte]]] = {
     val props = Map(
       "bootstrap.servers"                 -> kafkaConfig.brokers,
       "acks"                              -> "all",
       "retries"                           -> kafkaConfig.retries.toString,
       "linger.ms"                         -> bufferConfig.timeLimit.toString,
-      "key.serializer"                    -> "org.apache.kafka.common.serialization.StringSerializer",
+      "key.serializer"                    -> "org.apache.kafka.common.serialization.VoidSerializer",
       "value.serializer"                  -> "org.apache.kafka.common.serialization.ByteArraySerializer",
       "sasl.login.callback.handler.class" -> authCallbackClass
     ) ++ kafkaConfig.producerConf.getOrElse(Map.empty) + ("buffer.memory" -> Long.MaxValue.toString)
 
     val make = Sync[F].delay {
-      new KafkaProducer[String, Array[Byte]]((props: Map[String, AnyRef]).asJava)
+      new KafkaProducer[Nothing, Array[Byte]]((props: Map[String, AnyRef]).asJava)
     }
     Resource.make(make)(p => Sync[F].blocking(p.close))
   }

@@ -21,9 +21,9 @@ object TestUtils {
   }
 
   def noopSink[F[_]: Applicative]: Sink[F] = new Sink[F] {
-    val maxBytes: Int                                                   = Int.MaxValue
-    def isHealthy: F[Boolean]                                           = Applicative[F].pure(true)
-    def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit] = Applicative[F].unit
+    val maxBytes: Int                                      = Int.MaxValue
+    def isHealthy: F[Boolean]                              = Applicative[F].pure(true)
+    def storeRawEvents(events: List[Array[Byte]]): F[Unit] = Applicative[F].unit
   }
 
   val testConfig = Config[Any](
@@ -94,8 +94,7 @@ object TestUtils {
           5000
         ),
         AnyRef
-      ),
-      useIpAddressAsPartitionKey = false
+      )
     ),
     monitoring = Monitoring(
       Metrics(

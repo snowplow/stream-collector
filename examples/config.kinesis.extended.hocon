@@ -179,10 +179,6 @@ collector {
 
     bad = "bad"
 
-    # Whether to use the incoming event's ip as the partition key for the good stream/topic
-    # Note: Nsq does not make use of partition key.
-    useIpAddressAsPartitionKey = false
-
     good {
 
       # Events which have successfully been collected will be stored in the good stream/topic

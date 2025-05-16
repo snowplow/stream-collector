@@ -39,9 +39,8 @@ class NsqSink[F[_]: Sync] private (
   /**
     * Store raw events to the topic
     * @param events The list of events to send
-    * @param key The partition key (unused)
     */
-  override def storeRawEvents(events: List[Array[Byte]], key: String): F[Unit] =
+  override def storeRawEvents(events: List[Array[Byte]]): F[Unit] =
     Sync[F].blocking(producer.produceMulti(topicName, events.asJava)).onError {
       case _: NSQException | _: TimeoutException =>
         setHealthStatus(false)
