@@ -26,6 +26,8 @@ lazy val core = project
       Dependencies.Libraries.badRows,
       Dependencies.Libraries.collectorPayload,
       Dependencies.Libraries.slf4j,
+      Dependencies.Libraries.logback,
+      Dependencies.Libraries.logstash,
       Dependencies.Libraries.decline,
       Dependencies.Libraries.circeGeneric,
       Dependencies.Libraries.circeConfig,

@@ -29,6 +29,8 @@ object Dependencies {
     val kafka            = "3.9.0"
     val log4cats         = "2.6.0"
     val log4j            = "2.17.2" // CVE-2021-44228
+    val logback          = "1.5.16"
+    val logstash         = "8.0"
     val mskAuth          = "2.3.1"
     val nettyAll         = "4.1.118.Final" // to fix nsq dependency
     val nsqClient        = "1.3.0"
@@ -62,6 +64,8 @@ object Dependencies {
     val http4sDsl         = "org.http4s"            %% "http4s-dsl"                            % V.http4s
     val log4cats          = "org.typelevel"         %% "log4cats-slf4j"                        % V.log4cats
     val slf4j             = "org.slf4j"             % "slf4j-simple"                           % V.slf4j
+    val logback           = "ch.qos.logback"        % "logback-classic"                        % V.logback
+    val logstash          = "net.logstash.logback"  % "logstash-logback-encoder"               % V.logstash
     val thrift            = "org.apache.thrift"     % "libthrift"                              % V.thrift
     val trackerCore       = "com.snowplowanalytics" %% "snowplow-scala-tracker-core"           % V.tracker
     val datadogHttp4s     = "com.avast.cloud"       %% "datadog4s-http4s"                      % V.dataDog4s
