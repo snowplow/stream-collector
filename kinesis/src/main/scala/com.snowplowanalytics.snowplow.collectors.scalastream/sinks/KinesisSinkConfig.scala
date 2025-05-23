@@ -17,10 +17,10 @@ final case class KinesisSinkConfig(
   sqsMaxBytes: Int,
   startupCheckInterval: FiniteDuration
 ) {
-  val endpoint = customEndpoint.getOrElse(region match {
-    case cn @ "cn-north-1"     => s"https://kinesis.$cn.amazonaws.com.cn"
-    case cn @ "cn-northwest-1" => s"https://kinesis.$cn.amazonaws.com.cn"
-    case _                     => s"https://kinesis.$region.amazonaws.com"
+  val endpoint = customEndpoint.orElse(region match {
+    case cn @ "cn-north-1"     => Some(s"https://kinesis.$cn.amazonaws.com.cn")
+    case cn @ "cn-northwest-1" => Some(s"https://kinesis.$cn.amazonaws.com.cn")
+    case _                     => None
   })
 }
 

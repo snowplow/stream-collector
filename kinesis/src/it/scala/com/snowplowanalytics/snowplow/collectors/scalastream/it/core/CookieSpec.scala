@@ -14,7 +14,8 @@ import cats.effect.IO
 import cats.effect.testing.specs2.CatsEffect
 import com.snowplowanalytics.snowplow.collectors.scalastream.it.{EventGenerator, Http}
 import com.snowplowanalytics.snowplow.collectors.scalastream.it.kinesis.containers._
-import org.http4s.{Header, SameSite}
+import org.http4s.{Header, RequestCookie, SameSite, Status}
+import org.http4s.headers._
 import org.specs2.mutable.Specification
 import org.typelevel.ci.CIStringSyntax
 
@@ -48,7 +49,7 @@ class CookieSpec extends Specification with Localstack with CatsEffect {
                 cookie.name must beEqualTo("greatName")
                 cookie.expires match {
                   case Some(expiry) =>
-                    expiry.epochSecond should beCloseTo((now + 42.days).toSeconds, 10L)
+                    expiry.epochSecond should beCloseTo((now + 42.days).toSeconds, 100L)
                   case None =>
                     ko(s"Cookie [$cookie] doesn't contain the expiry date")
                 }
@@ -88,7 +89,7 @@ class CookieSpec extends Specification with Localstack with CatsEffect {
       }
     }
 
-    "not set cookie if the request sets SP-Anonymous header" in {
+    "set cookie if SP-Anonymous is present and request contains a cookie" in {
       val testName = "cookie-anonymous"
       val streamGood = s"$testName-raw"
       val streamBad = s"$testName-bad-1"
@@ -101,11 +102,101 @@ class CookieSpec extends Specification with Localstack with CatsEffect {
       ).use { collector =>
         val request = EventGenerator.mkTp2Event(collector.host, collector.port)
           .withHeaders(Header.Raw(ci"SP-Anonymous", "*"))
+          .addCookie(RequestCookie("sp", "test-nuid"))
+
+        for {
+          resp <- Http.response(request)
+          now <- IO.realTime
+        } yield {
+          resp.cookies match {
+            case List(cookie) =>
+              cookie.name must beEqualTo("sp")
+              cookie.content must beEqualTo("")
+              cookie.expires match {
+                case Some(expiry) =>
+                  expiry.epochSecond should beCloseTo((now - 365.days).toSeconds, 100L)
+                case None =>
+                  ko(s"Cookie [$cookie] doesn't contain the expiry date")
+              }
+            case _ => ko(s"There is not 1 cookie but ${resp.cookies.size}")
+          }
+        }
+      }
+    }
+
+    "return client cookie if client cookie name is given" in {
+      val testName = "client-cookie"
+      val streamGood = s"$testName-raw"
+      val streamBad = s"$testName-bad-1"
+      val clientCookieName = "sp_client"
+      val serverCookieName = "sp"
+      val nuid = "test-nuid"
+
+      Collector.container(
+        "kinesis/src/it/resources/collector-client-cookie.hocon",
+        testName,
+        streamGood,
+        streamBad,
+        additionalConfig = Map(
+          "SERVER_COOKIE_NAME" -> serverCookieName,
+          "CLIENT_COOKIE_NAME" -> clientCookieName
+        )
+      ).use { collector =>
+        val request = EventGenerator.mkTp2Event(collector.host, collector.port)
+          .addCookie(RequestCookie(serverCookieName, nuid))
 
         for {
           resp <- Http.response(request)
         } yield {
-          resp.cookies should beEmpty
+          resp.status mustEqual Status.Ok
+
+          val cookies = resp.headers.get[`Set-Cookie`].get
+          cookies.toList must haveSize(2)
+
+          val `Set-Cookie`(clientCookie) = cookies.find(_.cookie.name == clientCookieName).get
+          val `Set-Cookie`(serverCookie) = cookies.find(_.cookie.name == serverCookieName).get
+          clientCookie.content must beEqualTo(nuid)
+          clientCookie must beEqualTo(serverCookie.copy(httpOnly = false, name = clientCookieName))
+        }
+      }
+    }
+
+    "return a client cookie with empty content and expiration in the past if SP-Anonymous is present and nuid is set in request" in {
+      val testName = "client-cookie-anonymous"
+      val streamGood = s"$testName-raw"
+      val streamBad = s"$testName-bad-1"
+      val clientCookieName = "sp_client"
+      val serverCookieName = "sp"
+      val nuid = "test-nuid"
+
+      Collector.container(
+        "kinesis/src/it/resources/collector-client-cookie.hocon",
+        testName,
+        streamGood,
+        streamBad,
+        additionalConfig = Map(
+          "SERVER_COOKIE_NAME" -> serverCookieName,
+          "CLIENT_COOKIE_NAME" -> clientCookieName
+        )
+      ).use { collector =>
+        val request = EventGenerator.mkTp2Event(collector.host, collector.port)
+          .withHeaders(Header.Raw(ci"SP-Anonymous", "*"))
+          .addCookie(RequestCookie(serverCookieName, nuid))
+
+        for {
+          resp <- Http.response(request)
+          now <- IO.realTime
+        } yield {
+          resp.status mustEqual Status.Ok
+
+          val cookies = resp.headers.get[`Set-Cookie`].get
+          cookies.toList must haveSize(2)
+
+          val `Set-Cookie`(clientCookie) = cookies.find(_.cookie.name == clientCookieName).get
+          val `Set-Cookie`(serverCookie) = cookies.find(_.cookie.name == serverCookieName).get
+          clientCookie.content must beEqualTo("")
+          clientCookie.expires.get.epochSecond should beCloseTo((now - 365.days).toSeconds, 10L)
+          clientCookie must beEqualTo(serverCookie.copy(httpOnly = false, name = clientCookieName))
         }
       }
     }

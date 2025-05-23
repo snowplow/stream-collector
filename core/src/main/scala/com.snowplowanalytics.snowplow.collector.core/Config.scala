@@ -65,8 +65,12 @@ object Config {
     fallbackDomain: Option[String],
     secure: Boolean,
     httpOnly: Boolean,
-    sameSite: Option[SameSite]
-  )
+    sameSite: Option[SameSite],
+    clientCookieName: Option[String]
+  ) {
+    def clientCookie: Option[Cookie] =
+      clientCookieName.map(n => this.copy(name = n, httpOnly = false))
+  }
 
   case class DoNotTrackCookie(
     enabled: Boolean,

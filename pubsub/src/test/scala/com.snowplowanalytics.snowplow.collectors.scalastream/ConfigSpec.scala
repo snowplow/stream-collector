@@ -70,14 +70,15 @@ object ConfigSpec {
       secure  = true
     ),
     cookie = Config.Cookie(
-      enabled        = true,
-      expiration     = 365.days,
-      name           = "sp",
-      domains        = List.empty,
-      fallbackDomain = None,
-      secure         = true,
-      httpOnly       = true,
-      sameSite       = Some(SameSite.None)
+      enabled          = true,
+      expiration       = 365.days,
+      name             = "sp",
+      domains          = List.empty,
+      fallbackDomain   = None,
+      secure           = true,
+      httpOnly         = true,
+      sameSite         = Some(SameSite.None),
+      clientCookieName = None
     ),
     doNotTrackCookie = Config.DoNotTrackCookie(
       enabled = false,

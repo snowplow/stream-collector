@@ -44,14 +44,15 @@ object TestUtils {
       true
     ),
     cookie = Cookie(
-      enabled        = true,
-      name           = "sp",
-      expiration     = 365.days,
-      domains        = Nil,
-      fallbackDomain = None,
-      secure         = true,
-      httpOnly       = true,
-      sameSite       = Some(SameSite.None)
+      enabled          = true,
+      name             = "sp",
+      expiration       = 365.days,
+      domains          = Nil,
+      fallbackDomain   = None,
+      secure           = true,
+      httpOnly         = true,
+      sameSite         = Some(SameSite.None),
+      clientCookieName = None
     ),
     doNotTrackCookie = DoNotTrackCookie(
       false,

@@ -91,6 +91,9 @@ object BuildSettings {
         Dependencies.Libraries.mskAuth,
         Dependencies.Libraries.azureIdentity,
         Dependencies.Libraries.jacksonCbor,
+        Dependencies.Libraries.jsonSmart,
+        Dependencies.Libraries.nettyCommon,
+        Dependencies.Libraries.nettyHandler,
 
         // integration tests dependencies
         Dependencies.Libraries.IntegrationTests.specs2,
@@ -146,6 +149,7 @@ object BuildSettings {
       case x if x.endsWith("module-info.class")                 => MergeStrategy.first
       case x if x.endsWith("paginators-1.json")                 => MergeStrategy.first
       case x if x.endsWith("service-2.json")                    => MergeStrategy.first
+      case x if x.endsWith("FastDoubleParser-NOTICE")           => MergeStrategy.first
       case x =>
         val oldStrategy = (assembly / assemblyMergeStrategy).value
         oldStrategy(x)

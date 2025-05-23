@@ -13,7 +13,7 @@ import sbt._
 object Dependencies {
 
   object V {
-    val awsSdk           = "1.12.769"
+    val awsSdk           = "2.31.6"
     val badRows          = "2.2.1"
     val blaze            = "0.23.15"
     val catsRetry        = "3.1.0"
@@ -31,8 +31,8 @@ object Dependencies {
     val log4j            = "2.17.2" // CVE-2021-44228
     val logback          = "1.5.16"
     val logstash         = "8.0"
-    val mskAuth          = "1.1.1"
-    val nettyAll         = "4.1.115.Final" // to fix nsq dependency
+    val mskAuth          = "2.3.1"
+    val nettyAll         = "4.1.118.Final" // to fix nsq dependency
     val nsqClient        = "1.3.0"
     val pubsub           = "1.134.2" // force this version to mitigate security vulnerabilities
     val rabbitMQ         = "5.15.0"
@@ -44,7 +44,9 @@ object Dependencies {
     val tracker          = "2.0.0"
     val dataDog4s        = "0.32.0"
     val jnrPosix         = "3.1.20"  // force this version to mitigate security vulnerabilities
-    val azureIdentity    = "1.13.2"
+    val azureIdentity    = "1.13.3"
+    val httpClient       = "4.5.14" // CVE-2020-13956
+    val jsonSmart        = "2.5.2" // CVE-2024-57699
   }
 
   object Libraries {
@@ -69,21 +71,25 @@ object Dependencies {
     val datadogHttp4s     = "com.avast.cloud"       %% "datadog4s-http4s"                      % V.dataDog4s
     val datadogStatsd     = "com.avast.cloud"       %% "datadog4s-statsd"                      % V.dataDog4s
     val jnrPosix          = "com.github.jnr"        % "jnr-posix"                              % V.jnrPosix
+    val httpClient        = "org.apache.httpcomponents" % "httpclient"                         % V.httpClient
 
     //sinks
-    val fs2PubSub      = "com.permutive"                    %% "fs2-google-pubsub-grpc"     % V.fs2PubSub
-    val jackson        = "com.fasterxml.jackson.core"       % "jackson-databind"            % V.jackson
-    val jacksonCbor    = "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor"     % V.jackson
-    val kafka          = "org.apache.kafka"                 % "kafka-clients"               % V.kafka
-    val kinesis        = "com.amazonaws"                    % "aws-java-sdk-kinesis"        % V.awsSdk
-    val log4j          = "org.apache.logging.log4j"         % "log4j-core"                  % V.log4j
-    val mskAuth        = "software.amazon.msk"              % "aws-msk-iam-auth"            % V.mskAuth % Runtime // Enables AWS MSK IAM authentication https://github.com/snowplow/stream-collector/pull/214
-    val nettyAll       = "io.netty"                   % "netty-all"                   % V.nettyAll
-    val nsqClient      = "com.snowplowanalytics"      % "nsq-java-client"             % V.nsqClient
-    val pubsub         = "com.google.cloud"           % "google-cloud-pubsub"         % V.pubsub
-    val sqs            = "com.amazonaws"              % "aws-java-sdk-sqs"            % V.awsSdk
-    val sts            = "com.amazonaws"              % "aws-java-sdk-sts"            % V.awsSdk % Runtime // Enables web token authentication https://github.com/snowplow/stream-collector/issues/169
-    val azureIdentity  = "com.azure"                  % "azure-identity"              % V.azureIdentity
+    val fs2PubSub      = "com.permutive"                    %% "fs2-google-pubsub-grpc" % V.fs2PubSub
+    val jackson        = "com.fasterxml.jackson.core"       % "jackson-databind"        % V.jackson
+    val jacksonCbor    = "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % V.jackson
+    val kafka          = "org.apache.kafka"                 % "kafka-clients"           % V.kafka
+    val kinesis        = "software.amazon.awssdk"           % "kinesis"                 % V.awsSdk
+    val log4j          = "org.apache.logging.log4j"         % "log4j-core"              % V.log4j
+    val mskAuth        = "software.amazon.msk"              % "aws-msk-iam-auth"        % V.mskAuth % Runtime // Enables AWS MSK IAM authentication https://github.com/snowplow/stream-collector/pull/214
+    val nettyAll       = "io.netty"                         % "netty-all"               % V.nettyAll
+    val nettyCommon    = "io.netty"                         % "netty-common"            % V.nettyAll
+    val nettyHandler   = "io.netty"                         % "netty-handler"           % V.nettyAll
+    val nsqClient      = "com.snowplowanalytics"            % "nsq-java-client"         % V.nsqClient
+    val pubsub         = "com.google.cloud"                 % "google-cloud-pubsub"     % V.pubsub
+    val sqs            = "software.amazon.awssdk"           % "sqs"                     % V.awsSdk
+    val sts            = "software.amazon.awssdk"           % "sts"                     % V.awsSdk % Runtime // Enables web token authentication https://github.com/snowplow/stream-collector/issues/169
+    val azureIdentity  = "com.azure"                        % "azure-identity"          % V.azureIdentity
+    val jsonSmart      = "net.minidev"                      % "json-smart"              % V.jsonSmart
 
     //common unit tests
     val specs2    = "org.specs2"     %% "specs2-core"                % V.specs2    % Test

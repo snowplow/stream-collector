@@ -29,7 +29,7 @@ object Collector {
     streamGood: String,
     streamBad: String,
     createStreams: Boolean = true,
-    additionalConfig: Option[String] = None
+    additionalConfig: Map[String, String] = Map.empty
   ): Resource[IO, CollectorContainer] = {
     val container = GenericContainer(
       dockerImage = BuildInfo.dockerAlias,
@@ -44,7 +44,7 @@ object Collector {
         "MAX_BYTES" -> maxBytes.toString,
         "JDK_JAVA_OPTIONS" -> "-Dlogger.level.com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink=WARN",
         "HTTP4S_BACKEND" -> "BLAZE"
-      ) ++ configParameters(additionalConfig),
+      ) ++ additionalConfig,
       exposedPorts = Seq(port),
       fileSystemBind = Seq(
         GenericContainer.FileSystemBind(
@@ -71,12 +71,4 @@ object Collector {
       c => IO(c.container.stop())
     )
   }
-
-  private def configParameters(rawConfig: Option[String]): Map[String, String] =
-    rawConfig match {
-      case None => Map.empty[String, String]
-      case Some(config) =>
-        val fields = getConfigParameters(config).mkString(" ")
-        Map("JDK_JAVA_OPTIONS" -> fields)
-    }
 }
