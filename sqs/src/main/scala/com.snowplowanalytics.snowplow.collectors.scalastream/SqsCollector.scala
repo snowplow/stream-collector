@@ -10,16 +10,15 @@
   */
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
-import java.util.concurrent.ScheduledThreadPoolExecutor
+import java.util.concurrent.Executors
 import cats.effect.{IO, Resource}
-import com.snowplowanalytics.snowplow.collector.core.model.Sinks
-import com.snowplowanalytics.snowplow.collector.core.{App, Config, Telemetry}
+import com.snowplowanalytics.snowplow.collector.core.{App, Config, Sinks, Telemetry}
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks._
 
 object SqsCollector extends App[SqsSinkConfig](BuildInfo) {
 
   override def mkSinks(config: Config.Streams[SqsSinkConfig]): Resource[IO, Sinks[IO]] = {
-    val threadPoolExecutor = new ScheduledThreadPoolExecutor(config.good.config.threadPoolSize)
+    val threadPoolExecutor = Executors.newFixedThreadPool(config.good.config.threadPoolSize)
     for {
       good <- SqsSink.create[IO](config.good, threadPoolExecutor)
       bad  <- SqsSink.create[IO](config.bad, threadPoolExecutor)

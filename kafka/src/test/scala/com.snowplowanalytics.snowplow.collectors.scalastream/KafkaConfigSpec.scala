@@ -127,6 +127,7 @@ object KafkaConfigSpec {
           retries  = 10,
           producerConf = Some(
             Map(
+              "linger.ms"         -> "1",
               "security.protocol" -> "SASL_SSL",
               "sasl.mechanism"    -> "OAUTHBEARER",
               "sasl.jaas.config"  -> "org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required;"
@@ -147,6 +148,7 @@ object KafkaConfigSpec {
           retries  = 10,
           producerConf = Some(
             Map(
+              "linger.ms"         -> "1",
               "security.protocol" -> "SASL_SSL",
               "sasl.mechanism"    -> "OAUTHBEARER",
               "sasl.jaas.config"  -> "org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required;"

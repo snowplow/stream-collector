@@ -189,7 +189,7 @@ collector {
       # Some values are set to other values from this config by default:
       # "bootstrap.servers" = brokers
       # "buffer.memory"     = buffer.byteLimit
-      # "linger.ms"         = buffer.timeLimit
+      # "linger.ms"         = 1
       
       #producerConf {
       #  acks = all
@@ -230,7 +230,7 @@ collector {
       # Some values are set to other values from this config by default:
       # "bootstrap.servers" = brokers
       # "buffer.memory"     = buffer.byteLimit
-      # "linger.ms"         = buffer.timeLimit
+      # "linger.ms"         = 1
       
       #producerConf {
       #  acks = all

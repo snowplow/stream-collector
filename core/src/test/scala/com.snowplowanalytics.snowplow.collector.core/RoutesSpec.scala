@@ -63,8 +63,6 @@ class RoutesSpec extends Specification {
       }
 
     override def determinePath(vendor: String, version: String): String = s"/$vendor/$version"
-
-    override def sinksHealthy: IO[Boolean] = IO.pure(true)
   }
 
   def createTestServices(
@@ -75,7 +73,7 @@ class RoutesSpec extends Specification {
   ) = {
     val service = new TestService()
     val routes =
-      new Routes(enabledDefaultRedirect, enableRootResponse, enableCrossdomainTracking, service)
+      new Routes(enabledDefaultRedirect, enableRootResponse, enableCrossdomainTracking, service, IO.pure(true))
     val routesWithHsts = HttpServer.hstsApp(Config.HSTS(enableHsts, 180.days), (routes.value <+> routes.health))
     (service, routesWithHsts)
   }

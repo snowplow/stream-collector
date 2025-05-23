@@ -10,10 +10,9 @@
   */
 package com.snowplowanalytics.snowplow.collectors.scalastream.sinks
 
-import cats.Parallel
-import cats.effect.implicits.genSpawnOps
 import cats.effect.{Async, Ref, Resource, Sync}
 import cats.implicits._
+import cats.effect.implicits._
 import com.google.api.gax.retrying.RetrySettings
 import com.google.api.gax.rpc.{ApiException, FixedHeaderProvider}
 import com.permutive.pubsub.producer.Model.{ProjectId, Topic}
@@ -31,7 +30,7 @@ import retry.syntax.all._
 import scala.concurrent.duration.{DurationLong, FiniteDuration}
 import scala.util._
 
-class PubSubSink[F[_]: Async: Parallel: Logger] private (
+class PubSubSink[F[_]: Async: Logger] private (
   override val maxBytes: Int,
   isHealthyState: Ref[F, Boolean],
   producer: PubsubProducer[F, Array[Byte]],
@@ -80,7 +79,7 @@ object PubSubSink {
         a.asRight
     }
 
-  def create[F[_]: Async: Parallel](
+  def create[F[_]: Async](
     sinkConfig: Config.Sink[PubSubSinkConfig]
   ): Resource[F, Sink[F]] =
     for {
@@ -103,7 +102,7 @@ object PubSubSink {
     val config = PubsubProducerConfig[F](
       batchSize            = bufferConfig.recordLimit,
       requestByteThreshold = Some(bufferConfig.byteLimit),
-      delayThreshold       = bufferConfig.timeLimit.millis,
+      delayThreshold       = 1.millis,
       onFailedTerminate    = err => Logger[F].error(err)("PubSub sink termination error"),
       customizePublisher = Some {
         _.setRetrySettings(retrySettings(sinkConfig.backoffPolicy))

@@ -20,6 +20,7 @@ import scala.jdk.CollectionConverters._
 
 import cats.effect.{Clock, Sync}
 import cats.implicits._
+import cats.effect.std.QueueSink
 
 import fs2.Stream
 
@@ -30,7 +31,6 @@ import org.http4s.Status._
 
 import org.typelevel.ci._
 
-import com.snowplowanalytics.snowplow.collector.core.model._
 import com.snowplowanalytics.snowplow.collector.thrift.CollectorPayload
 
 trait IService[F[_]] {
@@ -43,7 +43,6 @@ trait IService[F[_]] {
     contentType: Option[String] = None
   ): F[Response[F]]
   def determinePath(vendor: String, version: String): String
-  def sinksHealthy: F[Boolean]
   def rootResponse: F[Response[F]]
   def crossdomainResponse: F[Response[F]]
 }
@@ -54,18 +53,23 @@ object Service {
   val spAnonymousNuid = "00000000-0000-0000-0000-000000000000"
 }
 
+/** Handles requests/responses and adds `CollectorPayload`s into a queue to be processed by a different fiber
+  *
+  *  @config The app config
+  *  @queue The queue into which this Service writes the `CollectorPayload`s it receives
+  *  @appInfo Details of this variant of collector
+  *
+  */
 class Service[F[_]: Sync](
   config: Config[Any],
-  sinks: Sinks[F],
+  queue: QueueSink[F, CollectorPayload],
   appInfo: AppInfo
 ) extends IService[F] {
 
   val pixelStream = Stream.iterable[F, Byte](Service.pixel)
 
   private val collector =
-    s"""${appInfo.shortName}-${appInfo.version}-${sinks.good.getClass.getSimpleName.toLowerCase}"""
-
-  private val splitBatch: SplitBatch = SplitBatch(appInfo)
+    s"""ssc-${appInfo.version}-${appInfo.sinkName}sink"""
 
   override def cookie(
     body: F[Option[ByteVector]],
@@ -126,7 +130,7 @@ class Service[F[_]: Sync](
         `Access-Control-Allow-Credentials`().toRaw1.some
       ).flatten
       responseHeaders = Headers(headerList ++ bounceLocationHeaders(config.cookieBounce, shouldBounce, request))
-      _ <- if (!doNotTrack && !shouldBounce) sinkEvent(event) else Sync[F].unit
+      _ <- if (!doNotTrack && !shouldBounce) queue.offer(event) else Sync[F].unit
       resp = buildHttpResponse(
         queryParams   = request.uri.query.params,
         headers       = responseHeaders,
@@ -135,8 +139,6 @@ class Service[F[_]: Sync](
         shouldBounce  = shouldBounce
       )
     } yield resp
-
-  override def sinksHealthy: F[Boolean] = (sinks.good.isHealthy, sinks.bad.isHealthy).mapN(_ && _)
 
   override def determinePath(vendor: String, version: String): String = {
     val original = s"/$vendor/$version"
@@ -323,20 +325,6 @@ class Service[F[_]: Sync](
     if (pixelExpected)
       Some(`Cache-Control`(CacheDirective.`no-cache`(), CacheDirective.`no-store`, CacheDirective.`must-revalidate`))
     else None
-
-  /** Produces the event to the configured sink. */
-  def sinkEvent(
-    event: CollectorPayload
-  ): F[Unit] =
-    for {
-      // Split events into Good and Bad
-      eventSplit <- Sync[F].delay(
-        splitBatch.splitAndSerializePayload(event, sinks.good.maxBytes, config.networking.maxPayloadSize)
-      )
-      // Send events to respective sinks
-      _ <- sinks.good.storeRawEvents(eventSplit.good)
-      _ <- sinks.bad.storeRawEvents(eventSplit.bad)
-    } yield ()
 
   /**
     * Builds a cookie header with the network user id as value.

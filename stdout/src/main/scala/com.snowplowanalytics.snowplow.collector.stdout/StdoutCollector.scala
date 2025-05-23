@@ -2,8 +2,7 @@ package com.snowplowanalytics.snowplow.collector.stdout
 
 import cats.effect.IO
 import cats.effect.kernel.Resource
-import com.snowplowanalytics.snowplow.collector.core.model.Sinks
-import com.snowplowanalytics.snowplow.collector.core.{App, Config, Telemetry}
+import com.snowplowanalytics.snowplow.collector.core.{App, Config, Sinks, Telemetry}
 
 object StdoutCollector extends App[SinkConfig](BuildInfo) {
 

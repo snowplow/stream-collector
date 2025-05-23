@@ -22,7 +22,8 @@ class Routes[F[_]: Async](
   enableDefaultRedirect: Boolean,
   enableRootResponse: Boolean,
   enableCrossdomainTracking: Boolean,
-  service: IService[F]
+  service: IService[F],
+  sinksHealthy: F[Boolean]
 ) extends Http4sDsl[F] {
 
   implicit val dns: Dns[F] = Dns.forSync[F]
@@ -82,12 +83,10 @@ class Routes[F[_]: Async](
     case GET -> Root / "health" =>
       Ok("ok")
     case GET -> Root / "sink-health" =>
-      service
-        .sinksHealthy
-        .ifM(
-          ifTrue  = Ok("ok"),
-          ifFalse = ServiceUnavailable("Service Unavailable")
-        )
+      sinksHealthy.ifM(
+        ifTrue  = Ok("ok"),
+        ifFalse = ServiceUnavailable("Service Unavailable")
+      )
     case GET -> Root / "robots.txt" =>
       Ok("User-agent: *\nDisallow: /\n\nUser-agent: Googlebot\nDisallow: /\n\nUser-agent: AdsBot-Google\nDisallow: /")
   }

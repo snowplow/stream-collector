@@ -42,6 +42,7 @@ object BuildSettings {
   lazy val kinesisSettings =
     commonSinkSettings ++ integrationTestSettings ++ Seq(
       moduleName := "snowplow-stream-collector-kinesis",
+      buildInfoKeys += BuildInfoKey("sinkName" -> "kinesis"),
       Docker / packageName := "scala-stream-collector-kinesis",
       libraryDependencies ++= Seq(
         Dependencies.Libraries.catsRetry,
@@ -58,6 +59,7 @@ object BuildSettings {
   lazy val sqsSettings =
     commonSinkSettings ++ Seq(
       moduleName := "snowplow-stream-collector-sqs",
+      buildInfoKeys += BuildInfoKey("sinkName" -> "sqs"),
       Docker / packageName := "scala-stream-collector-sqs",
       libraryDependencies ++= Seq(
         Dependencies.Libraries.catsRetry,
@@ -69,6 +71,7 @@ object BuildSettings {
   lazy val pubsubSettings =
     commonSinkSettings ++ integrationTestSettings ++ Seq(
       moduleName := "snowplow-stream-collector-google-pubsub",
+      buildInfoKeys += BuildInfoKey("sinkName" -> "pubsub"),
       Docker / packageName := "scala-stream-collector-pubsub",
       libraryDependencies ++= Seq(
         Dependencies.Libraries.catsRetry,
@@ -85,6 +88,7 @@ object BuildSettings {
   lazy val kafkaSettings =
     commonSinkSettings ++ integrationTestSettings ++ Seq(
       moduleName := "snowplow-stream-collector-kafka",
+      buildInfoKeys += BuildInfoKey("sinkName" -> "kafka"),
       Docker / packageName := "scala-stream-collector-kafka",
       libraryDependencies ++= Seq(
         Dependencies.Libraries.kafka,
@@ -104,6 +108,7 @@ object BuildSettings {
   lazy val nsqSettings =
     commonSinkSettings ++ Seq(
       moduleName := "snowplow-stream-collector-nsq",
+      buildInfoKeys += BuildInfoKey("sinkName" -> "nsq"),
       Docker / packageName := "scala-stream-collector-nsq",
       libraryDependencies ++= Seq(
         Dependencies.Libraries.nsqClient,
@@ -116,6 +121,7 @@ object BuildSettings {
   lazy val stdoutSettings =
     commonSinkSettings ++ Seq(
       moduleName := "snowplow-stream-collector-stdout",
+      buildInfoKeys += BuildInfoKey("sinkName" -> "printing"),
       buildInfoPackage := s"com.snowplowanalytics.snowplow.collector.stdout",
       Docker / packageName := "scala-stream-collector-stdout"
     )
@@ -129,7 +135,7 @@ object BuildSettings {
       addExampleConfToTestCp
 
   lazy val buildInfoSettings = Seq(
-    buildInfoKeys := Seq[BuildInfoKey](name, moduleName, dockerAlias, version, "shortName" -> "ssc"),
+    buildInfoKeys := Seq[BuildInfoKey](name, moduleName, dockerAlias, version),
     buildInfoOptions += BuildInfoOption.Traits("com.snowplowanalytics.snowplow.collector.core.AppInfo"),
     buildInfoPackage := s"com.snowplowanalytics.snowplow.collectors.scalastream"
   )

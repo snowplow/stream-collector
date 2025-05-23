@@ -11,8 +11,7 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import cats.effect.{IO, Resource}
-import com.snowplowanalytics.snowplow.collector.core.model.Sinks
-import com.snowplowanalytics.snowplow.collector.core.{App, Config, Telemetry}
+import com.snowplowanalytics.snowplow.collector.core.{App, Config, Sinks, Telemetry}
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks._
 
 object NsqCollector extends App[NsqSinkConfig](BuildInfo) {

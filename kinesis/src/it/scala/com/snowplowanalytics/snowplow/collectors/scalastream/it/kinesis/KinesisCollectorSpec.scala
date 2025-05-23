@@ -121,7 +121,7 @@ class KinesisCollectorSpec extends Specification with Localstack with CatsEffect
             Collector.maxBytes
           )
           _ <- Localstack.createStreams(List(streamGood, streamBad))
-          _ <- IO.sleep(10.second)
+          _ <- IO.sleep(20.second)
           statusAfterCreate <- Http.status(request)
           collectorOutput <- Kinesis.readOutput(streamGood, streamBad)
           _ <- printBadRows(testName, collectorOutput.bad)

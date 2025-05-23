@@ -3,13 +3,9 @@ package com.snowplowanalytics.snowplow.collector.core
 import org.apache.thrift.TDeserializer
 
 import io.circe.Json
-import io.circe.parser._
 import io.circe.syntax._
 import java.nio.charset.StandardCharsets
 import java.nio.ByteBuffer
-
-import com.snowplowanalytics.iglu.core.circe.implicits._
-import com.snowplowanalytics.iglu.core.SelfDescribingData
 
 import com.snowplowanalytics.snowplow.badrows._
 
@@ -84,10 +80,8 @@ class SplitBatchSpec extends Specification {
     "Reject an oversized GET CollectorPayload" in {
       val payload = new CollectorPayload()
       payload.setQuerystring("x" * 1000)
-      val actual   = splitBatch.splitAndSerializePayload(payload, 100, 1020L)
-      val res      = parse(new String(actual.bad.head)).toOption.get
-      val selfDesc = SelfDescribingData.parse(res).toOption.get
-      val badRow   = selfDesc.data.as[BadRow].toOption.get
+      val actual = splitBatch.splitAndSerializePayload(payload, 100, 1020L)
+      val badRow = actual.bad.head
       badRow must beAnInstanceOf[BadRow.SizeViolation]
       val sizeViolation = badRow.asInstanceOf[BadRow.SizeViolation]
       sizeViolation.failure.maximumAllowedSizeBytes must_== 100
@@ -101,10 +95,8 @@ class SplitBatchSpec extends Specification {
     "Reject an oversized POST CollectorPayload when exceeds max payload size" in {
       val payload = new CollectorPayload()
       payload.setBody(("s" * 1010).getBytes(StandardCharsets.UTF_8))
-      val actual   = splitBatch.splitAndSerializePayload(payload, 1000, 1000L)
-      val res      = parse(new String(actual.bad.head)).toOption.get
-      val selfDesc = SelfDescribingData.parse(res).toOption.get
-      val badRow   = selfDesc.data.as[BadRow].toOption.get
+      val actual = splitBatch.splitAndSerializePayload(payload, 1000, 1000L)
+      val badRow = actual.bad.head
       badRow must beAnInstanceOf[BadRow.SizeViolation]
       val sizeViolation = badRow.asInstanceOf[BadRow.SizeViolation]
       sizeViolation.failure.maximumAllowedSizeBytes must_== 1000
@@ -121,10 +113,8 @@ class SplitBatchSpec extends Specification {
     "Reject an oversized POST CollectorPayload with an unparseable body" in {
       val payload = new CollectorPayload()
       payload.setBody(("s" * 1000).getBytes(StandardCharsets.UTF_8))
-      val actual   = splitBatch.splitAndSerializePayload(payload, 100, 1020L)
-      val res      = parse(new String(actual.bad.head)).toOption.get
-      val selfDesc = SelfDescribingData.parse(res).toOption.get
-      val badRow   = selfDesc.data.as[BadRow].toOption.get
+      val actual = splitBatch.splitAndSerializePayload(payload, 100, 1020L)
+      val badRow = actual.bad.head
       badRow must beAnInstanceOf[BadRow.SizeViolation]
       val sizeViolation = badRow.asInstanceOf[BadRow.SizeViolation]
       sizeViolation.failure.maximumAllowedSizeBytes must_== 100
@@ -140,10 +130,8 @@ class SplitBatchSpec extends Specification {
       val payload = new CollectorPayload()
       val body    = Array.fill(1000)(192.toByte) // 192.toByte is not valid UTF-8
       payload.setBody(body)
-      val actual   = splitBatch.splitAndSerializePayload(payload, 100, 1020L)
-      val res      = parse(new String(actual.bad.head)).toOption.get
-      val selfDesc = SelfDescribingData.parse(res).toOption.get
-      val badRow   = selfDesc.data.as[BadRow].toOption.get
+      val actual = splitBatch.splitAndSerializePayload(payload, 100, 1020L)
+      val badRow = actual.bad.head
       badRow must beAnInstanceOf[BadRow.SizeViolation]
       val sizeViolation = badRow.asInstanceOf[BadRow.SizeViolation]
       sizeViolation.failure.maximumAllowedSizeBytes must_== 100
@@ -168,9 +156,7 @@ class SplitBatchSpec extends Specification {
       payload.setPath("p" * 1000)
       val actual = splitBatch.splitAndSerializePayload(payload, 1000, 2000L)
       actual.bad.size must_== 1
-      val res      = parse(new String(actual.bad.head)).toOption.get
-      val selfDesc = SelfDescribingData.parse(res).toOption.get
-      val badRow   = selfDesc.data.as[BadRow].toOption.get
+      val badRow = actual.bad.head
       badRow must beAnInstanceOf[BadRow.SizeViolation]
       val sizeViolation = badRow.asInstanceOf[BadRow.SizeViolation]
       sizeViolation.failure.maximumAllowedSizeBytes must_== 1000

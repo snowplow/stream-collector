@@ -15,5 +15,5 @@ trait AppInfo {
   def moduleName: String
   def version: String
   def dockerAlias: String
-  def shortName: String
+  def sinkName: String
 }

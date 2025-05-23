@@ -12,13 +12,9 @@ package com.snowplowanalytics.snowplow.collector.core
 
 import io.circe.Json
 
-object model {
+import com.snowplowanalytics.snowplow.badrows.BadRow
 
-  /**
-    * Case class for holding both good and
-    * bad sinks for the Stream Collector.
-    */
-  final case class Sinks[F[_]](good: Sink[F], bad: Sink[F])
+object model {
 
   /**
     * Case class for holding the results of
@@ -27,7 +23,7 @@ object model {
     * @param good All good results
     * @param bad  All bad results
     */
-  final case class EventSerializeResult(good: List[Array[Byte]], bad: List[Array[Byte]])
+  final case class EventSerializeResult(good: List[Array[Byte]], bad: List[BadRow.SizeViolation])
 
   /**
     * Class for the result of splitting a too-large array of events in the body of a POST request

@@ -20,8 +20,9 @@ import scala.concurrent.duration.FiniteDuration
 import cats.implicits._
 import cats.data.EitherT
 
-import cats.effect.{Async, ExitCode, Sync}
-import cats.effect.kernel.Resource
+import cats.effect.implicits._
+import cats.effect.{Async, Deferred, ExitCode, Resource, Sync}
+import cats.effect.std.{Queue, QueueSink}
 
 import org.http4s.blaze.client.BlazeClientBuilder
 
@@ -30,8 +31,7 @@ import com.monovore.decline.Opts
 import io.circe.Decoder
 
 import com.snowplowanalytics.snowplow.scalatracker.Tracking
-
-import com.snowplowanalytics.snowplow.collector.core.model.Sinks
+import com.snowplowanalytics.snowplow.collector.thrift.CollectorPayload
 
 object Run {
 
@@ -86,20 +86,60 @@ object Run {
     telemetryInfo: TelemetryInfo[F, SinkConfig],
     config: Config[SinkConfig]
   ): F[ExitCode] = {
-    val resources = for {
+
+    val resource = for {
+      queue <- Resource.eval(Queue.unbounded[F, CollectorPayload])
       sinks <- mkSinks(config.streams)
-      collectorService = new Service[F](
-        config,
-        Sinks(sinks.good, sinks.bad),
-        appInfo
-      )
-      routes = new Routes[F](
-        config.enableDefaultRedirect,
-        config.rootResponse.enabled,
-        config.crossDomain.enabled,
-        collectorService
-      )
-      httpServer = HttpServer.build[F](
+      _     <- runHttpServer(config, appInfo, sinks, queue)
+      sig   <- Resource.eval(Deferred[F, Throwable])
+      _ <- Sinks
+        .dequeue(config, appInfo, queue, sinks)
+        .compile
+        .drain
+        .onError {
+          case t => sig.complete(t).void
+        }
+        .background
+      appId = java.util.UUID.randomUUID.toString
+      httpClient <- BlazeClientBuilder[F].resource
+      _ <- Telemetry
+        .run(config.telemetry, httpClient, appInfo, appId, telemetryInfo(config.streams))
+        .mask
+        .compile
+        .drain
+        .background
+      _ <- withGracefulShutdown(config.preTerminationPeriod)
+    } yield sig
+
+    resource
+      .use { sig =>
+        sig.get.flatMap { t =>
+          Sync[F].raiseError[Unit](t)
+        }
+      }
+      .as(ExitCode.Success)
+  }
+
+  private def runHttpServer[F[_]: Async](
+    config: Config[Any],
+    appInfo: AppInfo,
+    sinks: Sinks[F],
+    queue: QueueSink[F, CollectorPayload]
+  ): Resource[F, Unit] = {
+    val collectorService = new Service[F](
+      config,
+      queue,
+      appInfo
+    )
+    val routes = new Routes[F](
+      config.enableDefaultRedirect,
+      config.rootResponse.enabled,
+      config.crossDomain.enabled,
+      collectorService,
+      (sinks.good.isHealthy, sinks.bad.isHealthy).mapN(_ && _)
+    )
+    HttpServer
+      .build[F](
         routes.value,
         routes.health,
         if (config.ssl.enable) config.ssl.port else config.port,
@@ -108,18 +148,7 @@ object Run {
         config.networking,
         config.monitoring.metrics
       )(HttpServer.buildBlazeServer)
-      _          <- withGracefulShutdown(config.preTerminationPeriod)(httpServer)
-      httpClient <- BlazeClientBuilder[F].resource
-    } yield httpClient
-
-    resources.use { httpClient =>
-      val appId = java.util.UUID.randomUUID.toString
-      Telemetry
-        .run(config.telemetry, httpClient, appInfo, appId, telemetryInfo(config.streams))
-        .compile
-        .drain
-        .flatMap(_ => Async[F].never[ExitCode])
-    }
+      .void
   }
 
   private def prettyLogException[F[_]: Sync](e: Throwable): F[Unit] = {
@@ -133,15 +162,12 @@ object Run {
     Logger[F].error(e.getMessage) >> logCause(e)
   }
 
-  private def withGracefulShutdown[F[_]: Async, A](delay: FiniteDuration)(resource: Resource[F, A]): Resource[F, A] =
-    for {
-      a <- resource
-      _ <- Resource.onFinalizeCase {
-        case Resource.ExitCase.Canceled =>
-          Logger[F].warn(s"Shutdown interrupted. Will continue to serve requests for $delay") >>
-            Async[F].sleep(delay)
-        case _ =>
-          Async[F].unit
-      }
-    } yield a
+  private def withGracefulShutdown[F[_]: Async](delay: FiniteDuration): Resource[F, Unit] =
+    Resource.onFinalizeCase {
+      case Resource.ExitCase.Canceled =>
+        Logger[F].warn(s"Shutdown interrupted. Will continue to serve requests for $delay") >>
+          Async[F].sleep(delay)
+      case _ =>
+        Async[F].unit
+    }
 }

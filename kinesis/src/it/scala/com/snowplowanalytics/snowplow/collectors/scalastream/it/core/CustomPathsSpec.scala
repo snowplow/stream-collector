@@ -50,7 +50,7 @@ class CustomPathsSpec extends Specification with Localstack with CatsEffect {
           _ <- Http.statuses(requests)
           _ <- IO.sleep(5.second)
           collectorOutput <- Kinesis.readOutput(streamGood, streamBad)
-          outputPaths = collectorOutput.good.map(cp => cp.getPath())
+          outputPaths = collectorOutput.good.sortBy(_.getTimestamp()).map(_.getPath())
         } yield {
           outputPaths must beEqualTo(List(
             "/com.snowplowanalytics.snowplow/tp2",

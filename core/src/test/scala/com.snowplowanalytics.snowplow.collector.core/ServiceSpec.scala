@@ -8,8 +8,6 @@ import org.specs2.mutable.Specification
 
 import org.typelevel.ci._
 
-import org.apache.thrift.{TDeserializer, TSerializer}
-
 import com.comcast.ip4s.{IpAddress, SocketAddress}
 import scodec.bits.ByteVector
 
@@ -23,16 +21,15 @@ import org.http4s.headers._
 import org.http4s.implicits._
 
 import com.snowplowanalytics.snowplow.collector.thrift.CollectorPayload
-import com.snowplowanalytics.snowplow.collector.core.model._
 
 import java.util.UUID
 
 class ServiceSpec extends Specification {
-  case class ProbeService(service: Service[IO], good: TestSink, bad: TestSink)
+  case class ProbeService(service: Service[IO], queue: TestQueueSink)
 
   val service = new Service(
     config  = TestUtils.testConfig,
-    sinks   = Sinks(new TestSink, new TestSink),
+    queue   = new TestQueueSink,
     appInfo = TestUtils.appInfo
   )
   val event     = new CollectorPayload("iglu-schema", "ip", System.currentTimeMillis, "UTF-8", "collector")
@@ -52,21 +49,14 @@ class ServiceSpec extends Specification {
   )
 
   def probeService(config: Config[Any] = TestUtils.testConfig): ProbeService = {
-    val good = new TestSink
-    val bad  = new TestSink
+    val queue = new TestQueueSink
     val service = new Service(
       config  = config,
-      sinks   = Sinks(good, bad),
+      queue   = queue,
       appInfo = TestUtils.appInfo
     )
-    ProbeService(service, good, bad)
+    ProbeService(service, queue)
   }
-
-  def emptyCollectorPayload: CollectorPayload =
-    new CollectorPayload(null, null, System.currentTimeMillis, null, null)
-
-  def serializer   = new TSerializer()
-  def deserializer = new TDeserializer()
 
   "The collector service" should {
     "cookie" in {
@@ -124,8 +114,8 @@ class ServiceSpec extends Specification {
         ) shouldEqual None
       }
       "not set a network_userid from cookie if SP-Anonymous is present" in {
-        val ProbeService(service, good, bad) = probeService()
-        val nuid                             = UUID.randomUUID().toString
+        val ProbeService(service, queue) = probeService()
+        val nuid                         = UUID.randomUUID().toString
         val req = Request[IO](
           method = Method.POST,
           headers = Headers(
@@ -143,15 +133,12 @@ class ServiceSpec extends Specification {
           .unsafeRunSync()
 
         r.status mustEqual Status.Ok
-        good.storedRawEvents must have size 1
-        bad.storedRawEvents must have size 0
-        val e = emptyCollectorPayload
-        deserializer.deserialize(e, good.storedRawEvents.head)
-        e.networkUserId shouldEqual "00000000-0000-0000-0000-000000000000"
+        queue.result.get must have size 1
+        queue.result.get.head.networkUserId shouldEqual "00000000-0000-0000-0000-000000000000"
       }
       "network_userid from cookie should persist if SP-Anonymous is not present" in {
-        val ProbeService(service, good, bad) = probeService()
-        val nuid                             = UUID.randomUUID().toString
+        val ProbeService(service, queue) = probeService()
+        val nuid                         = UUID.randomUUID().toString
         val req = Request[IO](
           method = Method.POST
         ).addCookie(TestUtils.testConfig.cookie.name, nuid)
@@ -166,14 +153,11 @@ class ServiceSpec extends Specification {
           .unsafeRunSync()
 
         r.status mustEqual Status.Ok
-        good.storedRawEvents must have size 1
-        bad.storedRawEvents must have size 0
-        val e = emptyCollectorPayload
-        deserializer.deserialize(e, good.storedRawEvents.head)
-        e.networkUserId shouldEqual nuid
+        queue.result.get must have size 1
+        queue.result.get.head.networkUserId shouldEqual nuid
       }
       "use the ip address from 'X-Forwarded-For' header if it exists" in {
-        val ProbeService(service, good, bad) = probeService()
+        val ProbeService(service, queue) = probeService()
         val req = Request[IO](
           method = Method.POST,
           headers = Headers(
@@ -191,14 +175,11 @@ class ServiceSpec extends Specification {
           .unsafeRunSync()
 
         r.status mustEqual Status.Ok
-        good.storedRawEvents must have size 1
-        bad.storedRawEvents must have size 0
-        val e = emptyCollectorPayload
-        deserializer.deserialize(e, good.storedRawEvents.head)
-        e.ipAddress shouldEqual "192.0.2.4"
+        queue.result.get must have size 1
+        queue.result.get.head.ipAddress shouldEqual "192.0.2.4"
       }
       "use the ip address from remote address if 'X-Forwarded-For' header doesn't exist" in {
-        val ProbeService(service, good, bad) = probeService()
+        val ProbeService(service, queue) = probeService()
         val req = Request[IO](
           method = Method.POST
         ).withAttribute(Request.Keys.ConnectionInfo, testConnection)
@@ -213,14 +194,11 @@ class ServiceSpec extends Specification {
           .unsafeRunSync()
 
         r.status mustEqual Status.Ok
-        good.storedRawEvents must have size 1
-        bad.storedRawEvents must have size 0
-        val e = emptyCollectorPayload
-        deserializer.deserialize(e, good.storedRawEvents.head)
-        e.ipAddress shouldEqual "192.0.2.2"
+        queue.result.get must have size 1
+        queue.result.get.head.ipAddress shouldEqual "192.0.2.2"
       }
       "set the ip address to 'unknown' if if SP-Anonymous is present" in {
-        val ProbeService(service, good, bad) = probeService()
+        val ProbeService(service, queue) = probeService()
         val req = Request[IO](
           method = Method.POST,
           headers = Headers(
@@ -238,15 +216,12 @@ class ServiceSpec extends Specification {
           .unsafeRunSync()
 
         r.status mustEqual Status.Ok
-        good.storedRawEvents must have size 1
-        bad.storedRawEvents must have size 0
-        val e = emptyCollectorPayload
-        deserializer.deserialize(e, good.storedRawEvents.head)
-        e.ipAddress shouldEqual "unknown"
+        queue.result.get must have size 1
+        queue.result.get.head.ipAddress shouldEqual "unknown"
       }
       "respond with a 200 OK and a good row in good sink" in {
-        val ProbeService(service, good, bad) = probeService()
-        val nuid                             = "dfdb716e-ecf9-4d00-8b10-44edfbc8a108"
+        val ProbeService(service, queue) = probeService()
+        val nuid                         = "dfdb716e-ecf9-4d00-8b10-44edfbc8a108"
         val req = Request[IO](
           method  = Method.POST,
           headers = testHeaders,
@@ -266,15 +241,13 @@ class ServiceSpec extends Specification {
           .unsafeRunSync()
 
         r.status mustEqual Status.Ok
-        good.storedRawEvents must have size 1
-        bad.storedRawEvents must have size 0
+        queue.result.get must have size 1
 
-        val e = emptyCollectorPayload
-        deserializer.deserialize(e, good.storedRawEvents.head)
+        val e = queue.result.get.head
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
         e.ipAddress shouldEqual "192.0.2.3"
         e.encoding shouldEqual "UTF-8"
-        e.collector shouldEqual s"${TestUtils.appInfo.shortName}-${TestUtils.appVersion}-testsink"
+        e.collector shouldEqual s"ssc-${TestUtils.appVersion}-testsink"
         e.querystring shouldEqual "a=b"
         new String(e.getBody, StandardCharsets.UTF_8) shouldEqual "b"
         e.path shouldEqual "p"
@@ -295,7 +268,7 @@ class ServiceSpec extends Specification {
       }
 
       "sink event with headers removed when spAnonymous set" in {
-        val ProbeService(service, good, bad) = probeService()
+        val ProbeService(service, queue) = probeService()
 
         val req = Request[IO](
           method  = Method.POST,
@@ -312,12 +285,9 @@ class ServiceSpec extends Specification {
           .unsafeRunSync()
 
         r.status mustEqual Status.Ok
-        good.storedRawEvents must have size 1
-        bad.storedRawEvents must have size 0
+        queue.result.get must have size 1
 
-        val e = emptyCollectorPayload
-        deserializer.deserialize(e, good.storedRawEvents.head)
-        e.headers shouldEqual List(
+        queue.result.get.head.headers shouldEqual List(
           "User-Agent: testUserAgent",
           "Referer: example.com",
           "Content-Type: application/json",
@@ -328,7 +298,7 @@ class ServiceSpec extends Specification {
       }
 
       "sink event with Cookie header upcased" in {
-        val ProbeService(service, good, bad) = probeService()
+        val ProbeService(service, queue) = probeService()
 
         val req = Request[IO](
           method  = Method.POST,
@@ -345,12 +315,9 @@ class ServiceSpec extends Specification {
           .unsafeRunSync()
 
         r.status mustEqual Status.Ok
-        good.storedRawEvents must have size 1
-        bad.storedRawEvents must have size 0
+        queue.result.get must have size 1
 
-        val e = emptyCollectorPayload
-        deserializer.deserialize(e, good.storedRawEvents.head)
-        e.headers.asScala must contain("Cookie: name=value")
+        queue.result.get.head.headers.asScala must contain("Cookie: name=value")
       }
 
       "return necessary cache control headers and respond with pixel when pixelExpected is true" in {
@@ -426,8 +393,8 @@ class ServiceSpec extends Specification {
           .copy(
             redirectDomains = Set("snowplow.acme.com", "example.com")
           )
-        val testPath                         = "/r/example?u=https://snowplow.acme.com/12"
-        val ProbeService(service, good, bad) = probeService(config = testConf)
+        val testPath                     = "/r/example?u=https://snowplow.acme.com/12"
+        val ProbeService(service, queue) = probeService(config = testConf)
         val req = Request[IO](
           method = Method.GET,
           uri    = Uri.unsafeFromString(testPath)
@@ -444,8 +411,7 @@ class ServiceSpec extends Specification {
 
         r.status mustEqual Status.Found
         r.headers.get[Location] must beSome(Location(Uri.unsafeFromString("https://snowplow.acme.com/12")))
-        good.storedRawEvents must have size 1
-        bad.storedRawEvents must have size 0
+        queue.result.get must have size 1
       }
 
       "return client cookie if client cookie name is configured" in {
@@ -455,8 +421,8 @@ class ServiceSpec extends Specification {
           .copy(
             cookie = TestUtils.testConfig.cookie.copy(clientCookieName = Some(clientCookieName))
           )
-        val ProbeService(service, good, bad) = probeService(config = testConf)
-        val nuid                             = UUID.randomUUID().toString
+        val ProbeService(service, queue) = probeService(config = testConf)
+        val nuid                         = UUID.randomUUID().toString
         val req = Request[IO](
           method = Method.POST
         ).addCookie(TestUtils.testConfig.cookie.name, nuid)
@@ -474,8 +440,7 @@ class ServiceSpec extends Specification {
         val cookies                        = r.headers.get[`Set-Cookie`].get
         val `Set-Cookie`(clientCookieResp) = cookies.find(_.cookie.name == clientCookieName).get
         val `Set-Cookie`(cookieResp)       = cookies.find(_.cookie.name == TestUtils.testConfig.cookie.name).get
-        good.storedRawEvents must have size 1
-        bad.storedRawEvents must have size 0
+        queue.result.get must have size 1
         cookies.toList must haveSize(2)
         clientCookieResp.content must beEqualTo(nuid)
         clientCookieResp must beEqualTo(cookieResp.copy(httpOnly = false, name = clientCookieName))
@@ -487,8 +452,8 @@ class ServiceSpec extends Specification {
           .copy(
             cookie = TestUtils.testConfig.cookie.copy(clientCookieName = None)
           )
-        val ProbeService(service, good, bad) = probeService(config = testConf)
-        val nuid                             = UUID.randomUUID().toString
+        val ProbeService(service, queue) = probeService(config = testConf)
+        val nuid                         = UUID.randomUUID().toString
         val req = Request[IO](
           method = Method.POST
         ).addCookie(TestUtils.testConfig.cookie.name, nuid)
@@ -505,8 +470,7 @@ class ServiceSpec extends Specification {
         r.status mustEqual Status.Ok
         val cookies    = r.headers.get[`Set-Cookie`].get
         val cookieResp = cookies.find(_.cookie.name == TestUtils.testConfig.cookie.name)
-        good.storedRawEvents must have size 1
-        bad.storedRawEvents must have size 0
+        queue.result.get must have size 1
         cookies.toList must haveSize(1)
         cookieResp must beSome
       }
@@ -517,8 +481,8 @@ class ServiceSpec extends Specification {
           .copy(
             cookie = TestUtils.testConfig.cookie.copy(enabled = false)
           )
-        val ProbeService(service, good, bad) = probeService(config = testConf)
-        val nuid                             = UUID.randomUUID().toString
+        val ProbeService(service, queue) = probeService(config = testConf)
+        val nuid                         = UUID.randomUUID().toString
         val req = Request[IO](
           method = Method.POST
         ).addCookie(TestUtils.testConfig.cookie.name, nuid)
@@ -534,8 +498,7 @@ class ServiceSpec extends Specification {
 
         r.status mustEqual Status.Ok
         val cookies = r.headers.get[`Set-Cookie`]
-        good.storedRawEvents must have size 1
-        bad.storedRawEvents must have size 0
+        queue.result.get must have size 1
         cookies must beNone
       }
 
@@ -546,9 +509,9 @@ class ServiceSpec extends Specification {
           .copy(
             cookie = TestUtils.testConfig.cookie.copy(clientCookieName = Some(clientCookieName))
           )
-        val ProbeService(service, good, bad) = probeService(config = testConf)
-        val nuid                             = UUID.randomUUID().toString
-        val now                              = Clock[IO].realTime.unsafeRunSync()
+        val ProbeService(service, queue) = probeService(config = testConf)
+        val nuid                         = UUID.randomUUID().toString
+        val now                          = Clock[IO].realTime.unsafeRunSync()
         val req = Request[IO](
           method  = Method.POST,
           headers = testHeaders.put(Header.Raw(ci"SP-Anonymous", "*"))
@@ -567,8 +530,7 @@ class ServiceSpec extends Specification {
         val cookies                        = r.headers.get[`Set-Cookie`].get
         val `Set-Cookie`(clientCookieResp) = cookies.find(_.cookie.name == clientCookieName).get
         val `Set-Cookie`(cookieResp)       = cookies.find(_.cookie.name == TestUtils.testConfig.cookie.name).get
-        good.storedRawEvents must have size 1
-        bad.storedRawEvents must have size 0
+        queue.result.get must have size 1
         cookies.toList must haveSize(2)
         clientCookieResp must beEqualTo(cookieResp.copy(httpOnly = false, name = clientCookieName))
         clientCookieResp.content must beEqualTo("")
@@ -585,7 +547,7 @@ class ServiceSpec extends Specification {
           .copy(
             cookie = TestUtils.testConfig.cookie.copy(clientCookieName = Some(clientCookieName))
           )
-        val ProbeService(service, good, bad) = probeService(config = testConf)
+        val ProbeService(service, queue) = probeService(config = testConf)
         val req = Request[IO](
           method  = Method.POST,
           headers = testHeaders.put(Header.Raw(ci"SP-Anonymous", "*"))
@@ -602,8 +564,7 @@ class ServiceSpec extends Specification {
 
         r.status mustEqual Status.Ok
         val cookies = r.headers.get[`Set-Cookie`]
-        good.storedRawEvents must have size 1
-        bad.storedRawEvents must have size 0
+        queue.result.get must have size 1
         cookies must beNone
       }
     }
@@ -640,7 +601,7 @@ class ServiceSpec extends Specification {
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
         e.ipAddress shouldEqual "ip"
         e.encoding shouldEqual "UTF-8"
-        e.collector shouldEqual s"${TestUtils.appInfo.shortName}-${TestUtils.appVersion}-testsink"
+        e.collector shouldEqual s"ssc-${TestUtils.appVersion}-testsink"
         e.querystring shouldEqual "q"
         new String(e.getBody, StandardCharsets.UTF_8) shouldEqual "b"
         e.path shouldEqual "p"
@@ -670,7 +631,7 @@ class ServiceSpec extends Specification {
         e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
         e.ipAddress shouldEqual "ip"
         e.encoding shouldEqual "UTF-8"
-        e.collector shouldEqual s"${TestUtils.appInfo.shortName}-${TestUtils.appVersion}-testsink"
+        e.collector shouldEqual s"ssc-${TestUtils.appVersion}-testsink"
         e.querystring shouldEqual null
         e.body shouldEqual null
         e.path shouldEqual "p"
@@ -683,16 +644,6 @@ class ServiceSpec extends Specification {
       }
     }
 
-    "sinkEvent" in {
-      "send back the produced events" in {
-        val ProbeService(s, good, bad) = probeService()
-        s.sinkEvent(event).unsafeRunSync()
-        good.storedRawEvents must have size 1
-        bad.storedRawEvents must have size 0
-        good.storedRawEvents.head.zip(serializer.serialize(event)).forall { case (a, b) => a mustEqual b }
-      }
-    }
-
     "buildHttpResponse" in {
       "rely on buildRedirectHttpResponse if redirect is true" in {
         val testConfig = TestUtils
@@ -700,7 +651,7 @@ class ServiceSpec extends Specification {
           .copy(
             redirectDomains = Set("example1.com", "example2.com")
           )
-        val ProbeService(service, _, _) = probeService(config = testConfig)
+        val ProbeService(service, _) = probeService(config = testConfig)
         val res = service.buildHttpResponse(
           queryParams   = Map("u" -> "https://example1.com/12"),
           headers       = testHeaders,
@@ -780,7 +731,7 @@ class ServiceSpec extends Specification {
           .copy(
             redirectDomains = Set("example1.com", "example2.com")
           )
-        val ProbeService(service, _, _) = probeService(config = testConfig)
+        val ProbeService(service, _) = probeService(config = testConfig)
         val res = service.buildRedirectHttpResponse(
           queryParams = Map("u" -> "https://example1.com/12"),
           headers     = testHeaders
@@ -794,7 +745,7 @@ class ServiceSpec extends Specification {
           .copy(
             redirectDomains = Set("example1.com", "example2.com")
           )
-        val ProbeService(service, _, _) = probeService(config = testConfig)
+        val ProbeService(service, _) = probeService(config = testConfig)
         val res = service.buildRedirectHttpResponse(
           queryParams = Map.empty,
           headers     = testHeaders
@@ -808,7 +759,7 @@ class ServiceSpec extends Specification {
           .copy(
             redirectDomains = Set("example1.com", "example2.com")
           )
-        val ProbeService(service, _, _) = probeService(config = testConfig)
+        val ProbeService(service, _) = probeService(config = testConfig)
         val res = service.buildRedirectHttpResponse(
           queryParams = Map("u" -> "https://invalidexample1.com/12"),
           headers     = testHeaders
@@ -822,7 +773,7 @@ class ServiceSpec extends Specification {
           .copy(
             redirectDomains = Set.empty
           )
-        val ProbeService(service, _, _) = probeService(config = testConfig)
+        val ProbeService(service, _) = probeService(config = testConfig)
         val res = service.buildRedirectHttpResponse(
           queryParams = Map("u" -> "https://unknown.example.com/12"),
           headers     = testHeaders
@@ -1232,7 +1183,7 @@ class ServiceSpec extends Specification {
       "should pass on the original path if no mapping for it can be found" in {
         val service = new Service(
           TestUtils.testConfig.copy(paths = Map.empty[String, String]),
-          Sinks(new TestSink, new TestSink),
+          new TestQueueSink,
           TestUtils.appInfo
         )
         val expected1 = "/com.acme/track"
@@ -1265,7 +1216,7 @@ class ServiceSpec extends Specification {
         val service = new Service(
           config =
             TestUtils.testConfig.copy(doNotTrackCookie = Config.DoNotTrackCookie(true, cookieName, "^snowplow-(.*)$")),
-          sinks   = Sinks(new TestSink, new TestSink),
+          queue   = new TestQueueSink,
           appInfo = TestUtils.appInfo
         )
         service.checkDoNotTrackCookie(request) should beFalse
@@ -1282,7 +1233,7 @@ class ServiceSpec extends Specification {
           config = TestUtils
             .testConfig
             .copy(doNotTrackCookie = Config.DoNotTrackCookie(true, s"snowplow-$cookieName", "^(.*)$")),
-          sinks   = Sinks(new TestSink, new TestSink),
+          queue   = new TestQueueSink,
           appInfo = TestUtils.appInfo
         )
         service.checkDoNotTrackCookie(request) should beFalse
@@ -1297,7 +1248,7 @@ class ServiceSpec extends Specification {
         )
         val service = new Service(
           config  = TestUtils.testConfig.copy(doNotTrackCookie = Config.DoNotTrackCookie(true, cookieName, "^(.*)$")),
-          sinks   = Sinks(new TestSink, new TestSink),
+          queue   = new TestQueueSink,
           appInfo = TestUtils.appInfo
         )
         service.checkDoNotTrackCookie(request) should beTrue
@@ -1312,7 +1263,7 @@ class ServiceSpec extends Specification {
       val nuid = "00000000-0000-4000-A000-000000000000"
       val service = new Service(
         config  = config,
-        sinks   = Sinks(new TestSink, new TestSink),
+        queue   = new TestQueueSink,
         appInfo = TestUtils.appInfo
       )
       "should set a redirect location when enabled and no nuid" in {

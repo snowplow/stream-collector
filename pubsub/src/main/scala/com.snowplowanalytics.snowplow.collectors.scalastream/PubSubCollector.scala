@@ -2,8 +2,7 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import cats.effect._
 import cats.effect.kernel.Resource
-import com.snowplowanalytics.snowplow.collector.core.model.Sinks
-import com.snowplowanalytics.snowplow.collector.core.{App, Config, Telemetry}
+import com.snowplowanalytics.snowplow.collector.core.{App, Config, Sinks, Telemetry}
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.{PubSubSink, PubSubSinkConfig}
 
 object PubSubCollector extends App[PubSubSinkConfig](BuildInfo) {

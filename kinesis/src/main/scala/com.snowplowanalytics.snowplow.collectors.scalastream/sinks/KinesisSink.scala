@@ -12,7 +12,8 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 package sinks
 
 import cats.implicits._
-import cats.effect.{Resource, Sync}
+import cats.effect.implicits._
+import cats.effect.{Async, Resource, Sync}
 import software.amazon.awssdk.core.SdkBytes
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.kinesis.KinesisClient
@@ -24,21 +25,19 @@ import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink._
 import org.slf4j.LoggerFactory
 
 import java.util.UUID
-import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ExecutorService
 import java.net.URI
 import scala.jdk.CollectionConverters._
-import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContextExecutorService, Future}
+import scala.concurrent.ExecutionContextExecutorService
 import scala.util.{Failure, Success, Try}
 
-class KinesisSink[F[_]: Sync] private (
+class KinesisSink[F[_]: Async] private (
   val maxBytes: Int,
   client: KinesisClient,
   kinesisConfig: KinesisSinkConfig,
-  bufferConfig: Config.Buffer,
   streamName: String,
-  executorService: ScheduledExecutorService,
+  executorService: ExecutorService,
   maybeSqs: Option[Sqs]
 ) extends Sink[F] {
 
@@ -53,10 +52,6 @@ class KinesisSink[F[_]: Sync] private (
       )
   }
 
-  private val ByteThreshold   = bufferConfig.byteLimit
-  private val RecordThreshold = bufferConfig.recordLimit
-  private val TimeThreshold   = bufferConfig.timeLimit
-
   private val maxBackoff      = kinesisConfig.backoffPolicy.maxBackoff
   private val minBackoff      = kinesisConfig.backoffPolicy.minBackoff
   private val maxRetries      = kinesisConfig.backoffPolicy.maxRetries
@@ -64,79 +59,23 @@ class KinesisSink[F[_]: Sync] private (
 
   private val MaxSqsBatchSizeN = 10
 
-  implicit lazy val ec: ExecutionContextExecutorService =
+  private lazy val ec: ExecutionContextExecutorService =
     concurrent.ExecutionContext.fromExecutorService(executorService)
 
   @volatile private var kinesisHealthy: Boolean = false
   @volatile private var sqsHealthy: Boolean     = false
-  override def isHealthy: F[Boolean]            = Sync[F].pure(kinesisHealthy || sqsHealthy)
+  override def isHealthy: F[Boolean]            = Sync[F].delay(kinesisHealthy || sqsHealthy)
 
   override def storeRawEvents(events: List[Array[Byte]]): F[Unit] =
-    events.traverse_ { e =>
-      for {
-        uuid <- Sync[F].delay(UUID.randomUUID)
-        _    <- Sync[F].delay(EventStorage.store(e, uuid.toString))
-      } yield ()
-    }
-
-  object EventStorage {
-    private val storedEvents              = ListBuffer.empty[Events]
-    private var byteCount                 = 0L
-    @volatile private var lastFlushedTime = 0L
-
-    def store(event: Array[Byte], key: String): Unit = {
-      val eventSize = event.size
-
-      synchronized {
-        if (storedEvents.size + 1 > RecordThreshold || byteCount + eventSize > ByteThreshold) {
-          flush()
-        }
-        storedEvents += Events(event, key)
-        byteCount += eventSize
+    events
+      .traverse { bytes =>
+        Sync[F].delay(UUID.randomUUID).map(uuid => Events(bytes, uuid.toString))
       }
-    }
+      .flatMap(sinkBatch(_))
+      .start
+      .void
 
-    def flush(): Unit = {
-      val eventsToSend = synchronized {
-        val evts = storedEvents.result()
-        storedEvents.clear()
-        byteCount = 0
-        evts
-      }
-      lastFlushedTime = System.currentTimeMillis()
-      sinkBatch(eventsToSend)
-    }
-
-    def getLastFlushTime: Long = lastFlushedTime
-
-    /**
-      * Recursively schedule a task to send everything in EventStorage.
-      * Even if the incoming event flow dries up, all stored events will eventually get sent.
-      * Whenever TimeThreshold milliseconds have passed since the last call to flush, call flush.
-      * @param interval When to schedule the next flush
-      */
-    def scheduleFlush(interval: Long = TimeThreshold): Unit = {
-      executorService.schedule(
-        new Runnable {
-          override def run(): Unit = {
-            val lastFlushed = getLastFlushTime
-            val currentTime = System.currentTimeMillis()
-            if (currentTime - lastFlushed >= TimeThreshold) {
-              flush()
-              scheduleFlush(TimeThreshold)
-            } else {
-              scheduleFlush(TimeThreshold + lastFlushed - currentTime)
-            }
-          }
-        },
-        interval,
-        MILLISECONDS
-      )
-      ()
-    }
-  }
-
-  def sinkBatch(batch: List[Events]): Unit =
+  def sinkBatch(batch: List[Events]): F[Unit] =
     if (batch.nonEmpty) maybeSqs match {
       // Kinesis healthy
       case _ if kinesisHealthy =>
@@ -147,14 +86,22 @@ class KinesisSink[F[_]: Sync] private (
       // Kinesis not healthy and SQS buffer defined
       case Some(sqs) =>
         val (big, small) = batch.partition(_.payloads.size > sqs.maxBytes)
-        if (small.nonEmpty) writeBatchToSqsWithRetries(small, sqs, minBackoff, maxRetries)
-        if (big.nonEmpty) writeBatchToKinesisWithRetries(big, minBackoff, Int.MaxValue)
+        val sqsAttempt =
+          if (small.nonEmpty) writeBatchToSqsWithRetries(small, sqs, minBackoff, maxRetries) else Sync[F].unit
+        val kinesisAttempt =
+          if (big.nonEmpty) writeBatchToKinesisWithRetries(big, minBackoff, Int.MaxValue) else Sync[F].unit
+        (sqsAttempt, kinesisAttempt).parTupled.void
     }
+    else Sync[F].unit
 
-  def writeBatchToKinesisWithRetries(batch: List[Events], nextBackoff: Long, retriesLeft: Int): Unit = {
+  private def writeBatchToKinesisWithRetries(
+    batch: List[Events],
+    nextBackoff: Long,
+    retriesLeft: Int
+  ): F[Unit] = {
     log.info(s"Writing ${batch.size} records to Kinesis stream $streamName")
-    writeBatchToKinesis(batch).onComplete {
-      case Success(s) =>
+    writeBatchToKinesis(batch).attempt.flatMap {
+      case Right(s) =>
         kinesisHealthy = true
         val results      = s.records().asScala.toList
         val failurePairs = batch.zip(results).filter(_._2.errorMessage() != null)
@@ -171,22 +118,24 @@ class KinesisSink[F[_]: Sync] private (
           }
           val failedRecords = failurePairs.map(_._1)
           handleKinesisError(failedRecords, nextBackoff, retriesLeft)
+        } else {
+          Sync[F].unit
         }
-      case Failure(f) =>
+      case Left(f) =>
         log.error(s"Writing ${batch.size} records to Kinesis stream $streamName failed with error: ${f.getMessage()}")
         handleKinesisError(batch, nextBackoff, retriesLeft)
     }
   }
 
-  def writeBatchToSqsWithRetries(
+  private def writeBatchToSqsWithRetries(
     batch: List[Events],
     sqs: Sqs,
     nextBackoff: Long,
     retriesLeft: Int
-  ): Unit = {
+  ): F[Unit] = {
     log.info(s"Writing ${batch.size} records to SQS buffer ${sqs.bufferName}")
-    writeBatchToSqs(batch, sqs).onComplete {
-      case Success(s) =>
+    writeBatchToSqs(batch, sqs).attempt.flatMap {
+      case Right(s) =>
         sqsHealthy = true
         log.info(
           s"Successfully wrote ${batch.size - s.size} out of ${batch.size} records to SQS buffer ${sqs.bufferName}"
@@ -201,8 +150,8 @@ class KinesisSink[F[_]: Sync] private (
           }
           val failedRecords = s.map(_._1)
           handleSqsError(failedRecords, sqs, nextBackoff, retriesLeft)
-        }
-      case Failure(f) =>
+        } else Sync[F].unit
+      case Left(f) =>
         log.error(
           s"Writing ${batch.size} records to SQS buffer ${sqs.bufferName} failed with error: ${f.getMessage()}"
         )
@@ -210,12 +159,17 @@ class KinesisSink[F[_]: Sync] private (
     }
   }
 
-  def handleKinesisError(failedRecords: List[Events], nextBackoff: Long, retriesLeft: Int): Unit =
+  private def handleKinesisError(failedRecords: List[Events], nextBackoff: Long, retriesLeft: Int): F[Unit] =
     if (retriesLeft > 0) {
       log.error(
         s"Retrying to write ${failedRecords.size} records to Kinesis stream $streamName in $nextBackoff milliseconds. $retriesLeft retries left"
       )
-      scheduleRetryToKinesis(failedRecords, nextBackoff, retriesLeft - 1)
+      val nextNextBackoff = getNextBackoff(nextBackoff)
+      Async[F].sleep(nextBackoff.millis) >> writeBatchToKinesisWithRetries(
+        failedRecords,
+        nextNextBackoff,
+        retriesLeft - 1
+      )
     } else {
       val error = s"Maximum number of retries reached for Kinesis stream $streamName for ${failedRecords.size} records"
       maybeSqs match {
@@ -234,21 +188,36 @@ class KinesisSink[F[_]: Sync] private (
             }
           }
           val (big, small) = failedRecords.partition(_.payloads.size > sqs.maxBytes)
-          if (small.nonEmpty) writeBatchToSqsWithRetries(small, sqs, minBackoff, maxRetries)
-          if (big.nonEmpty) writeBatchToKinesisWithRetries(big, maxBackoff, Int.MaxValue)
+
+          val sqsAttempt =
+            if (small.nonEmpty) writeBatchToSqsWithRetries(small, sqs, minBackoff, maxRetries).void else Sync[F].unit
+          val kinesisAttempt =
+            if (big.nonEmpty) writeBatchToKinesisWithRetries(big, maxBackoff, Int.MaxValue) else Sync[F].unit
+          (sqsAttempt, kinesisAttempt).parTupled.void
         case None =>
           log.error(s"$error. No SQS buffer defined. Retrying to send the events to Kinesis")
           kinesisHealthy = false
-          writeBatchToKinesisWithRetries(failedRecords, maxBackoff, maxRetries)
+          Async[F].sleep(maxBackoff.millis) >> writeBatchToKinesisWithRetries(failedRecords, maxBackoff, maxRetries)
       }
     }
 
-  def handleSqsError(failedRecords: List[Events], sqs: Sqs, nextBackoff: Long, retriesLeft: Int): Unit =
+  private def handleSqsError(
+    failedRecords: List[Events],
+    sqs: Sqs,
+    nextBackoff: Long,
+    retriesLeft: Int
+  ): F[Unit] =
     if (retriesLeft > 0) {
       log.error(
         s"Retrying to write ${failedRecords.size} records to SQS buffer ${sqs.bufferName} in $nextBackoff milliseconds. $retriesLeft retries left"
       )
-      scheduleRetryToSqs(failedRecords, sqs, nextBackoff, retriesLeft - 1)
+      val nextNextBackoff = getNextBackoff(nextBackoff)
+      Async[F].sleep(nextBackoff.millis) >> writeBatchToSqsWithRetries(
+        failedRecords,
+        sqs,
+        nextNextBackoff,
+        retriesLeft - 1
+      )
     } else {
       // If SQS was already unhealthy, the background check is already running.
       // It can happen when the collector switches back and forth between Kinesis and SQS.
@@ -266,8 +235,8 @@ class KinesisSink[F[_]: Sync] private (
       writeBatchToKinesisWithRetries(failedRecords, minBackoff, maxRetries)
     }
 
-  def writeBatchToKinesis(batch: List[Events]): Future[PutRecordsResponse] =
-    Future {
+  private def writeBatchToKinesis(batch: List[Events]): F[PutRecordsResponse] = {
+    val f = Sync[F].delay {
       val putRecordsRequest = {
         val putRecordsRequestEntryList = batch.map { event =>
           PutRecordsRequestEntry
@@ -280,13 +249,15 @@ class KinesisSink[F[_]: Sync] private (
       }
       client.putRecords(putRecordsRequest)
     }
+    Async[F].evalOn(f, ec)
+  }
 
   /**
     * @return Empty list if all events were successfully inserted;
     *         otherwise a non-empty list of Events to be retried and the reasons why they failed.
     */
-  def writeBatchToSqs(batch: List[Events], sqs: Sqs): Future[List[(Events, BatchResultErrorInfo)]] =
-    Future {
+  private def writeBatchToSqs(batch: List[Events], sqs: Sqs): F[List[(Events, BatchResultErrorInfo)]] = {
+    val f = Sync[F].delay {
       val splitBatch = split(batch, MaxSqsBatchSizeN, sqs.maxBytes)
       splitBatch.map(toSqsMessages).flatMap { msgGroup =>
         val entries = msgGroup.map(_._2)
@@ -308,8 +279,10 @@ class KinesisSink[F[_]: Sync] private (
         }
       }
     }
+    Async[F].evalOn(f, ec)
+  }
 
-  def toSqsMessages(events: List[Events]): List[(Events, SendMessageBatchRequestEntry)] =
+  private def toSqsMessages(events: List[Events]): List[(Events, SendMessageBatchRequestEntry)] =
     events.map(e =>
       (
         e,
@@ -326,38 +299,9 @@ class KinesisSink[F[_]: Sync] private (
       )
     )
 
-  def b64Encode(msg: Array[Byte]): String = {
+  private def b64Encode(msg: Array[Byte]): String = {
     val buffer = java.util.Base64.getEncoder.encode(msg)
     new String(buffer)
-  }
-
-  def scheduleRetryToKinesis(failedRecords: List[Events], currentBackoff: Long, retriesLeft: Int): Unit = {
-    val nextBackoff = getNextBackoff(currentBackoff)
-    executorService.schedule(
-      new Runnable {
-        override def run(): Unit = writeBatchToKinesisWithRetries(failedRecords, nextBackoff, retriesLeft)
-      },
-      currentBackoff,
-      MILLISECONDS
-    )
-    ()
-  }
-
-  def scheduleRetryToSqs(
-    failedRecords: List[Events],
-    sqs: Sqs,
-    currentBackoff: Long,
-    retriesLeft: Int
-  ): Unit = {
-    val nextBackoff = getNextBackoff(currentBackoff)
-    executorService.schedule(
-      new Runnable {
-        override def run(): Unit = writeBatchToSqsWithRetries(failedRecords, sqs, nextBackoff, retriesLeft)
-      },
-      currentBackoff,
-      MILLISECONDS
-    )
-    ()
   }
 
   /**
@@ -371,7 +315,6 @@ class KinesisSink[F[_]: Sync] private (
   }
 
   def shutdown(): Unit = {
-    EventStorage.flush()
     executorService.shutdown()
     executorService.awaitTermination(10000, MILLISECONDS)
     ()
@@ -449,10 +392,10 @@ object KinesisSink {
     * Exists so that no threads can get a reference to the KinesisSink
     * during its construction.
     */
-  def create[F[_]: Sync](
+  def create[F[_]: Async](
     sinkConfig: Config.Sink[KinesisSinkConfig],
     sqsBufferName: Option[String],
-    executorService: ScheduledExecutorService
+    executorService: ExecutorService
   ): Resource[F, KinesisSink[F]] = {
     val acquire =
       Sync[F]
@@ -497,10 +440,10 @@ object KinesisSink {
     * Exists so that no threads can get a reference to the KinesisSink
     * during its construction.
     */
-  private def createAndInitialize[F[_]: Sync](
+  private def createAndInitialize[F[_]: Async](
     sinkConfig: Config.Sink[KinesisSinkConfig],
     sqsBufferName: Option[String],
-    executorService: ScheduledExecutorService
+    executorService: ExecutorService
   ): Either[Throwable, KinesisSink[F]] = {
     val clients = for {
       kinesisClient    <- createKinesisClient(sinkConfig.config.endpoint, sinkConfig.config.region)
@@ -514,14 +457,12 @@ object KinesisSink {
             sinkConfig.config.maxBytes,
             kinesisClient,
             sinkConfig.config,
-            sinkConfig.buffer,
             sinkConfig.name,
             executorService,
             sqsClientAndName
           )
         ks.checkKinesisHealth()
         ks.checkSqsHealth()
-        ks.EventStorage.scheduleFlush()
         ks
     }
   }

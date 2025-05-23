@@ -1,20 +1,21 @@
 package com.snowplowanalytics.snowplow.collector.core
 
-import cats.effect.IO
+import cats.effect.{IO, Ref}
 
-import scala.collection.mutable.ListBuffer
+class TestSink(val receivedBatchSizes: Ref[IO, List[Int]]) extends Sink[IO] {
 
-class TestSink extends Sink[IO] {
-
-  private val buf: ListBuffer[Array[Byte]] = ListBuffer()
-
-  override val maxBytes: Int = Int.MaxValue
+  override val maxBytes: Int = 10000
 
   override def isHealthy: IO[Boolean] = IO.pure(true)
 
   override def storeRawEvents(events: List[Array[Byte]]): IO[Unit] =
-    IO.delay(buf ++= events)
+    receivedBatchSizes.update(_ :+ events.length)
 
-  def storedRawEvents: List[Array[Byte]] = buf.toList
+}
+
+object TestSink {
+
+  def build: IO[TestSink] =
+    Ref[IO].of(List.empty[Int]).map(new TestSink(_))
 
 }

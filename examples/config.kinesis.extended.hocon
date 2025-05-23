@@ -251,7 +251,7 @@ collector {
         byteLimit = 3145728
         recordLimit = 500
         timeLimit = 5000
-      }      
+      }
     }
     
   # Bad rows (https://docs.snowplowanalytics.com/docs/try-snowplow/recipes/recipe-understanding-bad-data/) will be stored in the bad stream/topic.

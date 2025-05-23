@@ -26,8 +26,6 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import com.snowplowanalytics.snowplow.scalatracker.emitters.http4s.ceTracking
 
-import com.snowplowanalytics.snowplow.collector.core.model.Sinks
-
 abstract class App[SinkConfig: Decoder](appInfo: AppInfo)
     extends CommandIOApp(
       name    = App.helpCommand(appInfo),

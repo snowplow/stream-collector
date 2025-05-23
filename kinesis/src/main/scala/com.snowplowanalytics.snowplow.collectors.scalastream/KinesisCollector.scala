@@ -12,13 +12,12 @@ package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import cats.effect.{IO, Resource}
 
-import com.snowplowanalytics.snowplow.collector.core.model.Sinks
-import com.snowplowanalytics.snowplow.collector.core.{App, Config, Telemetry}
+import com.snowplowanalytics.snowplow.collector.core.{App, Config, Sinks, Telemetry}
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.{KinesisSink, KinesisSinkConfig}
 
 import org.slf4j.LoggerFactory
 
-import java.util.concurrent.ScheduledThreadPoolExecutor
+import java.util.concurrent.{ExecutorService, Executors}
 
 object KinesisCollector extends App[KinesisSinkConfig](BuildInfo) {
 
@@ -43,8 +42,8 @@ object KinesisCollector extends App[KinesisSinkConfig](BuildInfo) {
         )
       )
 
-  def buildExecutorService(kc: KinesisSinkConfig): ScheduledThreadPoolExecutor = {
+  def buildExecutorService(kc: KinesisSinkConfig): ExecutorService = {
     log.info("Creating thread pool of size " + kc.threadPoolSize)
-    new ScheduledThreadPoolExecutor(kc.threadPoolSize)
+    Executors.newFixedThreadPool(kc.threadPoolSize)
   }
 }

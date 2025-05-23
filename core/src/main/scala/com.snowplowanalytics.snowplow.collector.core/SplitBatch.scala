@@ -10,7 +10,6 @@
   */
 package com.snowplowanalytics.snowplow.collector.core
 
-import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets.UTF_8
 import java.time.Instant
 import org.apache.thrift.TSerializer
@@ -137,24 +136,21 @@ case class SplitBatch(appInfo: AppInfo) {
     * @param size size of the oversized payload
     * @param maxSize maximum size allowed
     * @param msg error message
-    * @return the created bad rows as json
+    * @return a size violation bad row
     */
   private def oversizedPayload(
     event: CollectorPayload,
     size: Int,
     maxSize: Int,
     msg: String
-  ): Array[Byte] =
-    BadRow
-      .SizeViolation(
-        Processor(appInfo.name, appInfo.version),
-        Failure.SizeViolation(Instant.now(), maxSize, size, s"oversized collector payload: $msg"),
-        Payload.RawPayload(event.toString().take(maxSize / 10))
-      )
-      .compact
-      .getBytes(UTF_8)
+  ): BadRow.SizeViolation =
+    BadRow.SizeViolation(
+      Processor(appInfo.name, appInfo.version),
+      Failure.SizeViolation(Instant.now(), maxSize, size, s"oversized collector payload: $msg"),
+      Payload.RawPayload(event.toString().take(maxSize / 10))
+    )
 
-  private def getSize(a: Array[Byte]): Int = ByteBuffer.wrap(a).capacity
+  private def getSize(a: Array[Byte]): Int = a.size
 
   private def getSize(s: String): Int = getSize(s.getBytes(UTF_8))
 

@@ -10,18 +10,18 @@
   */
 package com.snowplowanalytics.snowplow.collectors.scalastream.sinks
 
-import cats.effect.{Resource, Sync}
+import cats.effect.{Async, Resource, Sync}
 import cats.implicits._
+import cats.effect.implicits._
 
 import org.slf4j.LoggerFactory
 
 import java.util.UUID
-import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ExecutorService
 
-import scala.collection.mutable.ListBuffer
 import scala.util.{Failure, Random, Success, Try}
-import scala.concurrent.{ExecutionContextExecutorService, Future}
-import scala.concurrent.duration.MILLISECONDS
+import scala.concurrent.ExecutionContextExecutorService
+import scala.concurrent.duration.{DurationLong, MILLISECONDS}
 import scala.jdk.CollectionConverters._
 
 import software.amazon.awssdk.regions.Region
@@ -30,21 +30,16 @@ import software.amazon.awssdk.services.sqs.model._
 
 import com.snowplowanalytics.snowplow.collector.core.{Config, Sink}
 
-class SqsSink[F[_]: Sync] private (
+class SqsSink[F[_]: Async] private (
   val maxBytes: Int,
   client: SqsClient,
   sqsConfig: SqsSinkConfig,
-  bufferConfig: Config.Buffer,
   queueName: String,
-  executorService: ScheduledExecutorService
+  executorService: ExecutorService
 ) extends Sink[F] {
   import SqsSink._
 
   private lazy val log = LoggerFactory.getLogger(getClass())
-
-  private val ByteThreshold: Long   = bufferConfig.byteLimit
-  private val RecordThreshold: Long = bufferConfig.recordLimit
-  private val TimeThreshold: Long   = bufferConfig.timeLimit
 
   private val maxBackoff: Long        = sqsConfig.backoffPolicy.maxBackoff
   private val minBackoff: Long        = sqsConfig.backoffPolicy.minBackoff
@@ -53,83 +48,27 @@ class SqsSink[F[_]: Sync] private (
 
   private val MaxSqsBatchSizeN = 10
 
-  implicit lazy val ec: ExecutionContextExecutorService =
+  lazy val ec: ExecutionContextExecutorService =
     concurrent.ExecutionContext.fromExecutorService(executorService)
 
   @volatile private var sqsHealthy: Boolean = false
-  override def isHealthy: F[Boolean]        = Sync[F].pure(sqsHealthy)
+  override def isHealthy: F[Boolean]        = Sync[F].delay(sqsHealthy)
 
   override def storeRawEvents(events: List[Array[Byte]]): F[Unit] =
-    events.traverse_ { e =>
-      for {
-        uuid <- Sync[F].delay(UUID.randomUUID)
-        _    <- Sync[F].delay(EventStorage.store(e, uuid.toString))
-      } yield ()
-    }
-
-  object EventStorage {
-    private val storedEvents              = ListBuffer.empty[Events]
-    private var byteCount                 = 0L
-    @volatile private var lastFlushedTime = 0L
-
-    def store(event: Array[Byte], key: String): Unit = {
-      val eventSize = event.size
-
-      synchronized {
-        if (storedEvents.size + 1 > RecordThreshold || byteCount + eventSize > ByteThreshold) {
-          flush()
-        }
-        storedEvents += Events(event, key)
-        byteCount += eventSize
+    events
+      .traverse { bytes =>
+        Sync[F].delay(UUID.randomUUID).map(uuid => Events(bytes, uuid.toString))
       }
-    }
+      .flatMap(withKeys => sinkBatch(withKeys, minBackoff, maxRetries))
+      .start
+      .void
 
-    def flush(): Unit = {
-      val eventsToSend = synchronized {
-        val evts = storedEvents.result()
-        storedEvents.clear()
-        byteCount = 0
-        evts
-      }
-      lastFlushedTime = System.currentTimeMillis()
-      sinkBatch(eventsToSend, minBackoff, maxRetries)
-    }
-
-    def getLastFlushTime: Long = lastFlushedTime
-
-    /**
-      * Recursively schedule a task to send everything in EventStorage.
-      * Even if the incoming event flow dries up, all stored events will eventually get sent.
-      * Whenever TimeThreshold milliseconds have passed since the last call to flush, call flush.
-      * @param interval When to schedule the next flush
-      */
-    def scheduleFlush(interval: Long = TimeThreshold): Unit = {
-      executorService.schedule(
-        new Runnable {
-          override def run(): Unit = {
-            val lastFlushed = getLastFlushTime
-            val currentTime = System.currentTimeMillis()
-            if (currentTime - lastFlushed >= TimeThreshold) {
-              flush()
-              scheduleFlush(TimeThreshold)
-            } else {
-              scheduleFlush(TimeThreshold + lastFlushed - currentTime)
-            }
-          }
-        },
-        interval,
-        MILLISECONDS
-      )
-      ()
-    }
-  }
-
-  def sinkBatch(batch: List[Events], nextBackoff: Long, retriesLeft: Int): Unit =
+  private def sinkBatch(batch: List[Events], nextBackoff: Long, retriesLeft: Int): F[Unit] =
     if (batch.nonEmpty) {
       log.info(s"Writing ${batch.size} records to SQS queue $queueName")
 
-      writeBatchToSqs(batch).onComplete {
-        case Success(s) =>
+      writeBatchToSqs(batch).attempt.flatMap {
+        case Right(s) =>
           sqsHealthy = true
           log.info(s"Successfully wrote ${batch.size - s.size} out of ${batch.size} records to SQS queue $queueName")
 
@@ -143,36 +82,41 @@ class SqsSink[F[_]: Sync] private (
             }
             val failedRecords = s.map(_._1)
             handleError(failedRecords, nextBackoff, retriesLeft)
+          } else {
+            Sync[F].unit
           }
-        case Failure(f) =>
+        case Left(f) =>
           log.error(
             s"Writing ${batch.size} records to SQS queue $queueName failed with error: ${f.getMessage()}"
           )
           handleError(batch, nextBackoff, retriesLeft)
       }
+    } else {
+      Sync[F].unit
     }
 
-  def handleError(failedRecords: List[Events], nextBackoff: Long, retriesLeft: Int): Unit =
+  private def handleError(failedRecords: List[Events], nextBackoff: Long, retriesLeft: Int): F[Unit] =
     if (retriesLeft > 0) {
       log.error(
         s"$retriesLeft retries left. Retrying to write ${failedRecords.size} records to SQS queue $queueName in $nextBackoff milliseconds"
       )
-      scheduleWrite(failedRecords, nextBackoff, retriesLeft - 1)
+      val nextNextBackoff = getNextBackoff(nextBackoff)
+      Sync[F].sleep(nextBackoff.millis) >> sinkBatch(failedRecords, nextNextBackoff, retriesLeft - 1)
     } else {
       sqsHealthy = false
       checkSqsHealth()
       log.error(
         s"Maximum number of retries reached for SQS queue $queueName for ${failedRecords.size} records"
       )
-      scheduleWrite(failedRecords, maxBackoff, maxRetries)
+      Sync[F].sleep(maxBackoff.millis) >> sinkBatch(failedRecords, maxBackoff, maxRetries)
     }
 
   /**
     * @return Empty list if all events were successfully inserted;
     *         otherwise a non-empty list of Events to be retried and the reasons why they failed.
     */
-  def writeBatchToSqs(batch: List[Events]): Future[List[(Events, BatchResultErrorInfo)]] =
-    Future {
+  private def writeBatchToSqs(batch: List[Events]): F[List[(Events, BatchResultErrorInfo)]] = {
+    val f = Sync[F].delay {
       toSqsMessages(batch)
         .grouped(MaxSqsBatchSizeN)
         .flatMap { msgGroup =>
@@ -196,14 +140,16 @@ class SqsSink[F[_]: Sync] private (
         }
         .toList
     }
+    Async[F].evalOn(f, ec)
+  }
 
-  def toSqsMessages(events: List[Events]): List[(Events, SendMessageBatchRequestEntry)] =
+  private def toSqsMessages(events: List[Events]): List[(Events, SendMessageBatchRequestEntry)] =
     events.map(e =>
       (
         e,
         SendMessageBatchRequestEntry
           .builder
-          .id(UUID.randomUUID.toString)
+          .id(e.key)
           .messageBody(b64Encode(e.payloads))
           .messageAttributes(
             Map(
@@ -214,21 +160,9 @@ class SqsSink[F[_]: Sync] private (
       )
     )
 
-  def b64Encode(e: Array[Byte]): String = {
+  private def b64Encode(e: Array[Byte]): String = {
     val buffer = java.util.Base64.getEncoder.encode(e)
     new String(buffer)
-  }
-
-  def scheduleWrite(batch: List[Events], lastBackoff: Long, retriesLeft: Int): Unit = {
-    val nextBackoff = getNextBackoff(lastBackoff)
-    executorService.schedule(
-      new Runnable {
-        override def run(): Unit = sinkBatch(batch, nextBackoff, retriesLeft)
-      },
-      lastBackoff,
-      MILLISECONDS
-    )
-    ()
   }
 
   /**
@@ -242,7 +176,6 @@ class SqsSink[F[_]: Sync] private (
   }
 
   def shutdown(): Unit = {
-    EventStorage.flush()
     executorService.shutdown()
     executorService.awaitTermination(10000, MILLISECONDS)
     ()
@@ -284,9 +217,9 @@ object SqsSink {
   // Details about why messages failed to be written to SQS.
   final case class BatchResultErrorInfo(code: String, message: String)
 
-  def create[F[_]: Sync](
+  def create[F[_]: Async](
     sqsConfig: Config.Sink[SqsSinkConfig],
-    executorService: ScheduledExecutorService
+    executorService: ExecutorService
   ): Resource[F, SqsSink[F]] = {
     val acquire =
       Sync[F]
@@ -305,18 +238,17 @@ object SqsSink {
     )
 
   /**
-    * Create an SqsSink and schedule a task to flush its EventStorage.
+    * Create an SqsSink and schedule a task to check its health
     * Exists so that no threads can get a reference to the SqsSink
     * during its construction.
     */
-  def createAndInitialize[F[_]: Sync](
+  def createAndInitialize[F[_]: Async](
     sqsConfig: Config.Sink[SqsSinkConfig],
-    executorService: ScheduledExecutorService
+    executorService: ExecutorService
   ): Either[Throwable, SqsSink[F]] =
     createSqsClient(sqsConfig.config.region).map { c =>
       val sqsSink =
-        new SqsSink(sqsConfig.config.maxBytes, c, sqsConfig.config, sqsConfig.buffer, sqsConfig.name, executorService)
-      sqsSink.EventStorage.scheduleFlush()
+        new SqsSink(sqsConfig.config.maxBytes, c, sqsConfig.config, sqsConfig.name, executorService)
       sqsSink.checkSqsHealth()
       sqsSink
     }

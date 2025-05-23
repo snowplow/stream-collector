@@ -2,8 +2,6 @@ package com.snowplowanalytics.snowplow.collector.core
 
 import scala.concurrent.duration._
 
-import cats.Applicative
-
 import org.http4s.SameSite
 
 import com.snowplowanalytics.snowplow.collector.core.Config.{Sink => SinkConfig, _}
@@ -17,13 +15,7 @@ object TestUtils {
     def moduleName  = appName
     def version     = appVersion
     def dockerAlias = "docker run collector"
-    def shortName   = "ssc"
-  }
-
-  def noopSink[F[_]: Applicative]: Sink[F] = new Sink[F] {
-    val maxBytes: Int                                      = Int.MaxValue
-    def isHealthy: F[Boolean]                              = Applicative[F].pure(true)
-    def storeRawEvents(events: List[Array[Byte]]): F[Unit] = Applicative[F].unit
+    def sinkName    = "test"
   }
 
   val testConfig = Config[Any](

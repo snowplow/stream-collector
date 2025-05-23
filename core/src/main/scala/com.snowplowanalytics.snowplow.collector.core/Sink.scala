@@ -17,5 +17,17 @@ trait Sink[F[_]] {
   val maxBytes: Int
 
   def isHealthy: F[Boolean]
+
+  /** Write a batch of messages into the stream
+    *
+    *  The `Sink` is expected to write the messages immediately with minimal delay. The core
+    *  collector has already batched up messages into a sensible sized batch.
+    *
+    *  The returned `F[Unit]` must complete immediately, e.g. the `Sink` should start the work on
+    *  a fiber.
+    *
+    *  The `Sink` must handle all failures by retrying the write.  The returned `F[Unit]` must not
+    *  fail.
+    */
   def storeRawEvents(events: List[Array[Byte]]): F[Unit]
 }

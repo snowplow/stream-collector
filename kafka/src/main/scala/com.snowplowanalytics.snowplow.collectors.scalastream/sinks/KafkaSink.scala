@@ -88,7 +88,7 @@ object KafkaSink {
   ): Resource[F, KafkaSink[F]] =
     for {
       isHealthyState <- Resource.eval(Ref.of[F, Boolean](false))
-      kafkaProducer  <- createProducer(sinkConfig.config, sinkConfig.buffer, authCallbackClass)
+      kafkaProducer  <- createProducer(sinkConfig.config, authCallbackClass)
       ec             <- createExecutionContext
     } yield new KafkaSink(
       sinkConfig.config.maxBytes,
@@ -106,14 +106,12 @@ object KafkaSink {
     */
   private def createProducer[F[_]: Async](
     kafkaConfig: KafkaSinkConfig,
-    bufferConfig: Config.Buffer,
     authCallbackClass: String
   ): Resource[F, KafkaProducer[Nothing, Array[Byte]]] = {
     val props = Map(
       "bootstrap.servers"                 -> kafkaConfig.brokers,
       "acks"                              -> "all",
       "retries"                           -> kafkaConfig.retries.toString,
-      "linger.ms"                         -> bufferConfig.timeLimit.toString,
       "key.serializer"                    -> "org.apache.kafka.common.serialization.VoidSerializer",
       "value.serializer"                  -> "org.apache.kafka.common.serialization.ByteArraySerializer",
       "sasl.login.callback.handler.class" -> authCallbackClass
