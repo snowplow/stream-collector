@@ -26,10 +26,17 @@ object BuildSettings {
     organization   := "com.snowplowanalytics",
     name           := "snowplow-stream-collector",
     description    := "Scala Stream Collector for Snowplow raw events",
-    scalaVersion   := "2.13.12",
-    crossScalaVersions := Seq("2.13.12", "2.12.14"),
-    scalacOptions ++= Seq("-Ywarn-macros:after"),
-    javacOptions   := Seq("-source", "11", "-target", "11"),
+    scalaVersion   := "2.13.16",
+    crossScalaVersions := Seq("2.13.16", "2.12.20"),
+    scalacOptions ++= {
+      CrossVersion.partialVersion(scalaVersion.value) match {
+        case Some((2, n)) if n <= 12 =>
+          Seq("-Ywarn-macros:after")
+        case _ =>
+          Nil
+      }
+    },
+    javacOptions   := Seq("-source", "21", "-target", "21"),
     resolvers     ++= Seq(
       // For uaParser utils
       "user-agent-parser repo".at("https://clojars.org/repo/")
