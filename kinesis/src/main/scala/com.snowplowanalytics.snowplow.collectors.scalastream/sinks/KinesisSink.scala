@@ -72,7 +72,6 @@ class KinesisSink[F[_]: Async] private (
         Sync[F].delay(UUID.randomUUID).map(uuid => Events(bytes, uuid.toString))
       }
       .flatMap(sinkBatch(_))
-      .start
       .void
 
   def sinkBatch(batch: List[Events]): F[Unit] =

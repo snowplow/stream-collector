@@ -121,10 +121,9 @@ object NsqConfigSpec {
           timeLimit   = 5000
         ),
         config = NsqSinkConfig(
-          maxBytes       = 1000000,
-          threadPoolSize = 10,
-          host           = "nsqHost",
-          port           = 4150
+          maxBytes = 1000000,
+          host     = "nsqHost",
+          port     = 4150
         )
       ),
       bad = Config.Sink(
@@ -135,10 +134,9 @@ object NsqConfigSpec {
           timeLimit   = 5000
         ),
         config = NsqSinkConfig(
-          maxBytes       = 1000000,
-          threadPoolSize = 10,
-          host           = "nsqHost",
-          port           = 4150
+          maxBytes = 1000000,
+          host     = "nsqHost",
+          port     = 4150
         )
       )
     ),

@@ -8,126 +8,39 @@
   * BY INSTALLING, DOWNLOADING, ACCESSING, USING OR DISTRIBUTING ANY PORTION
   * OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
   */
-package com.snowplowanalytics.snowplow.collectors.scalastream
-package sinks
+package com.snowplowanalytics.snowplow.collectors.scalastream.sinks
 
-import cats.implicits._
-import cats.effect.implicits._
-import cats.effect._
+import cats.Id
+import cats.effect.{Async, Resource, Sync}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import org.apache.kafka.clients.producer.{Callback, KafkaProducer, ProducerRecord, RecordMetadata}
 
+import com.snowplowanalytics.snowplow.streams.kafka.{KafkaFactory, KafkaSinkConfigM => CommonKafkaSinkConfigM}
 import com.snowplowanalytics.snowplow.collector.core.{Config, Sink}
-
-import scala.jdk.CollectionConverters._
-import scala.concurrent.ExecutionContext
-import java.util.concurrent.Executors
-
-/**
-  * Kafka Sink for the Scala Stream Collector
-  */
-class KafkaSink[F[_]: Async: Logger](
-  val maxBytes: Int,
-  isHealthyState: Ref[F, Boolean],
-  kafkaProducer: KafkaProducer[Nothing, Array[Byte]],
-  topicName: String,
-  ec: ExecutionContext
-) extends Sink[F] {
-
-  override def isHealthy: F[Boolean] = isHealthyState.get
-
-  /**
-    * Store raw events to the topic
-    *
-    * @param events The list of events to send
-    */
-  override def storeRawEvents(events: List[Array[Byte]]): F[Unit] =
-    storeRawEventsAndWait(events).start.void
-
-  private def storeRawEventsAndWait(events: List[Array[Byte]]): F[Unit] =
-    Logger[F].debug(s"Writing ${events.size} Thrift records to Kafka topic $topicName") *>
-      events.parTraverse_ { e =>
-        def go: F[Unit] =
-          Async[F]
-            .async[Unit] { cb =>
-              val blockingSend = Sync[F].delay {
-                val record = new ProducerRecord(topicName, e)
-                kafkaProducer.send(record, callback(cb))
-                Option.empty[F[Unit]]
-              }
-              Async[F].startOn(blockingSend, ec).map(f => Some(f.cancel))
-            }
-            .handleErrorWith { e =>
-              handlePublishError(e) >> go
-            }
-        go
-      } *> isHealthyState.set(true)
-
-  private def callback(asyncCallback: Either[Throwable, Unit] => Unit): Callback =
-    new Callback {
-      def onCompletion(metadata: RecordMetadata, exception: Exception): Unit =
-        Option(exception) match {
-          case Some(e) => asyncCallback(Left(e))
-          case None    => asyncCallback(Right(()))
-        }
-    }
-
-  private def handlePublishError(error: Throwable): F[Unit] =
-    isHealthyState.set(false) *> Logger[F].error(s"Publishing to Kafka failed with message ${error.getMessage}")
-}
 
 object KafkaSink {
 
-  implicit private def unsafeLogger[F[_]: Sync]: Logger[F] =
-    Slf4jLogger.getLogger[F]
+  implicit private def logger[F[_]: Sync]: Logger[F] = Slf4jLogger.getLogger[F]
 
   def create[F[_]: Async](
-    sinkConfig: Config.Sink[KafkaSinkConfig],
-    authCallbackClass: String
-  ): Resource[F, KafkaSink[F]] =
+    kafkaConfig: Config.Sink[KafkaSinkConfig],
+    factory: KafkaFactory[F]
+  ): Resource[F, Sink[F]] =
     for {
-      isHealthyState <- Resource.eval(Ref.of[F, Boolean](false))
-      kafkaProducer  <- createProducer(sinkConfig.config, authCallbackClass)
-      ec             <- createExecutionContext
-    } yield new KafkaSink(
-      sinkConfig.config.maxBytes,
-      isHealthyState,
-      kafkaProducer,
-      sinkConfig.name,
-      ec
+      commonSink <- factory.sink(convertConfig(kafkaConfig.name, kafkaConfig.config))
+      sink <- Sink.ofCommonStreamsSink(
+        name                       = kafkaConfig.name,
+        maxBytes                   = kafkaConfig.config.maxBytes,
+        sinkRetryInterval          = kafkaConfig.config.retryInterval,
+        startupHealthCheckInterval = kafkaConfig.config.startupCheckInterval,
+        sink                       = commonSink
+      )
+    } yield sink
+
+  private def convertConfig(name: String, c: KafkaSinkConfig): CommonKafkaSinkConfigM[Id] =
+    CommonKafkaSinkConfigM[Id](
+      topicName        = name,
+      bootstrapServers = c.brokers,
+      producerConf     = c.producerConf
     )
-
-  /**
-    * Creates a new Kafka Producer with the given
-    * configuration options
-    *
-    * @return a new Kafka Producer
-    */
-  private def createProducer[F[_]: Async](
-    kafkaConfig: KafkaSinkConfig,
-    authCallbackClass: String
-  ): Resource[F, KafkaProducer[Nothing, Array[Byte]]] = {
-    val props = Map(
-      "bootstrap.servers"                 -> kafkaConfig.brokers,
-      "acks"                              -> "all",
-      "retries"                           -> kafkaConfig.retries.toString,
-      "key.serializer"                    -> "org.apache.kafka.common.serialization.VoidSerializer",
-      "value.serializer"                  -> "org.apache.kafka.common.serialization.ByteArraySerializer",
-      "sasl.login.callback.handler.class" -> authCallbackClass
-    ) ++ kafkaConfig.producerConf.getOrElse(Map.empty) + ("buffer.memory" -> Long.MaxValue.toString)
-
-    val make = Sync[F].delay {
-      new KafkaProducer[Nothing, Array[Byte]]((props: Map[String, AnyRef]).asJava)
-    }
-    Resource.make(make)(p => Sync[F].blocking(p.close))
-  }
-
-  def createExecutionContext[F[_]: Sync]: Resource[F, ExecutionContext] = {
-    val make = Sync[F].delay {
-      Executors.newSingleThreadExecutor
-    }
-    Resource.make(make)(e => Sync[F].blocking(e.shutdown)).map(ExecutionContext.fromExecutorService(_))
-  }
-
 }

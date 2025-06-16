@@ -182,14 +182,11 @@ collector {
       name = "good"
       brokers = "localhost:9092,another.host:9092"
       
-      ## Number of retries to perform before giving up on sending a record
-      retries = 10
       # The kafka producer has a variety of possible configuration options defined at
       # https://kafka.apache.org/documentation/#producerconfigs
       # Some values are set to other values from this config by default:
       # "bootstrap.servers" = brokers
-      # "buffer.memory"     = buffer.byteLimit
-      # "linger.ms"         = 1
+      # "client.id"     = "snowplow-collector"
       
       #producerConf {
       #  acks = all
@@ -201,6 +198,11 @@ collector {
       # If a record is bigger, a size violation bad row is emitted instead
       # Default: 1 MB
       maxBytes = 1000000
+
+      # Optional. When collector starts, it checks if PubSub topics exist with listTopics.
+      # This is the interval for the calls.
+      # /sink-health is made healthy as soon as requests are successful or records are successfully inserted.
+      startupCheckInterval = 10 seconds
       
       # Incoming events are stored in a buffer before being sent to Kafka.
       # The buffer is emptied whenever:
@@ -212,6 +214,11 @@ collector {
         recordLimit = 500
         timeLimit = 5000
       }
+
+      # Optional. Collector uses built-in retry mechanism of Kafka API.
+      # In case of failure of these retries, the events are retried
+      # every retryInterval by the collector
+      retryInterval = 10 seconds
     }
 
     # Bad rows (https://docs.snowplowanalytics.com/docs/try-snowplow/recipes/recipe-understanding-bad-data/) will be stored in the bad stream/topic.
@@ -223,14 +230,11 @@ collector {
       name = "bad"
       brokers = "localhost:9092,another.host:9092"
       
-      ## Number of retries to perform before giving up on sending a record
-      retries = 10
       # The kafka producer has a variety of possible configuration options defined at
       # https://kafka.apache.org/documentation/#producerconfigs
       # Some values are set to other values from this config by default:
       # "bootstrap.servers" = brokers
-      # "buffer.memory"     = buffer.byteLimit
-      # "linger.ms"         = 1
+      # "client.id"     = "snowplow-collector"
       
       #producerConf {
       #  acks = all
@@ -242,6 +246,11 @@ collector {
       # If a record is bigger, a size violation bad row is emitted instead
       # Default: 1 MB
       maxBytes = 1000000
+
+      # Optional. When collector starts, it checks if PubSub topics exist with listTopics.
+      # This is the interval for the calls.
+      # /sink-health is made healthy as soon as requests are successful or records are successfully inserted.
+      startupCheckInterval = 10 seconds
       
       # Incoming events are stored in a buffer before being sent to Kafka.
       # The buffer is emptied whenever:
@@ -253,6 +262,11 @@ collector {
         recordLimit = 500
         timeLimit = 5000
       }
+
+      # Optional. Collector uses built-in retry mechanism of Kafka API.
+      # In case of failure of these retries, the events are retried
+      # every retryInterval by the collector
+      retryInterval = 10 seconds
     }
   }
 

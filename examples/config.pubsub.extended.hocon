@@ -182,17 +182,6 @@ collector {
       name = "good"
       
       googleProjectId = "google-project-id"
-      ## Minimum, maximum and total backoff periods, in milliseconds
-      ## and multiplier between two backoff
-      backoffPolicy {
-        minBackoff = 1000
-        maxBackoff = 1000
-        totalBackoff = 9223372036854
-        multiplier = 2
-        initialRpcTimeout = 10000
-        maxRpcTimeout = 10000
-        rpcTimeoutMultiplier = 2
-      }
 
       # Optional. Maximum number of bytes that a single record can contain.
       # If a record is bigger, a size violation bad row is emitted instead
@@ -202,13 +191,12 @@ collector {
       # Optional. When collector starts, it checks if PubSub topics exist with listTopics.
       # This is the interval for the calls.
       # /sink-health is made healthy as soon as requests are successful or records are successfully inserted.
-      startupCheckInterval = 1 second
+      startupCheckInterval = 10 seconds
 
       # Optional. Collector uses built-in retry mechanism of PubSub API.
       # In case of failure of these retries, the events are added to a buffer
       # and every retryInterval collector retries to send them.
       retryInterval = 10 seconds
-      
       
       # Incoming events are stored in a buffer before being sent to Pubsub.
       # The buffer is emptied whenever:
@@ -231,17 +219,6 @@ collector {
       name = "bad"
       
       googleProjectId = "google-project-id"
-      ## Minimum, maximum and total backoff periods, in milliseconds
-      ## and multiplier between two backoff
-      backoffPolicy {
-        minBackoff = 1000
-        maxBackoff = 1000
-        totalBackoff = 9223372036854
-        multiplier = 2
-        initialRpcTimeout = 10000
-        maxRpcTimeout = 10000
-        rpcTimeoutMultiplier = 2
-      }
 
       # Optional. Maximum number of bytes that a single record can contain.
       # If a record is bigger, a size violation bad row is emitted instead
@@ -251,13 +228,12 @@ collector {
       # Optional. When collector starts, it checks if PubSub topics exist with listTopics.
       # This is the interval for the calls.
       # /sink-health is made healthy as soon as requests are successful or records are successfully inserted.
-      startupCheckInterval = 1 second
+      startupCheckInterval = 10 seconds
 
       # Optional. Collector uses built-in retry mechanism of PubSub API.
       # In case of failure of these retries, the events are added to a buffer
       # and every retryInterval collector retries to send them.
       retryInterval = 10 seconds
-      
       
       # Incoming events are stored in a buffer before being sent to Pubsub.
       # The buffer is emptied whenever:

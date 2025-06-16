@@ -11,14 +11,16 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import cats.effect.{IO, Resource}
+import com.snowplowanalytics.snowplow.streams.nsq.NsqFactory
 import com.snowplowanalytics.snowplow.collector.core.{App, Config, Sinks, Telemetry}
-import com.snowplowanalytics.snowplow.collectors.scalastream.sinks._
+import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.{NsqSink, NsqSinkConfig}
 
 object NsqCollector extends App[NsqSinkConfig](BuildInfo) {
   override def mkSinks(config: Config.Streams[NsqSinkConfig]): Resource[IO, Sinks[IO]] =
     for {
-      good <- NsqSink.create[IO](config.good)
-      bad  <- NsqSink.create[IO](config.bad)
+      factory <- NsqFactory.resource[IO]
+      good    <- NsqSink.create[IO](config.good, factory)
+      bad     <- NsqSink.create[IO](config.bad, factory)
     } yield Sinks(good, bad)
 
   override def telemetryInfo(config: Config.Streams[NsqSinkConfig]): IO[Telemetry.TelemetryInfo] =

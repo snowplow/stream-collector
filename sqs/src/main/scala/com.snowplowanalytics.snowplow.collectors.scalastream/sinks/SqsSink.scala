@@ -12,7 +12,6 @@ package com.snowplowanalytics.snowplow.collectors.scalastream.sinks
 
 import cats.effect.{Async, Resource, Sync}
 import cats.implicits._
-import cats.effect.implicits._
 
 import org.slf4j.LoggerFactory
 
@@ -60,7 +59,6 @@ class SqsSink[F[_]: Async] private (
         Sync[F].delay(UUID.randomUUID).map(uuid => Events(bytes, uuid.toString))
       }
       .flatMap(withKeys => sinkBatch(withKeys, minBackoff, maxRetries))
-      .start
       .void
 
   private def sinkBatch(batch: List[Events], nextBackoff: Long, retriesLeft: Int): F[Unit] =

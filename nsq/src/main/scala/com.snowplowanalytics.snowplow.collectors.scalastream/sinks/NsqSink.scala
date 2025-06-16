@@ -8,60 +8,49 @@
   * BY INSTALLING, DOWNLOADING, ACCESSING, USING OR DISTRIBUTING ANY PORTION
   * OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
   */
-package com.snowplowanalytics.snowplow.collectors.scalastream
-package sinks
+package com.snowplowanalytics.snowplow.collectors.scalastream.sinks
 
-import java.util.concurrent.TimeoutException
-import scala.jdk.CollectionConverters._
-import cats.effect.{Resource, Sync}
-import cats.implicits._
-import com.snowplowanalytics.client.nsq.NSQProducer
+import cats.Id
+import cats.effect.{Async, Resource, Sync}
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
+
+import com.snowplowanalytics.snowplow.streams.nsq.{BackoffPolicy, NsqFactory, NsqSinkConfigM => CommonNsqSinkConfigM}
 import com.snowplowanalytics.snowplow.collector.core.{Config, Sink}
-import com.snowplowanalytics.client.nsq.exceptions.NSQException
 
-/**
-  * NSQ Sink for the Scala Stream Collector
-  * @param nsqConfig Configuration for Nsq
-  * @param topicName Nsq topic name
-  */
-class NsqSink[F[_]: Sync] private (
-  val maxBytes: Int,
-  nsqConfig: NsqSinkConfig,
-  topicName: String
-) extends Sink[F] {
-
-  @volatile private var healthStatus = true
-
-  override def isHealthy: F[Boolean] = Sync[F].pure(healthStatus)
-
-  private val producer = new NSQProducer().addAddress(nsqConfig.host, nsqConfig.port).start()
-
-  /**
-    * Store raw events to the topic
-    * @param events The list of events to send
-    */
-  override def storeRawEvents(events: List[Array[Byte]]): F[Unit] =
-    Sync[F].blocking(producer.produceMulti(topicName, events.asJava)).onError {
-      case _: NSQException | _: TimeoutException =>
-        setHealthStatus(false)
-    } *> setHealthStatus(true)
-
-  def shutdown(): Unit =
-    producer.shutdown()
-
-  private def setHealthStatus(status: Boolean): F[Unit] = Sync[F].delay {
-    healthStatus = status
-  }
-}
+import scala.concurrent.duration.{Duration, DurationInt}
 
 object NsqSink {
 
-  def create[F[_]: Sync](
-    nsqConfig: Config.Sink[NsqSinkConfig]
-  ): Resource[F, NsqSink[F]] =
-    Resource.make(
-      Sync[F].delay(
-        new NsqSink(nsqConfig.config.maxBytes, nsqConfig.config, nsqConfig.name)
+  implicit private def logger[F[_]: Sync]: Logger[F] = Slf4jLogger.getLogger[F]
+
+  def create[F[_]: Async](
+    nsqConfig: Config.Sink[NsqSinkConfig],
+    factory: NsqFactory[F]
+  ): Resource[F, Sink[F]] =
+    for {
+      commonSink <- factory.sink(convertConfig(nsqConfig.name, nsqConfig.config))
+      sink <- Sink.ofCommonStreamsSink(
+        name                       = nsqConfig.name,
+        maxBytes                   = nsqConfig.config.maxBytes,
+        sinkRetryInterval          = Duration.Zero,
+        startupHealthCheckInterval = Duration.Zero,
+        sink                       = commonSink
       )
-    )(sink => Sync[F].delay(sink.shutdown()))
+    } yield sink
+
+  /** Converts from the collector's format of sink config into common-streams's format of sink config
+    *
+    *  Note that `byteLimit` is set to `Int.MaxValue`. This is safe because the collector already
+    *  takes responsibility for batching up events to not exceed the batch limit.  We set it to
+    *  `Int.MaxValue` to make it clear which component has responsibility for batching.
+    */
+  private def convertConfig(name: String, c: NsqSinkConfig): CommonNsqSinkConfigM[Id] =
+    CommonNsqSinkConfigM[Id](
+      topic         = name,
+      nsqdHost      = c.host,
+      nsqdPort      = c.port,
+      byteLimit     = Int.MaxValue,
+      backoffPolicy = BackoffPolicy(minBackoff = 100.millis, maxBackoff = 1.second, maxRetries = Some(3))
+    )
 }

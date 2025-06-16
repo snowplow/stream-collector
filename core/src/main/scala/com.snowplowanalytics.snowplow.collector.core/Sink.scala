@@ -10,6 +10,15 @@
   */
 package com.snowplowanalytics.snowplow.collector.core
 
+import cats.implicits._
+import cats.effect.implicits._
+import cats.effect.{Async, Ref, Resource}
+import org.typelevel.log4cats.Logger
+
+import com.snowplowanalytics.snowplow.streams.{ListOfList, Sink => CommonStreamsSink}
+
+import scala.concurrent.duration.FiniteDuration
+
 trait Sink[F[_]] {
 
   // Maximum number of bytes that a single record can contain.
@@ -23,11 +32,71 @@ trait Sink[F[_]] {
     *  The `Sink` is expected to write the messages immediately with minimal delay. The core
     *  collector has already batched up messages into a sensible sized batch.
     *
-    *  The returned `F[Unit]` must complete immediately, e.g. the `Sink` should start the work on
-    *  a fiber.
-    *
     *  The `Sink` must handle all failures by retrying the write.  The returned `F[Unit]` must not
     *  fail.
     */
   def storeRawEvents(events: List[Array[Byte]]): F[Unit]
+}
+
+object Sink {
+
+  /** Wrap a common-streams `Sink[F]` as a collector `Sink[F]`
+    *
+    *  @param name The name of the output topic or stream. Used for logging only.
+    *  @param maxBytes Maximum number of bytes that a single record can contain.
+    *  @param sinkRetryInterval How soon to retry sinking events after a failure. Note that common-streams sink implementations already do some backoff and retry.
+    *  @param startupHealthCheckInterval How soon to retry the startup health check in case the first check fails
+    *  @param sink The common-streams sink
+    */
+  def ofCommonStreamsSink[F[_]: Logger: Async](
+    name: String,
+    maxBytes: Int,
+    sinkRetryInterval: FiniteDuration,
+    startupHealthCheckInterval: FiniteDuration,
+    sink: CommonStreamsSink[F]
+  ): Resource[F, Sink[F]] =
+    for {
+      ref <- Resource.eval(Ref[F].of(false))
+      _   <- initializeHealth(name, startupHealthCheckInterval, sink, ref).background
+    } yield new OfCommonStreamsSink(maxBytes, name, sinkRetryInterval, sink, ref)
+
+  private class OfCommonStreamsSink[F[_]: Logger: Async](
+    val maxBytes: Int,
+    name: String,
+    retryInterval: FiniteDuration,
+    sink: CommonStreamsSink[F],
+    isHealthyState: Ref[F, Boolean]
+  ) extends Sink[F] {
+
+    override def isHealthy: F[Boolean] = isHealthyState.get
+
+    override def storeRawEvents(events: List[Array[Byte]]): F[Unit] =
+      sink.sinkSimple(ListOfList.of(List(events))).attempt.flatMap {
+        case Left(e) =>
+          isHealthyState.set(false) >>
+            Logger[F].error(s"Error sinking events to $name: ${e.getMessage}") >>
+            Async[F].sleep(retryInterval) >>
+            storeRawEvents(events)
+        case Right(()) =>
+          isHealthyState.set(true)
+      }
+  }
+
+  private def initializeHealth[F[_]: Logger: Async](
+    name: String,
+    retryInterval: FiniteDuration,
+    sink: CommonStreamsSink[F],
+    isHealthyState: Ref[F, Boolean]
+  ): F[Unit] =
+    sink.isHealthy.attempt.flatMap {
+      case Right(true) =>
+        isHealthyState.set(true)
+      case Right(false) =>
+        Logger[F].warn(s"Sink $name is not healthy") >> Async[F]
+          .sleep(retryInterval) >> initializeHealth(name, retryInterval, sink, isHealthyState)
+      case Left(e) =>
+        Logger[F].warn(e)(s"Exception when trying to check health of sink $name") >> Async[F]
+          .sleep(retryInterval) >> initializeHealth(name, retryInterval, sink, isHealthyState)
+    }
+
 }

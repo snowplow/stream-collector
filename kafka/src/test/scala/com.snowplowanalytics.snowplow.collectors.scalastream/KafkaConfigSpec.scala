@@ -124,15 +124,14 @@ object KafkaConfigSpec {
         config = KafkaSinkConfig(
           maxBytes = 1000000,
           brokers  = "localhost:9092,another.host:9092",
-          retries  = 10,
-          producerConf = Some(
-            Map(
-              "linger.ms"         -> "1",
-              "security.protocol" -> "SASL_SSL",
-              "sasl.mechanism"    -> "OAUTHBEARER",
-              "sasl.jaas.config"  -> "org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required;"
-            )
-          )
+          producerConf = Map(
+            "client.id"         -> "snowplow-collector",
+            "security.protocol" -> "SASL_SSL",
+            "sasl.mechanism"    -> "OAUTHBEARER",
+            "sasl.jaas.config"  -> "org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required;"
+          ),
+          startupCheckInterval = 10.seconds,
+          retryInterval        = 10.seconds
         )
       ),
       bad = Config.Sink(
@@ -145,15 +144,14 @@ object KafkaConfigSpec {
         config = KafkaSinkConfig(
           maxBytes = 1000000,
           brokers  = "localhost:9092,another.host:9092",
-          retries  = 10,
-          producerConf = Some(
-            Map(
-              "linger.ms"         -> "1",
-              "security.protocol" -> "SASL_SSL",
-              "sasl.mechanism"    -> "OAUTHBEARER",
-              "sasl.jaas.config"  -> "org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required;"
-            )
-          )
+          producerConf = Map(
+            "client.id"         -> "snowplow-collector",
+            "security.protocol" -> "SASL_SSL",
+            "sasl.mechanism"    -> "OAUTHBEARER",
+            "sasl.jaas.config"  -> "org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required;"
+          ),
+          startupCheckInterval = 10.seconds,
+          retryInterval        = 10.seconds
         )
       )
     ),

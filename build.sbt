@@ -18,6 +18,7 @@ lazy val core = project
   .settings(BuildSettings.coreHttp4sSettings)
   .settings(
     libraryDependencies ++= Seq(
+      Dependencies.Libraries.commonStreams,
       Dependencies.Libraries.http4sDsl,
       Dependencies.Libraries.http4sBlaze,
       Dependencies.Libraries.http4sClient,
@@ -36,7 +37,6 @@ lazy val core = project
       Dependencies.Libraries.specs2CE,
       Dependencies.Libraries.ceTestkit,
       Dependencies.Libraries.jnrPosix,
-      Dependencies.Libraries.httpClient,
 
       //Integration tests
       Dependencies.Libraries.IntegrationTests.testcontainers,

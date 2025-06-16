@@ -15,6 +15,7 @@ import cats.{Applicative, Foldable}
 import cats.effect.std.QueueSource
 import cats.effect.Async
 import cats.implicits._
+import cats.effect.implicits._
 
 import com.snowplowanalytics.snowplow.collector.thrift.CollectorPayload
 import com.snowplowanalytics.snowplow.badrows.BadRow
@@ -115,9 +116,9 @@ object Sinks {
     totalSizeBytes: Long
   )
 
-  private def writeToSink[F[_]: Applicative](sink: Sink[F], messages: List[Array[Byte]]): F[Unit] =
+  private def writeToSink[F[_]: Async](sink: Sink[F], messages: List[Array[Byte]]): F[Unit] =
     if (messages.nonEmpty)
-      sink.storeRawEvents(messages)
+      sink.storeRawEvents(messages).start.void
     else
       Applicative[F].unit
 

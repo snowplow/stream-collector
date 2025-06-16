@@ -74,10 +74,7 @@ object BuildSettings {
       buildInfoKeys += BuildInfoKey("sinkName" -> "pubsub"),
       Docker / packageName := "scala-stream-collector-pubsub",
       libraryDependencies ++= Seq(
-        Dependencies.Libraries.catsRetry,
-        Dependencies.Libraries.fs2PubSub,
         Dependencies.Libraries.pubsub,
-        
         // integration tests dependencies
         Dependencies.Libraries.IntegrationTests.specs2,
         Dependencies.Libraries.IntegrationTests.specs2CE,
@@ -92,13 +89,9 @@ object BuildSettings {
       Docker / packageName := "scala-stream-collector-kafka",
       libraryDependencies ++= Seq(
         Dependencies.Libraries.kafka,
+        Dependencies.Libraries.kafkaClients,
         Dependencies.Libraries.mskAuth,
-        Dependencies.Libraries.azureIdentity,
-        Dependencies.Libraries.jacksonCbor,
         Dependencies.Libraries.jsonSmart,
-        Dependencies.Libraries.nettyCommon,
-        Dependencies.Libraries.nettyHandler,
-
         // integration tests dependencies
         Dependencies.Libraries.IntegrationTests.specs2,
         Dependencies.Libraries.IntegrationTests.specs2CE
@@ -111,10 +104,8 @@ object BuildSettings {
       buildInfoKeys += BuildInfoKey("sinkName" -> "nsq"),
       Docker / packageName := "scala-stream-collector-nsq",
       libraryDependencies ++= Seq(
-        Dependencies.Libraries.nsqClient,
-        Dependencies.Libraries.jackson,
-        Dependencies.Libraries.nettyAll,
-        Dependencies.Libraries.log4j
+        Dependencies.Libraries.nsq,
+        Dependencies.Libraries.httpClient
       )
     )
   

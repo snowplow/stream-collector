@@ -62,14 +62,12 @@ object Containers {
     val container = GenericContainer(
       dockerImage = BuildInfo.dockerAlias,
       env = Map(
-        "PUBSUB_EMULATOR_HOST" -> s"pubsub-emulator:$emulatorPort",
         "PORT" -> collectorPort.toString,
         "TOPIC_GOOD" -> topicGood,
         "TOPIC_BAD" -> topicBad,
         "GOOGLE_PROJECT_ID" -> projectId,
         "MAX_BYTES" -> Integer.MAX_VALUE.toString,
-        "JDK_JAVA_OPTIONS" -> "-Dorg.slf4j.simpleLogger.log.com.snowplowanalytics.snowplow.collectors.scalastream.sinks.GooglePubSubSink=warn",
-        "HTTP4S_BACKEND" -> "BLAZE"
+        "JDK_JAVA_OPTIONS" -> s"-Dcollector.streams.good.emulatorHost=pubsub-emulator:$emulatorPort  -Dorg.slf4j.simpleLogger.log.com.snowplowanalytics.snowplow.collectors.scalastream.sinks.GooglePubSubSink=warn"
       ) ++ envs,
       exposedPorts = Seq(collectorPort),
       fileSystemBind = Seq(

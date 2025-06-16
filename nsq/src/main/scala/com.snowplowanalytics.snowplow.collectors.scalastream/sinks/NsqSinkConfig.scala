@@ -15,7 +15,6 @@ import io.circe.generic.semiauto._
 
 final case class NsqSinkConfig(
   maxBytes: Int,
-  threadPoolSize: Int,
   host: String,
   port: Int
 )

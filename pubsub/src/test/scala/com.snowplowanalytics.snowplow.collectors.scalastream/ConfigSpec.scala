@@ -13,6 +13,7 @@ import cats.effect.testing.specs2.CatsEffect
 import cats.effect.{ExitCode, IO}
 import com.snowplowanalytics.snowplow.collector.core.{Config, ConfigParser}
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.PubSubSinkConfig
+import com.snowplowanalytics.snowplow.streams.pubsub.GcpUserAgent
 import org.http4s.SameSite
 import org.specs2.mutable.Specification
 
@@ -130,20 +131,12 @@ object ConfigSpec {
           timeLimit   = 1000
         ),
         config = PubSubSinkConfig(
-          maxBytes        = 10000000,
-          googleProjectId = "google-project-id",
-          backoffPolicy = PubSubSinkConfig.BackoffPolicy(
-            minBackoff           = 1000,
-            maxBackoff           = 1000,
-            totalBackoff         = 9223372036854L,
-            multiplier           = 2,
-            initialRpcTimeout    = 10000,
-            maxRpcTimeout        = 10000,
-            rpcTimeoutMultiplier = 2
-          ),
-          startupCheckInterval = 1.second,
+          maxBytes             = 10000000,
+          googleProjectId      = "google-project-id",
+          startupCheckInterval = 10.seconds,
           retryInterval        = 10.seconds,
-          gcpUserAgent         = PubSubSinkConfig.GcpUserAgent(productName = "Snowplow OSS")
+          gcpUserAgent         = GcpUserAgent(productName = "Snowplow OSS", productVersion = "collector"),
+          emulatorHost         = None
         )
       ),
       bad = Config.Sink(
@@ -154,20 +147,12 @@ object ConfigSpec {
           timeLimit   = 1000
         ),
         config = PubSubSinkConfig(
-          maxBytes        = 10000000,
-          googleProjectId = "google-project-id",
-          backoffPolicy = PubSubSinkConfig.BackoffPolicy(
-            minBackoff           = 1000,
-            maxBackoff           = 1000,
-            totalBackoff         = 9223372036854L,
-            multiplier           = 2,
-            initialRpcTimeout    = 10000,
-            maxRpcTimeout        = 10000,
-            rpcTimeoutMultiplier = 2
-          ),
-          startupCheckInterval = 1.second,
+          maxBytes             = 10000000,
+          googleProjectId      = "google-project-id",
+          startupCheckInterval = 10.seconds,
           retryInterval        = 10.seconds,
-          gcpUserAgent         = PubSubSinkConfig.GcpUserAgent(productName = "Snowplow OSS")
+          gcpUserAgent         = GcpUserAgent(productName = "Snowplow OSS", productVersion = "collector"),
+          emulatorHost         = None
         )
       )
     ),
