@@ -173,13 +173,13 @@ jobs:
   snowman-tests:
     name: Run Snowman Tests
     runs-on: ubuntu-latest
-    needs: publish_docker
+    needs: deploy_to_docker
     strategy:
       matrix:
         component:
           - collector
         test_directory:
-          - collector
+          - stream_collector
     steps:
       - uses: actions/checkout@v4
       - name: Get version from tag

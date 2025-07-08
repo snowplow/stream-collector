@@ -168,8 +168,7 @@ object BuildSettings {
   }
   
   lazy val formatting = Seq(
-    scalafmtConfig := file(".scalafmt.conf"),
-    scalafmtOnCompile := true
+    scalafmtConfig := file(".scalafmt.conf")
   )
 
   lazy val addExampleConfToTestCp = Seq(
