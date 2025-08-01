@@ -55,7 +55,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy_to_docker:
-    if: ${{ github.event.repository.private == true }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -67,7 +66,7 @@ jobs:
           - nsq
           - stdout
         include:
-          - suffix: ""
+          - visibility_suffix: ${{ github.event.repository.private == true && '-private' || '' }}
           - platform: kinesis
             run_snyk: ${{ !contains(github.ref, 'rc') }}
           - platform: pubsub
@@ -106,7 +105,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: snowplow/scala-stream-collector-${{ matrix.platform }}${{ matrix.suffix }}
+          images: snowplow/scala-stream-collector-${{ matrix.platform }}${{ matrix.visibility_suffix }}
           tags: |
             type=raw,value=latest,enable=${{ !contains(steps.ver.outputs.project_version, 'rc') }}
             type=raw,value=latest-focal,enable=${{ !contains(steps.ver.outputs.project_version, 'rc') }}
@@ -119,7 +118,7 @@ jobs:
         id: distroless-meta
         uses: docker/metadata-action@v3
         with:
-          images: snowplow/scala-stream-collector-${{ matrix.platform }}${{ matrix.suffix }}
+          images: snowplow/scala-stream-collector-${{ matrix.platform }}${{ matrix.visibility_suffix }}
           tags: |
             type=raw,value=latest-distroless,enable=${{ !contains(steps.ver.outputs.project_version, 'rc') }}
             type=raw,value=${{ steps.ver.outputs.project_version }}-distroless
@@ -164,13 +163,14 @@ jobs:
         uses: snyk/actions/docker@master
         if: matrix.run_snyk
         with:
-          image: "snowplow/scala-stream-collector-${{ matrix.platform }}:${{ github.ref_name }}-distroless"
+          image: "snowplow/scala-stream-collector-${{ matrix.platform }}${{ matrix.visibility_suffix }}:${{ github.ref_name }}-distroless"
           args: "--app-vulns --org=data-processing-new"
           command: monitor
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
   snowman-tests:
+    if: ${{ github.event.repository.private == false }}  # Excluded private repo runs because Snowman cannot access private DockerHub repo yet
     name: Run Snowman Tests
     runs-on: ubuntu-latest
     needs: deploy_to_docker
