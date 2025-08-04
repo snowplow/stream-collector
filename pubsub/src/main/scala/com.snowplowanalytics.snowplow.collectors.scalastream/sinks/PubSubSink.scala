@@ -16,8 +16,8 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import com.snowplowanalytics.snowplow.streams.pubsub.{
+  PubsubSinkConfig => CommonPubsubSinkConfig,
   PubsubFactory,
-  PubsubSinkConfig  => CommonPubsubSinkConfig,
   PubsubSinkConfigM => CommonPubsubSinkConfigM
 }
 import com.snowplowanalytics.snowplow.collector.core.{Config, Sink}
