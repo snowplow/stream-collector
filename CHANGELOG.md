@@ -13,6 +13,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 ### Security
 
+## [3.5.0] - 2025-08-04
+### Added
+- Add script to synchronize private repo and public repo main branch
+- Implementation of automated snowman tests
+- Add visibility-based Docker image naming [snowplow/stream-collector-private#28]
+
+### Changed
+- Core collector is now responsible for batching events [snowplow/stream-collector-private#18]
+- Use common-streams sinks for pubsub/kafka/nsq [snowplow/stream-collector-private#22]
+- Java 21 for Docker images [snowplow/stream-collector-private#21]
+- Bump common-streams to 0.13.1 [snowplow/stream-collector-private#29]
+- Run integration tests in separate jobs in CI [snowplow/stream-collector-private#30]
+- Increase sleep time in Kinesis integration tests [snowplow/stream-collector-private#30]
+- Enhance sync-public-main and run all workflows in private repo only [snowplow/stream-collector-private#13]
+- Bump coursier/cache-actions to v6 [snowplow/stream-collector-private#13]
+- Bump actions/checkout from v2 to v4 [snowplow/stream-collector-private#13]
+- Bump actions/setup-java from v1 to v4 [snowplow/stream-collector-private#13]
+
+### Fixed
+- Collector should not convert body to String [snowplow/stream-collector-private#16]
+- Fix github action for snowman tests [snowplow/stream-collector-private#23]
+
+### Removed
+- Remove feature `useIpAddressAsPartitionKey` [snowplow/stream-collector-private#14]
+
 ## [3.4.0] - 2025-04-01
 ### Added
 - Add option to create second cookie to store networkUserID that is not http only [snowplow/stream-collector-private#10]
@@ -588,7 +613,8 @@ Ensure docker image has latest libfreetype6 version [#247]
 - Scala Stream Collector, Scala Kinesis Enrich: replaced stream list with describe to tighten permissions, thanks @pkallos! [snowplow/snowplow#535]
 
 
-[Unreleased]: https://github.com/snowplow/stream-collector/compare/3.4.0...HEAD
+[Unreleased]: https://github.com/snowplow/stream-collector/compare/3.5.0...HEAD
+[3.5.0]: https://github.com/snowplow/stream-collector/compare/3.4.0...3.5.0
 [3.4.0]: https://github.com/snowplow/stream-collector/compare/3.3.0...3.4.0
 [3.3.0]: https://github.com/snowplow/stream-collector/compare/3.2.1...3.3.0
 [3.2.1]: https://github.com/snowplow/stream-collector/compare/3.2.0...3.2.1
