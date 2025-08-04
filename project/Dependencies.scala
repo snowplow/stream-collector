@@ -13,7 +13,7 @@ import sbt._
 object Dependencies {
 
   object V {
-    val commonStreams  = "0.13.0-M5"
+    val commonStreams  = "0.13.1"
     val awsSdk         = "2.31.6"
     val badRows        = "2.2.1"
     val blaze          = "0.23.15"
