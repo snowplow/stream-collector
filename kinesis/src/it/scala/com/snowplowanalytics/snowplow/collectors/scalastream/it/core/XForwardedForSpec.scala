@@ -45,7 +45,7 @@ class XForwardedForSpec extends Specification with Localstack with CatsEffect {
 
         for {
           _ <- Http.status(request)
-          _ <- IO.sleep(5.second)
+          _ <- IO.sleep(30.second)
           collectorOutput <- Kinesis.readOutput(streamGood, streamBad)
         } yield {
           val expected = "X-Forwarded-For: 123.123.123.123"

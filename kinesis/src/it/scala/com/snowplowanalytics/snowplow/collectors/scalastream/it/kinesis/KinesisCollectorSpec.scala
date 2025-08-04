@@ -63,7 +63,7 @@ class KinesisCollectorSpec extends Specification with Localstack with CatsEffect
             Collector.maxBytes
           )
           _ <- log(testName, "Data sent. Waiting for collector to work")
-          _ <- IO.sleep(5.second)
+          _ <- IO.sleep(30.second)
           _ <- log(testName, "Consuming collector's output")
           collectorOutput <- Kinesis.readOutput(streamGood, streamBad)
           _ <- printBadRows(testName, collectorOutput.bad)

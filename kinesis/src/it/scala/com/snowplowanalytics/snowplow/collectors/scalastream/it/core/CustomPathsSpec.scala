@@ -48,7 +48,7 @@ class CustomPathsSpec extends Specification with Localstack with CatsEffect {
 
         for {
           _ <- Http.statuses(requests)
-          _ <- IO.sleep(5.second)
+          _ <- IO.sleep(30.second)
           collectorOutput <- Kinesis.readOutput(streamGood, streamBad)
           outputPaths = collectorOutput.good.sortBy(_.getTimestamp()).map(_.getPath())
         } yield {
