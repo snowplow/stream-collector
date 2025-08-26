@@ -36,6 +36,7 @@ object Dependencies {
     val jnrPosix       = "3.1.20"  // force this version to mitigate security vulnerabilities
     val httpClient       = "4.5.14" // CVE-2020-13956
     val jsonSmart      = "2.5.2" // CVE-2024-57699
+    val zstd           = "1.5.7-4"
   }
 
   object Libraries {
@@ -58,6 +59,7 @@ object Dependencies {
     val datadogStatsd   = "com.avast.cloud"           %% "datadog4s-statsd"                      % V.dataDog4s
     val jnrPosix        = "com.github.jnr"            % "jnr-posix"                              % V.jnrPosix
     val httpClient      = "org.apache.httpcomponents" % "httpclient"                             % V.httpClient
+    val zstd            = "com.github.luben"          % "zstd-jni"                               % V.zstd
 
     //sinks
     val commonStreams = "com.snowplowanalytics"   %% "streams-core"      % V.commonStreams

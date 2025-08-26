@@ -53,6 +53,8 @@ class SqsSink[F[_]: Async] private (
   @volatile private var sqsHealthy: Boolean = false
   override def isHealthy: F[Boolean]        = Sync[F].delay(sqsHealthy)
 
+  override def targetBytes: F[Int] = Sync[F].pure(maxBytes)
+
   override def storeRawEvents(events: List[Array[Byte]]): F[Unit] =
     events
       .traverse { bytes =>

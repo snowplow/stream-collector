@@ -66,6 +66,13 @@ class KinesisSink[F[_]: Async] private (
   @volatile private var sqsHealthy: Boolean     = false
   override def isHealthy: F[Boolean]            = Sync[F].delay(kinesisHealthy || sqsHealthy)
 
+  override def targetBytes: F[Int] = Sync[F].delay {
+    if (sqsHealthy && !kinesisHealthy)
+      kinesisConfig.sqsMaxBytes
+    else
+      maxBytes
+  }
+
   override def storeRawEvents(events: List[Array[Byte]]): F[Unit] =
     events
       .traverse { bytes =>

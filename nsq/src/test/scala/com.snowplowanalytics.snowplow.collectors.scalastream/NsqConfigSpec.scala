@@ -162,6 +162,12 @@ object NsqConfigSpec {
       maxPayloadSize        = 1048576,
       dropPayloadSize       = 2097152
     ),
-    license = Config.License(accept = true)
+    license = Config.License(accept = true),
+    compression = Config.Compression(
+      enabled              = false,
+      `type`               = Config.Compression.ZSTD,
+      gzipCompressionLevel = 6,
+      zstdCompressionLevel = 9
+    )
   )
 }

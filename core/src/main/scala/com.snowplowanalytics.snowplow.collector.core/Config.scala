@@ -41,7 +41,8 @@ case class Config[+SinkConfig](
   enableDefaultRedirect: Boolean,
   redirectDomains: Set[String],
   preTerminationPeriod: FiniteDuration,
-  license: Config.License
+  license: Config.License,
+  compression: Config.Compression
 )
 
 object Config {
@@ -173,6 +174,19 @@ object Config {
     accept: Boolean
   )
 
+  case class Compression(
+    enabled: Boolean,
+    `type`: Compression.Type,
+    gzipCompressionLevel: Int,
+    zstdCompressionLevel: Int
+  )
+
+  object Compression {
+    sealed trait Type
+    case object GZIP extends Type
+    case object ZSTD extends Type
+  }
+
   implicit def decoder[SinkConfig: Decoder]: Decoder[Config[SinkConfig]] = {
     implicit val license: Decoder[License] = {
       val truthy = Set("true", "yes", "on", "1")
@@ -207,6 +221,16 @@ object Config {
     implicit val networking       = deriveDecoder[Networking]
     implicit val sinkConfig       = newDecoder[SinkConfig].or(legacyDecoder[SinkConfig])
     implicit val streams          = deriveDecoder[Streams[SinkConfig]]
+
+    implicit val compressionType = Decoder[String].emap[Compression.Type] { str =>
+      str.toLowerCase match {
+        case "gzip" => Right(Compression.GZIP)
+        case "zstd" => Right(Compression.ZSTD)
+        case _      => Left(s"Unsupported compression type $str")
+      }
+    }
+
+    implicit val compression = deriveDecoder[Compression]
 
     deriveDecoder[Config[SinkConfig]]
   }

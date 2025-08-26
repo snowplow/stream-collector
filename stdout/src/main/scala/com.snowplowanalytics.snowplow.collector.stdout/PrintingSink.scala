@@ -10,13 +10,13 @@ import cats.effect.Sync
 import com.snowplowanalytics.snowplow.collector.core.Sink
 
 class PrintingSink[F[_]: Sync](
-  maxByteS: Int,
+  override val maxBytes: Int,
   stream: PrintStream
 ) extends Sink[F] {
   private val encoder: Base64.Encoder = Base64.getEncoder.withoutPadding()
 
-  override val maxBytes: Int         = maxByteS
   override def isHealthy: F[Boolean] = Sync[F].pure(true)
+  override def targetBytes: F[Int]   = Sync[F].pure(maxBytes)
 
   override def storeRawEvents(events: List[Array[Byte]]): F[Unit] =
     events.traverse_ { event =>

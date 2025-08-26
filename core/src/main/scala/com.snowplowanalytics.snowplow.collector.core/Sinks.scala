@@ -44,7 +44,12 @@ object Sinks {
   ): Stream[F, Nothing] =
     Stream
       .fromQueueUnterminated(queue)
-      .through(batchAndSinkGood(config.streams.good.buffer, config.networking, new SplitBatch(appInfo), sinks.good))
+      .through {
+        if (config.compression.enabled)
+          CompressingDequeuer.batchAndSinkGood(appInfo, config.compression, config.streams.good.buffer, sinks.good)
+        else
+          batchAndSinkGood(config.streams.good.buffer, config.networking, new SplitBatch(appInfo), sinks.good)
+      }
       .through(batchAndSinkBad(config.streams.bad.buffer, sinks.bad))
 
   /** A fs2 `Pipe` that batches up `CollectorPayload`s and sends serialized batches to the good `Sink`

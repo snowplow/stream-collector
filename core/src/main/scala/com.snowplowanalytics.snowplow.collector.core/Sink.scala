@@ -21,9 +21,24 @@ import scala.concurrent.duration.FiniteDuration
 
 trait Sink[F[_]] {
 
-  // Maximum number of bytes that a single record can contain.
-  // If a record is bigger, a size violation bad row is emitted instead
+  /** Maximum number of bytes that a single record can contain.
+    *
+    *  If {batching+compression} is enabled, then this refers to the size after {batching+compression}
+    *
+    * If a record is bigger, a size violation bad row is emitted instead
+    */
   val maxBytes: Int
+
+  /** If {batching+compression} is enabled, this is the target maximum size of a record.
+    *
+    *  This is wrapped in a `F` because target size might change over time. E.g. if Kinesis is
+    *  unhealthy, then the Kinesis sink might request a smaller target so it can write records to
+    *  SQS.
+    *
+    *  If a record is bigger, then it is emitted anyway, as long as it does not exceed `maxBytes`
+    *
+    */
+  def targetBytes: F[Int]
 
   def isHealthy: F[Boolean]
 
@@ -69,6 +84,8 @@ object Sink {
   ) extends Sink[F] {
 
     override def isHealthy: F[Boolean] = isHealthyState.get
+
+    override def targetBytes: F[Int] = maxBytes.pure[F]
 
     override def storeRawEvents(events: List[Array[Byte]]): F[Unit] =
       sink.sinkSimple(ListOfList.of(List(events))).attempt.flatMap {
