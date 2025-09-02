@@ -1,20 +1,19 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
-import cats.effect.{IO, Resource}
+import cats.effect.IO
+import software.amazon.awssdk.http.async.SdkAsyncHttpClient
 
 import com.snowplowanalytics.snowplow.collector.core.Config
-import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.{KinesisSink, KinesisSinkConfig}
+import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.{KinesisOps, KinesisSinkConfig}
 
 object TelemetryUtils {
 
-  def getAccountId(config: Config.Streams[KinesisSinkConfig]): IO[Option[String]] =
-    Resource
-      .make(
-        IO(KinesisSink.createKinesisClient(config.good.config.endpoint, config.good.config.region)).rethrow
-      )(c => IO(c.close()))
-      .use { kinesis =>
-        IO {
-          val streamArn = KinesisSink.describeStream(kinesis, config.good.name).streamARN()
+  def getAccountId(httpClient: SdkAsyncHttpClient, config: Config.Streams[KinesisSinkConfig]): IO[Option[String]] =
+    KinesisOps
+      .resource[IO](httpClient, config.good.name, config.good.config)
+      .use { kinesisOps =>
+        kinesisOps.describeStreamSummary.map { response =>
+          val streamArn = response.streamDescriptionSummary().streamARN()
           Some(extractAccountId(streamArn))
         }
       }

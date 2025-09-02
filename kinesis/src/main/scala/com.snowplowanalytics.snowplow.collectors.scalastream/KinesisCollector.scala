@@ -11,39 +11,38 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 
 import cats.effect.{IO, Resource}
+import software.amazon.awssdk.http.async.SdkAsyncHttpClient
+import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient
 
 import com.snowplowanalytics.snowplow.collector.core.{App, Config, Sinks, Telemetry}
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.{KinesisSink, KinesisSinkConfig}
 
-import org.slf4j.LoggerFactory
-
-import java.util.concurrent.{ExecutorService, Executors}
-
 object KinesisCollector extends App[KinesisSinkConfig](BuildInfo) {
 
-  private lazy val log = LoggerFactory.getLogger(getClass)
-
-  override def mkSinks(config: Config.Streams[KinesisSinkConfig]): Resource[IO, Sinks[IO]] = {
-    val threadPoolExecutor = buildExecutorService(config.good.config)
+  override def mkSinks(config: Config.Streams[KinesisSinkConfig]): Resource[IO, Sinks[IO]] =
     for {
-      good <- KinesisSink.create[IO](config.good, config.good.config.sqsGoodBuffer, threadPoolExecutor)
-      bad  <- KinesisSink.create[IO](config.bad, config.bad.config.sqsBadBuffer, threadPoolExecutor)
+      httpClient <- mkHttpClient
+      good       <- KinesisSink.resource[IO](httpClient, config.good, config.good.config.sqsGoodBuffer)
+      bad        <- KinesisSink.resource[IO](httpClient, config.bad, config.bad.config.sqsBadBuffer)
     } yield Sinks(good, bad)
-  }
 
   override def telemetryInfo(config: Config.Streams[KinesisSinkConfig]): IO[Telemetry.TelemetryInfo] =
-    TelemetryUtils
-      .getAccountId(config)
-      .map(id =>
-        Telemetry.TelemetryInfo(
-          region                 = Some(config.good.config.region),
-          cloud                  = Some("AWS"),
-          unhashedInstallationId = id
+    mkHttpClient.use { httpClient =>
+      TelemetryUtils
+        .getAccountId(httpClient, config)
+        .map(id =>
+          Telemetry.TelemetryInfo(
+            region                 = Some(config.good.config.region),
+            cloud                  = Some("AWS"),
+            unhashedInstallationId = id
+          )
         )
-      )
+    }
 
-  def buildExecutorService(kc: KinesisSinkConfig): ExecutorService = {
-    log.info("Creating thread pool of size " + kc.threadPoolSize)
-    Executors.newFixedThreadPool(kc.threadPoolSize)
-  }
+  private def mkHttpClient: Resource[IO, SdkAsyncHttpClient] =
+    Resource.fromAutoCloseable {
+      IO.delay {
+        NettyNioAsyncHttpClient.builder().build()
+      }
+    }
 }

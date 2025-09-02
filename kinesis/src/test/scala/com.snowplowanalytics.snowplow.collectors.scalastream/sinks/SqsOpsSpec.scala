@@ -11,16 +11,16 @@
 package com.snowplowanalytics.snowplow.collectors.scalastream
 package sinks
 
-import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink._
+import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.SqsOps._
 
 import org.specs2.mutable.Specification
 
-class KinesisSinkSpec extends Specification {
-  val event = Events("a".getBytes, "b")
+class SqsOpsSpec extends Specification {
+  val event = "a".getBytes
 
-  "KinesisSink.split" should {
+  "SqsOps.split" should {
     "return empty list if given an empty batch" in {
-      val emptyBatch = List.empty[Events]
+      val emptyBatch = List.empty[Array[Byte]]
 
       split(emptyBatch, 1, 10) mustEqual List.empty
       split(emptyBatch, 10, 1) mustEqual List.empty

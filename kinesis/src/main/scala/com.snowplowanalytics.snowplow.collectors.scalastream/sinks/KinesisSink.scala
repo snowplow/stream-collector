@@ -8,513 +8,191 @@
   * BY INSTALLING, DOWNLOADING, ACCESSING, USING OR DISTRIBUTING ANY PORTION
   * OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
   */
-package com.snowplowanalytics.snowplow.collectors.scalastream
-package sinks
+package com.snowplowanalytics.snowplow.collectors.scalastream.sinks
 
 import cats.implicits._
 import cats.effect.implicits._
-import cats.effect.{Async, Resource, Sync}
-import software.amazon.awssdk.core.SdkBytes
-import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.kinesis.KinesisClient
-import software.amazon.awssdk.services.kinesis.model._
-import software.amazon.awssdk.services.sqs.SqsClient
-import software.amazon.awssdk.services.sqs.model._
+import cats.effect.{Async, Ref, Resource}
+import software.amazon.awssdk.http.async.SdkAsyncHttpClient
+
 import com.snowplowanalytics.snowplow.collector.core.{Config, Sink}
-import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.KinesisSink._
-import org.slf4j.LoggerFactory
 
-import java.util.UUID
-import java.util.concurrent.ExecutorService
-import java.net.URI
-import scala.jdk.CollectionConverters._
-import scala.concurrent.duration._
-import scala.concurrent.ExecutionContextExecutorService
-import scala.util.{Failure, Success, Try}
+import scala.concurrent.duration.DurationLong
 
-class KinesisSink[F[_]: Async] private (
-  val maxBytes: Int,
-  client: KinesisClient,
+class KinesisSink[F[_]: Async](
   kinesisConfig: KinesisSinkConfig,
-  streamName: String,
-  executorService: ExecutorService,
-  maybeSqs: Option[Sqs]
+  kinesisOps: KinesisOps[F],
+  sqsOpsOpt: Option[SqsOps[F]],
+  state: KinesisSink.State[F]
 ) extends Sink[F] {
+  import KinesisSink._
 
-  private lazy val log = LoggerFactory.getLogger(getClass)
+  override val maxBytes: Int = kinesisConfig.maxBytes
 
-  maybeSqs match {
-    case Some(sqs) =>
-      log.info(s"SQS buffer for Kinesis stream $streamName is defined with name ${sqs.bufferName}")
-    case None =>
-      log.warn(
-        s"No SQS buffer for surge protection set up for stream $streamName (consider setting it via the config file)"
-      )
-  }
+  override def isHealthy: F[Boolean] =
+    (kinesisOps.isHealthy, sqsOpsOpt.traverse(_.isHealthy)).mapN {
+      case (kinesisHealthy, sqsHealthy) => kinesisHealthy || sqsHealthy.contains(true)
+    }
 
-  private val maxBackoff      = kinesisConfig.backoffPolicy.maxBackoff
-  private val minBackoff      = kinesisConfig.backoffPolicy.minBackoff
-  private val maxRetries      = kinesisConfig.backoffPolicy.maxRetries
-  private val randomGenerator = new java.util.Random()
-
-  private val MaxSqsBatchSizeN = 10
-
-  private lazy val ec: ExecutionContextExecutorService =
-    concurrent.ExecutionContext.fromExecutorService(executorService)
-
-  @volatile private var kinesisHealthy: Boolean = false
-  @volatile private var sqsHealthy: Boolean     = false
-  override def isHealthy: F[Boolean]            = Sync[F].delay(kinesisHealthy || sqsHealthy)
-
-  override def targetBytes: F[Int] = Sync[F].delay {
-    if (sqsHealthy && !kinesisHealthy)
-      kinesisConfig.sqsMaxBytes
-    else
-      maxBytes
-  }
+  override def targetBytes: F[Int] =
+    (state.failoverCounter.get, kinesisOps.isHealthy).mapN {
+      case (counter, kinesisHealthy) =>
+        if ((counter > 0) || !kinesisHealthy) kinesisConfig.sqsMaxBytes else maxBytes
+    }
 
   override def storeRawEvents(events: List[Array[Byte]]): F[Unit] =
-    events
-      .traverse { bytes =>
-        Sync[F].delay(UUID.randomUUID).map(uuid => Events(bytes, uuid.toString))
-      }
-      .flatMap(sinkBatch(_))
-      .void
-
-  def sinkBatch(batch: List[Events]): F[Unit] =
-    if (batch.nonEmpty) maybeSqs match {
-      // Kinesis healthy
-      case _ if kinesisHealthy =>
-        writeBatchToKinesisWithRetries(batch, minBackoff, maxRetries)
-      // No SQS buffer
-      case None =>
-        writeBatchToKinesisWithRetries(batch, minBackoff, maxRetries)
-      // Kinesis not healthy and SQS buffer defined
-      case Some(sqs) =>
-        val (big, small) = batch.partition(_.payloads.size > sqs.maxBytes)
-        val sqsAttempt =
-          if (small.nonEmpty) writeBatchToSqsWithRetries(small, sqs, minBackoff, maxRetries) else Sync[F].unit
-        val kinesisAttempt =
-          if (big.nonEmpty) writeBatchToKinesisWithRetries(big, minBackoff, Int.MaxValue) else Sync[F].unit
-        (sqsAttempt, kinesisAttempt).parTupled.void
+    kinesisOps.write(events).flatMap {
+      case Nil => Async[F].unit
+      case failures =>
+        enterFailoverLoop(failures)
     }
-    else Sync[F].unit
 
-  private def writeBatchToKinesisWithRetries(
-    batch: List[Events],
-    nextBackoff: Long,
-    retriesLeft: Int
-  ): F[Unit] = {
-    log.info(s"Writing ${batch.size} records to Kinesis stream $streamName")
-    writeBatchToKinesis(batch).attempt.flatMap {
-      case Right(s) =>
-        kinesisHealthy = true
-        val results      = s.records().asScala.toList
-        val failurePairs = batch.zip(results).filter(_._2.errorMessage() != null)
-        log.info(
-          s"Successfully wrote ${batch.size - failurePairs.size} out of ${batch.size} records to Kinesis stream $streamName"
-        )
-        if (failurePairs.nonEmpty) {
-          failurePairs.groupBy(_._2.errorCode()).foreach {
-            case (errorCode, items) =>
-              val exampleMsg = items.map(_._2.errorMessage()).find(_.nonEmpty).getOrElse("")
-              log.error(
-                s"Writing ${items.size} records (out of ${batch.size}) to Kinesis stream $streamName failed with error code [$errorCode] and example message: $exampleMsg"
-              )
-          }
-          val failedRecords = failurePairs.map(_._1)
-          handleKinesisError(failedRecords, nextBackoff, retriesLeft)
-        } else {
-          Sync[F].unit
-        }
-      case Left(f) =>
-        log.error(s"Writing ${batch.size} records to Kinesis stream $streamName failed with error: ${f.getMessage()}")
-        handleKinesisError(batch, nextBackoff, retriesLeft)
-    }
-  }
-
-  private def writeBatchToSqsWithRetries(
-    batch: List[Events],
-    sqs: Sqs,
-    nextBackoff: Long,
-    retriesLeft: Int
-  ): F[Unit] = {
-    log.info(s"Writing ${batch.size} records to SQS buffer ${sqs.bufferName}")
-    writeBatchToSqs(batch, sqs).attempt.flatMap {
-      case Right(s) =>
-        sqsHealthy = true
-        log.info(
-          s"Successfully wrote ${batch.size - s.size} out of ${batch.size} records to SQS buffer ${sqs.bufferName}"
-        )
-        if (s.nonEmpty) {
-          s.groupBy(_._2.code).foreach {
-            case (errorCode, items) =>
-              val exampleMsg = items.map(_._2.message).find(_.nonEmpty).getOrElse("")
-              log.error(
-                s"Writing ${items.size} records (out of ${batch.size}) to SQS buffer ${sqs.bufferName} failed with error code [$errorCode] and example message: $exampleMsg"
-              )
-          }
-          val failedRecords = s.map(_._1)
-          handleSqsError(failedRecords, sqs, nextBackoff, retriesLeft)
-        } else Sync[F].unit
-      case Left(f) =>
-        log.error(
-          s"Writing ${batch.size} records to SQS buffer ${sqs.bufferName} failed with error: ${f.getMessage()}"
-        )
-        handleSqsError(batch, sqs, nextBackoff, retriesLeft)
-    }
-  }
-
-  private def handleKinesisError(failedRecords: List[Events], nextBackoff: Long, retriesLeft: Int): F[Unit] =
-    if (retriesLeft > 0) {
-      log.error(
-        s"Retrying to write ${failedRecords.size} records to Kinesis stream $streamName in $nextBackoff milliseconds. $retriesLeft retries left"
-      )
-      val nextNextBackoff = getNextBackoff(nextBackoff)
-      Async[F].sleep(nextBackoff.millis) >> writeBatchToKinesisWithRetries(
-        failedRecords,
-        nextNextBackoff,
-        retriesLeft - 1
-      )
-    } else {
-      val error = s"Maximum number of retries reached for Kinesis stream $streamName for ${failedRecords.size} records"
-      maybeSqs match {
-        case Some(sqs) =>
-          log.error(
-            s"$error. SQS buffer ${sqs.bufferName} defined. Retrying to send the events to SQS"
-          )
-          // If Kinesis was already unhealthy, the background check is already running.
-          // It can happen when the collector switches back and forth between Kinesis and SQS.
-          if (kinesisHealthy) {
-            this.synchronized {
-              if (kinesisHealthy) {
-                kinesisHealthy = false
-                checkKinesisHealth()
-              }
-            }
-          }
-          val (big, small) = failedRecords.partition(_.payloads.size > sqs.maxBytes)
-
-          val sqsAttempt =
-            if (small.nonEmpty) writeBatchToSqsWithRetries(small, sqs, minBackoff, maxRetries).void else Sync[F].unit
-          val kinesisAttempt =
-            if (big.nonEmpty) writeBatchToKinesisWithRetries(big, maxBackoff, Int.MaxValue) else Sync[F].unit
-          (sqsAttempt, kinesisAttempt).parTupled.void
+  private def enterFailoverLoop(events: List[Array[Byte]]): F[Unit] =
+    state.withIncrementedFailoverCounter.surround {
+      sqsOpsOpt match {
+        case Some(sqsOps) =>
+          val (big, small) = events.partition(_.size > kinesisConfig.sqsMaxBytes)
+          val f1           = if (big.nonEmpty) kinesisOnlyFailoverLoop(big) else Async[F].unit
+          val f2           = if (small.nonEmpty) kinesisAndSqsFailoverLoop(sqsOps, small) else Async[F].unit
+          (f1, f2).parTupled.void
         case None =>
-          log.error(s"$error. No SQS buffer defined. Retrying to send the events to Kinesis")
-          kinesisHealthy = false
-          Async[F].sleep(maxBackoff.millis) >> writeBatchToKinesisWithRetries(failedRecords, maxBackoff, maxRetries)
+          kinesisOnlyFailoverLoop(events)
       }
     }
 
-  private def handleSqsError(
-    failedRecords: List[Events],
-    sqs: Sqs,
-    nextBackoff: Long,
-    retriesLeft: Int
-  ): F[Unit] =
-    if (retriesLeft > 0) {
-      log.error(
-        s"Retrying to write ${failedRecords.size} records to SQS buffer ${sqs.bufferName} in $nextBackoff milliseconds. $retriesLeft retries left"
-      )
-      val nextNextBackoff = getNextBackoff(nextBackoff)
-      Async[F].sleep(nextBackoff.millis) >> writeBatchToSqsWithRetries(
-        failedRecords,
-        sqs,
-        nextNextBackoff,
-        retriesLeft - 1
-      )
-    } else {
-      // If SQS was already unhealthy, the background check is already running.
-      // It can happen when the collector switches back and forth between Kinesis and SQS.
-      if (sqsHealthy) {
-        this.synchronized {
-          if (sqsHealthy) {
-            sqsHealthy = false
-            checkSqsHealth()
-          }
-        }
-      }
-      log.error(
-        s"Maximum number of retries reached for SQS buffer ${sqs.bufferName} for ${failedRecords.size} records. Retrying in Kinesis"
-      )
-      writeBatchToKinesisWithRetries(failedRecords, minBackoff, maxRetries)
-    }
-
-  private def writeBatchToKinesis(batch: List[Events]): F[PutRecordsResponse] = {
-    val f = Sync[F].delay {
-      val putRecordsRequest = {
-        val putRecordsRequestEntryList = batch.map { event =>
-          PutRecordsRequestEntry
-            .builder()
-            .partitionKey(event.key)
-            .data(SdkBytes.fromByteArrayUnsafe(event.payloads))
-            .build()
-        }
-        PutRecordsRequest.builder().streamName(streamName).records(putRecordsRequestEntryList.asJava).build()
-      }
-      client.putRecords(putRecordsRequest)
-    }
-    Async[F].evalOn(f, ec)
-  }
-
-  /**
-    * @return Empty list if all events were successfully inserted;
-    *         otherwise a non-empty list of Events to be retried and the reasons why they failed.
-    */
-  private def writeBatchToSqs(batch: List[Events], sqs: Sqs): F[List[(Events, BatchResultErrorInfo)]] = {
-    val f = Sync[F].delay {
-      val splitBatch = split(batch, MaxSqsBatchSizeN, sqs.maxBytes)
-      splitBatch.map(toSqsMessages).flatMap { msgGroup =>
-        val entries = msgGroup.map(_._2)
-        val batchRequest =
-          SendMessageBatchRequest.builder().queueUrl(sqs.bufferName).entries(entries.asJava).build()
-        val response = sqs.client.sendMessageBatch(batchRequest)
-        val failures = response
-          .failed()
-          .asScala
-          .toList
-          .map { bree =>
-            (bree.id(), BatchResultErrorInfo(bree.code(), bree.message()))
-          }
-          .toMap
-        // Events to retry and reasons for failure
-        msgGroup.collect {
-          case (e, m) if failures.contains(m.id()) =>
-            (e, failures(m.id()))
-        }
+  private def kinesisOnlyFailoverLoop(events: List[Array[Byte]]): F[Unit] =
+    withFibonacciBackoff(kinesisConfig.backoffPolicy, events) { events =>
+      kinesisOps.write(events).map {
+        case Nil      => None
+        case failures => Some(failures)
       }
     }
-    Async[F].evalOn(f, ec)
-  }
 
-  private def toSqsMessages(events: List[Events]): List[(Events, SendMessageBatchRequestEntry)] =
-    events.map(e =>
-      (
-        e,
-        SendMessageBatchRequestEntry
-          .builder()
-          .id(UUID.randomUUID.toString)
-          .messageBody(b64Encode(e.payloads))
-          .messageAttributes(
-            Map(
-              "kinesisKey" -> MessageAttributeValue.builder().dataType("String").stringValue(e.key).build()
-            ).asJava
-          )
-          .build()
-      )
-    )
+  private def kinesisAndSqsFailoverLoop(sqsOps: SqsOps[F], events: List[Array[Byte]]): F[Unit] = {
 
-  private def b64Encode(msg: Array[Byte]): String = {
-    val buffer = java.util.Base64.getEncoder.encode(msg)
-    new String(buffer)
-  }
-
-  /**
-    * How long to wait before sending the next request
-    * @param lastBackoff The previous backoff time
-    * @return Maximum of two-thirds of lastBackoff and a random number between minBackoff and maxBackoff
-    */
-  private def getNextBackoff(lastBackoff: Long): Long = {
-    val diff = (maxBackoff - minBackoff + 1).toInt
-    (minBackoff + randomGenerator.nextInt(diff)).max(lastBackoff / 3 * 2)
-  }
-
-  def shutdown(): Unit = {
-    executorService.shutdown()
-    executorService.awaitTermination(10000, MILLISECONDS)
-    ()
-  }
-
-  private def checkKinesisHealth(): Unit = {
-    val healthRunnable = new Runnable {
-      override def run(): Unit = {
-        log.info(s"Starting background check for Kinesis stream $streamName")
-        while (!kinesisHealthy) {
-          Try {
-            val streamDescription = describeStream(client, streamName)
-            streamDescription.streamStatusAsString()
-          } match {
-            case Success("ACTIVE") =>
-              log.info(s"Stream $streamName ACTIVE")
-              kinesisHealthy = true
-            case Success(other) =>
-              log.warn(s"Stream $streamName not ACTIVE but $other")
-              Thread.sleep(kinesisConfig.startupCheckInterval.toMillis)
-            case Failure(err) =>
-              log.error(s"Error while checking status of stream $streamName: ${err.getMessage()}")
-              Thread.sleep(kinesisConfig.startupCheckInterval.toMillis)
-          }
-        }
+    def trySqs(events: List[Array[Byte]]): F[Unit] =
+      sqsOps.write(events).flatMap {
+        case Nil      => Async[F].unit
+        case failures => tryKinesis(failures)
       }
-    }
-    executorService.execute(healthRunnable)
-  }
 
-  private def checkSqsHealth(): Unit = maybeSqs.foreach { sqs =>
-    val healthRunnable = new Runnable {
-      override def run(): Unit = {
-        log.info(s"Starting background check for SQS buffer ${sqs.bufferName}")
-        while (!sqsHealthy) {
-          Try {
-            val req = GetQueueUrlRequest.builder().queueName(sqs.bufferName).build()
-            sqs.client.getQueueUrl(req)
-          } match {
-            case Success(_) =>
-              log.info(s"SQS buffer ${sqs.bufferName} exists")
-              sqsHealthy = true
-            case Failure(err) =>
-              log.error(s"SQS buffer ${sqs.bufferName} doesn't exist. Error: ${err.getMessage()}")
-          }
-          Thread.sleep(kinesisConfig.startupCheckInterval.toMillis)
-        }
+    def tryKinesis(events: List[Array[Byte]]): F[Unit] =
+      kinesisOps.write(events).flatMap {
+        case Nil      => Async[F].unit
+        case failures => trySqs(failures)
       }
-    }
-    executorService.execute(healthRunnable)
+
+    trySqs(events)
   }
 }
 
-/** KinesisSink companion object with factory method */
 object KinesisSink {
 
-  sealed trait Target
-  final case object Kinesis extends Target
-  final case class Sqs(client: SqsClient, bufferName: String, maxBytes: Int) extends Target
-
-  /**
-    * Events to be written to Kinesis or SQS.
-    * @param payloads Serialized events extracted from a CollectorPayload.
-    *                 The size of this collection is limited by MaxBytes.
-    *                 Not to be confused with a 'batch' events to sink.
-    * @param key Partition key for Kinesis
-    */
-  final case class Events(payloads: Array[Byte], key: String)
-
-  // Details about why messages failed to be written to SQS.
-  final case class BatchResultErrorInfo(code: String, message: String)
-
-  /**
-    * Create a KinesisSink and schedule a task to flush its EventStorage.
-    * Exists so that no threads can get a reference to the KinesisSink
-    * during its construction.
-    */
-  def create[F[_]: Async](
-    sinkConfig: Config.Sink[KinesisSinkConfig],
-    sqsBufferName: Option[String],
-    executorService: ExecutorService
-  ): Resource[F, KinesisSink[F]] = {
-    val acquire =
-      Sync[F]
-        .delay(
-          createAndInitialize(sinkConfig, sqsBufferName, executorService)
-        )
-        .rethrow
-    val release = (sink: KinesisSink[F]) => Sync[F].delay(sink.shutdown())
-
-    Resource.make(acquire)(release)
+  private class State[F[_]](
+    val failoverCounter: Ref[F, Int]
+  ) {
+    def withIncrementedFailoverCounter(implicit F: cats.Functor[F]): Resource[F, Unit] =
+      Resource.make(failoverCounter.update(_ + 1))(_ => failoverCounter.update(_ - 1))
   }
 
-  /**
-    * Creates a new Kinesis client.
-    * @param provider aws credentials provider
-    * @param endpoint kinesis endpoint where the stream resides
-    * @param region aws region where the stream resides
-    * @return the initialized AmazonKinesisClient
+  /** Retries an action with Fibonacci-based backoff delays.
+    *
+    * This function iteratively invokes the provided action, sleeping between iterations with
+    * exponentially increasing delays based on the Fibonacci sequence. The backoff duration
+    * starts at `minBackoff` and grows by multiplying `minBackoff` by successive Fibonacci
+    * numbers (1, 1, 2, 3, 5, 8, 13, ...), capped at `maxBackoff`.
+    *
+    * @param config The backoff policy configuration containing `minBackoff` and `maxBackoff` values
+    * @param initial The initial input value to pass to the first invocation of `action`
+    * @param action A function that processes the current value and returns:
+    *               - `None` to terminate the retry loop
+    *               - `Some(next)` to continue with `next` as the input for the next iteration
+    * @return An effect that completes when the action returns `None`
+    *
+    * @note The function sleeps BEFORE invoking the action on each iteration (including the first)
+    * @note The sleep duration follows the pattern: minBackoff * fib(n), capped by maxBackoff
     */
-  def createKinesisClient(
-    customEndpoint: Option[String],
-    region: String
-  ): Either[Throwable, KinesisClient] =
-    Either.catchNonFatal {
-      val endpointUri = customEndpoint.map(URI.create)
-      val builder     = KinesisClient.builder().region(Region.of(region))
-      val withEndpointOverride = endpointUri match {
-        case None    => builder
-        case Some(e) => builder.endpointOverride(e)
+  def withFibonacciBackoff[F[_]: Async, A](config: KinesisSinkConfig.BackoffPolicy, initial: A)(
+    action: A => F[Option[A]]
+  ): F[Unit] = {
+    def loop(current: A, fib1: Int, fib2: Int): F[Unit] = {
+      val duration = (config.minBackoff * fib1).min(config.maxBackoff).millis
+      Async[F].sleep(duration).flatMap { _ =>
+        action(current).flatMap {
+          case None       => Async[F].unit
+          case Some(next) => loop(next, fib2, fib1 + fib2)
+        }
       }
-      withEndpointOverride.build()
     }
 
-  def describeStream(client: KinesisClient, streamName: String) = {
-    val describeRequest = DescribeStreamSummaryRequest.builder().streamName(streamName).build()
-    val describeResult  = client.describeStreamSummary(describeRequest)
-    describeResult.streamDescriptionSummary()
+    loop(initial, 1, 1)
   }
 
-  /**
-    * Create a KinesisSink and schedule a task to flush its EventStorage.
-    * Exists so that no threads can get a reference to the KinesisSink
-    * during its construction.
+  /** Repeatedly checks if a Kinesis stream exists and is ACTIVE until it becomes available.
+    *
+    * This function will continue checking indefinitely until the stream exists and is in ACTIVE status.
+    * Between each check, it sleeps for the configured startup check interval.
+    *
+    * @param kinesisOps The KinesisOps instance to check stream existence and status
+    * @param config The Kinesis sink configuration containing the check interval
+    * @return Effect that completes successfully when the stream exists and is ACTIVE
     */
-  private def createAndInitialize[F[_]: Async](
-    sinkConfig: Config.Sink[KinesisSinkConfig],
-    sqsBufferName: Option[String],
-    executorService: ExecutorService
-  ): Either[Throwable, KinesisSink[F]] = {
-    val clients = for {
-      kinesisClient    <- createKinesisClient(sinkConfig.config.endpoint, sinkConfig.config.region)
-      sqsClientAndName <- sqsBuffer(sqsBufferName, sinkConfig.config.region, sinkConfig.config.sqsMaxBytes)
-    } yield (kinesisClient, sqsClientAndName)
-
-    clients.map {
-      case (kinesisClient, sqsClientAndName) =>
-        val ks =
-          new KinesisSink(
-            sinkConfig.config.maxBytes,
-            kinesisClient,
-            sinkConfig.config,
-            sinkConfig.name,
-            executorService,
-            sqsClientAndName
-          )
-        ks.checkKinesisHealth()
-        ks.checkSqsHealth()
-        ks
-    }
-  }
-
-  private def sqsBuffer(
-    bufferName: Option[String],
-    region: String,
-    maxBytes: Int
-  ): Either[Throwable, Option[Sqs]] =
-    bufferName match {
-      case Some(name) =>
-        createSqsClient(region).map(client => Some(Sqs(client, name, maxBytes)))
-      case None => None.asRight
-    }
-
-  private def createSqsClient(region: String): Either[Throwable, SqsClient] =
-    Either.catchNonFatal(
-      SqsClient.builder().region(Region.of(region)).build()
-    )
-
-  /**
-    * Splits a Kinesis-sized batch of `Events` into smaller batches that meet the SQS limit.
-    * @param batch A batch of up to `KinesisLimit` that must be split into smaller batches.
-    * @param maxRecords Max records for the smaller batches.
-    * @param maxBytes Max byte size for the smaller batches.
-    * @return A batch of smaller batches, each one of which meets the limits.
-    */
-  def split(
-    batch: List[Events],
-    maxRecords: Int,
-    maxBytes: Int
-  ): List[List[Events]] = {
-    var bytes = 0L
-    @scala.annotation.tailrec
-    def go(originalBatch: List[Events], tmpBatch: List[Events], newBatch: List[List[Events]]): List[List[Events]] =
-      (originalBatch, tmpBatch) match {
-        case (Nil, Nil) => newBatch
-        case (Nil, acc) => acc :: newBatch
-        case (h :: t, acc) if acc.size + 1 > maxRecords || h.payloads.size + bytes > maxBytes =>
-          bytes = h.payloads.size.toLong
-          go(t, h :: Nil, acc :: newBatch)
-        case (h :: t, acc) =>
-          bytes += h.payloads.size
-          go(t, h :: acc, newBatch)
+  private def waitForKinesisStreamExists[F[_]: Async](
+    kinesisOps: KinesisOps[F],
+    config: KinesisSinkConfig
+  ): F[Unit] =
+    kinesisOps.checkStreamExists.flatMap { exists =>
+      if (exists) {
+        Async[F].unit
+      } else {
+        Async[F].sleep(config.startupCheckInterval) >>
+          waitForKinesisStreamExists(kinesisOps, config)
       }
-    go(batch, Nil, Nil).map(_.reverse).reverse.filter(_.nonEmpty)
-  }
+    }
+
+  /** Repeatedly checks if an SQS topic exists until it becomes available.
+    *
+    * This function will continue checking indefinitely until the topic exists or becomes accessible.
+    * Between each check, it sleeps for the configured startup check interval.
+    *
+    * @param sqsOps The SqsOps instance to check topic existence
+    * @param config The Kinesis sink configuration containing the check interval
+    * @return Effect that completes successfully when the topic exists and is accessible
+    */
+  private def waitForSqsTopicExists[F[_]: Async](
+    sqsOps: SqsOps[F],
+    config: KinesisSinkConfig
+  ): F[Unit] =
+    sqsOps.checkTopicExists.flatMap { exists =>
+      if (exists) {
+        Async[F].unit
+      } else {
+        Async[F].sleep(config.startupCheckInterval) >>
+          waitForSqsTopicExists(sqsOps, config)
+      }
+    }
+
+  /** Creates a KinesisSink wrapped in a Resource for proper cleanup.
+    *
+    * @param httpClient The SdkAsyncHttpClient to use for AWS SDK clients
+    * @param sinkConfig The sink configuration containing stream name and Kinesis config
+    * @param sqsTopicName Optional SQS topic name for failover buffer
+    * @return Resource-wrapped KinesisSink instance
+    */
+  def resource[F[_]: Async](
+    httpClient: SdkAsyncHttpClient,
+    sinkConfig: Config.Sink[KinesisSinkConfig],
+    sqsTopicName: Option[String]
+  ): Resource[F, KinesisSink[F]] =
+    for {
+      kinesisOps <- KinesisOps.resource(httpClient, sinkConfig.name, sinkConfig.config)
+      sqsOpsOpt <- sqsTopicName.traverse(topicName =>
+        SqsOps.resource(httpClient, topicName, sinkConfig.config.sqsMaxBytes, sinkConfig.config)
+      )
+      failoverCounterRef <- Resource.eval(Ref[F].of(0))
+      _                  <- waitForKinesisStreamExists(kinesisOps, sinkConfig.config).background
+      _                  <- sqsOpsOpt.traverse(sqsOps => waitForSqsTopicExists(sqsOps, sinkConfig.config).background)
+      state = new State(failoverCounterRef)
+    } yield new KinesisSink(sinkConfig.config, kinesisOps, sqsOpsOpt, state)
 
 }

@@ -12,6 +12,7 @@ package com.snowplowanalytics.snowplow.collector.core
 import fs2.{Chunk, Pipe, Pull}
 import cats.Foldable
 import cats.effect.{Async, Sync}
+import cats.effect.implicits._
 import cats.implicits._
 import org.apache.thrift.TBaseHelper
 import org.apache.thrift.protocol.TBinaryProtocol
@@ -96,20 +97,20 @@ object CompressingDequeuer {
       timedPull.uncons.flatMap {
         case None =>
           // Upstream finished cleanly. Emit whatever is pending and we're done.
-          Pull.eval(emitToSink(sink, maybePending))
+          Pull.eval(emitAnythingPendingToSink(sink, maybePending))
         case Some((Left(_), next)) =>
           // Timer timed-out. Emit whatever is pending
-          Pull.eval(emitToSink(sink, maybePending)) >> go(next, None)
+          Pull.eval(emitAnythingPendingToSink(sink, maybePending)) >> go(next, None)
         case Some((Right(chunk), next)) =>
           Foldable[Chunk]
             .foldM(chunk, maybePending) {
               case (maybePending, cp) =>
-                val transport = new TMemoryTransport(Array())
-                val protocol  = new TBinaryProtocol(transport)
-                cp.write(protocol)
                 val context = ProcessingContext(bufferConfig, appInfo, factory, next, sink)
-                val payload = PayloadData(cp, transport.getOutput.get, 0, transport.getOutput.len)
-                handleCollectorPayload(context, maybePending, payload)
+                for {
+                  payload <- Pull.eval(Sync[F].delay(serializeCollectorPayload(cp)))
+                  pending <- getOrCreatePendingOutput(context, maybePending)
+                  result  <- handleCollectorPayload(context, pending, payload)
+                } yield result
             }
             .flatMap { result =>
               val cancelTimeout = if (result.isEmpty) next.timeout(Duration.Zero) else Pull.done
@@ -123,6 +124,31 @@ object CompressingDequeuer {
   }
 
   /**
+    * Gets the existing pending output or creates a new one if none exists.
+    *
+    * Ensure we use the latest target size for the compressor. And ensures we
+    * reset the timed pull, to limit the delay until this pending output gets
+    * emitted to the sink.
+    *
+    * @param ctx Processing dependencies (config, sink, factory, etc.)
+    * @param maybePending Current batch state, or None to create a new pending state
+    * @return A pending output ready for processing events
+    */
+  private def getOrCreatePendingOutput[F[_]](
+    ctx: ProcessingContext[F],
+    maybePending: Option[PendingOutput]
+  ): Pull[F, BadRow.SizeViolation, PendingOutput] =
+    maybePending match {
+      case Some(pending) =>
+        Pull.pure(pending)
+      case None =>
+        for {
+          compressor    <- newCompressorWithLatestTargetSize(ctx.factory, ctx.sink)
+          pendingOutput <- openNewPendingOutput(ctx.config, ctx.timedPull, compressor)
+        } yield pendingOutput
+    }
+
+  /**
     * Processes a single CollectorPayload by attempting to add it to the current compressor.
     *
     * This is the core logic that handles:
@@ -130,57 +156,51 @@ object CompressingDequeuer {
     * - Emitting full batches when size/count limits are reached
     * - Creating a new compressor when the previous one reached the limit
     *
-    * @param context Processing dependencies (config, sink, factory, etc.)
-    * @param maybePending Current batch state, or None to open a new pending state
+    * @param ctx Processing dependencies (config, sink, factory, etc.)
+    * @param pending Current batch state (guaranteed to exist)
     * @param payload The CollectorPayload to process
-    * @return An optional pending state
+    * @return An optional pending state (None if batch was emitted)
     */
-  private def handleCollectorPayload[F[_]: Sync](
+  private def handleCollectorPayload[F[_]: Async](
     ctx: ProcessingContext[F],
-    maybePending: Option[PendingOutput],
+    pending: PendingOutput,
     payload: PayloadData
   ): Pull[F, BadRow.SizeViolation, Option[PendingOutput]] =
-    for {
-      pending <- maybePending match {
-        case Some(p) => Pull.pure(p)
-        case None    => openNewPendingOutput(ctx.config, ctx.factory, ctx.timedPull, ctx.sink)
-      }
-      result <- pending.inProgress.addRecord(payload.cpBytes, payload.cpBytesOffset, payload.cpBytesLength) match {
-        case true =>
-          // payload was successfully added to the compressor
-          Pull.pure(Some(pending))
-        case false =>
-          // compressed payload was too big for this compressor
-          if (pending.inProgress.recordCount === 0) {
-            // Single record failed to compress to targetBytes
-            handleSingleRecordFailure(ctx.appInfo, payload, pending, ctx.factory, ctx.sink)
-          } else {
-            val compressedBytes = TBaseHelper.byteBufferToByteArray(pending.inProgress.result)
-            // Get current sink target bytes for accurate estimation of new batch size
-            Pull.eval(ctx.sink.targetBytes).flatMap { currentTargetBytes =>
-              if (pending.serializedByteCount + compressedBytes.size + pending.inProgress.targetSize > ctx
-                    .config
-                    .byteLimit || pending.outputCount + 1 > ctx.config.recordLimit) {
-                for {
-                  _      <- Pull.eval(emitBytesToSink(ctx.sink, compressedBytes :: pending.serialized))
-                  result <- handleCollectorPayload(ctx, None, payload)
-                } yield result
-              } else {
-                val compressor = ctx.factory.buildAndInitialize(currentTargetBytes)
-                val nextPending = PendingOutput(
-                  compressedBytes :: pending.serialized,
-                  compressor,
-                  pending.outputCount         + 1,
-                  pending.serializedByteCount + compressedBytes.size
-                )
-                handleCollectorPayload(ctx, Some(nextPending), payload)
-              }
+    pending.inProgress.addRecord(payload.cpBytes, payload.cpBytesOffset, payload.cpBytesLength) match {
+      case true =>
+        // payload was successfully added to the compressor
+        Pull.pure(Some(pending))
+      case false =>
+        // compressed payload was too big for this compressor
+        if (pending.inProgress.recordCount === 0) {
+          // Single record failed to compress to targetBytes
+          handleSingleRecordFailure(ctx, payload, pending)
+        } else {
+          val compressedBytes = TBaseHelper.byteBufferToByteArray(pending.inProgress.result)
+          // Get current sink target bytes for accurate estimation of new batch size
+          newCompressorWithLatestTargetSize(ctx.factory, ctx.sink).flatMap { nextCompressor =>
+            if (pending.serializedByteCount + compressedBytes.size + nextCompressor.targetSize > ctx
+                  .config
+                  .byteLimit || pending.outputCount + 1 > ctx.config.recordLimit) {
+              for {
+                _           <- Pull.eval(emitBytesToSink(ctx.sink, compressedBytes :: pending.serialized))
+                nextPending <- openNewPendingOutput(ctx.config, ctx.timedPull, nextCompressor)
+                result      <- handleCollectorPayload(ctx, nextPending, payload)
+              } yield result
+            } else {
+              val nextPending = PendingOutput(
+                compressedBytes :: pending.serialized,
+                nextCompressor,
+                pending.outputCount         + 1,
+                pending.serializedByteCount + compressedBytes.size
+              )
+              handleCollectorPayload(ctx, nextPending, payload)
             }
           }
-      }
-    } yield result
+        }
+    }
 
-  private def emitToSink[F[_]: Sync](
+  private def emitAnythingPendingToSink[F[_]: Async](
     sink: Sink[F],
     maybePending: Option[PendingOutput]
   ): F[Unit] =
@@ -196,26 +216,20 @@ object CompressingDequeuer {
         }
     }
 
-  private def emitBytesToSink[F[_]: Sync](sink: Sink[F], messages: List[Array[Byte]]): F[Unit] =
+  private def emitBytesToSink[F[_]: Async](sink: Sink[F], messages: List[Array[Byte]]): F[Unit] =
     if (messages.nonEmpty)
-      sink.storeRawEvents(messages)
+      sink.storeRawEvents(messages).start.void
     else
       Sync[F].unit
 
   private def openNewPendingOutput[F[_]](
     config: Config.Buffer,
-    factory: Compressor.Factory,
     timedPull: Pull.Timed[F, _],
-    sink: Sink[F]
+    compressor: Compressor
   ): Pull[F, Nothing, PendingOutput] =
     for {
-      _           <- timedPull.timeout(config.timeLimit.millis)
-      targetBytes <- Pull.eval(sink.targetBytes)
-    } yield {
-      val compressor = factory.buildAndInitialize(targetBytes)
-      // Start with outputCount=1 to represent the message corresponding to this compressor
-      PendingOutput(Nil, compressor, 1, 0L)
-    }
+      _ <- timedPull.timeout(config.timeLimit.millis)
+    } yield PendingOutput(Nil, compressor, 1, 0L)
 
   private def oversizedPayload(
     appInfo: AppInfo,
@@ -234,6 +248,13 @@ object CompressingDequeuer {
       Payload.RawPayload(event.toString().take(maxSize / 10))
     )
 
+  private def serializeCollectorPayload(cp: CollectorPayload): PayloadData = {
+    val transport = new TMemoryTransport(Array())
+    val protocol  = new TBinaryProtocol(transport)
+    cp.write(protocol)
+    PayloadData(cp, transport.getOutput.get, 0, transport.getOutput.len)
+  }
+
   /**
     * Creates a new compressor using the current target size from the sink.
     *
@@ -244,7 +265,7 @@ object CompressingDequeuer {
     * @param sink Sink to get current targetBytes from
     * @return A new initialized compressor
     */
-  private def createCompressor[F[_]](
+  private def newCompressorWithLatestTargetSize[F[_]](
     factory: Compressor.Factory,
     sink: Sink[F]
   ): Pull[F, Nothing, Compressor] =
@@ -256,27 +277,23 @@ object CompressingDequeuer {
     * This is the common pattern used when a payload exceeds the maximum allowed size.
     * It generates the appropriate bad row and prepares for processing the next payload.
     *
-    * @param appInfo Application info for the bad row
+    * @param ctx Processing dependencies (config, sink, factory, etc.)
     * @param cp The oversized CollectorPayload
     * @param cpBytesLength Size of the oversized payload
     * @param pending Current batch state to reset
-    * @param factory Factory for creating the replacement compressor
-    * @param sink Sink for getting current target size
     * @return An optional pending state
     */
   private def createSizeViolationAndResetCompressor[F[_]](
-    appInfo: AppInfo,
+    ctx: ProcessingContext[F],
     cp: CollectorPayload,
     cpBytesLength: Int,
-    pending: PendingOutput,
-    factory: Compressor.Factory,
-    sink: Sink[F]
+    pending: PendingOutput
   ): Pull[F, BadRow.SizeViolation, Option[PendingOutput]] = {
-    val br = oversizedPayload(appInfo, cp, cpBytesLength, sink.maxBytes)
+    val br = oversizedPayload(ctx.appInfo, cp, cpBytesLength, ctx.sink.maxBytes)
     for {
-      compressor <- createCompressor(factory, sink)
-      result     <- Pull.output1(br).as(Some(pending.copy(inProgress = compressor)))
-    } yield result
+      compressor <- newCompressorWithLatestTargetSize(ctx.factory, ctx.sink)
+      _          <- Pull.output1(br)
+    } yield Some(pending.copy(inProgress = compressor))
   }
 
   /**
@@ -287,30 +304,26 @@ object CompressingDequeuer {
     * compression with maxBytes (e.g., 1MB) to maintain the guarantee that all
     * payloads under 1MB are accepted.
     *
-    * @param appInfo Application info for potential bad rows
+    * @param ctx Processing dependencies (config, sink, factory, etc.)
     * @param payload The payload that failed initial compression
     * @param pending Current batch state
-    * @param factory Factory for creating compressors
-    * @param sink Sink providing maxBytes and targetBytes
     * @return An optional pending state
     */
   private def handleSingleRecordFailure[F[_]](
-    appInfo: AppInfo,
+    ctx: ProcessingContext[F],
     payload: PayloadData,
-    pending: PendingOutput,
-    factory: Compressor.Factory,
-    sink: Sink[F]
+    pending: PendingOutput
   ): Pull[F, BadRow.SizeViolation, Option[PendingOutput]] =
-    if (pending.inProgress.targetSize < sink.maxBytes) {
+    if (pending.inProgress.targetSize < ctx.sink.maxBytes) {
       // Try again with maxBytes if we were using a smaller target
-      val maxBytesCompressor = factory.buildAndInitialize(sink.maxBytes)
+      val maxBytesCompressor = ctx.factory.buildAndInitialize(ctx.sink.maxBytes)
       if (maxBytesCompressor.addRecord(payload.cpBytes, payload.cpBytesOffset, payload.cpBytesLength)) {
         Pull.pure(Some(pending.copy(inProgress = maxBytesCompressor)))
       } else {
         // Payload too large even for maxBytes - compressor auto-closed by addRecord failure
-        createSizeViolationAndResetCompressor(appInfo, payload.cp, payload.cpBytesLength, pending, factory, sink)
+        createSizeViolationAndResetCompressor(ctx, payload.cp, payload.cpBytesLength, pending)
       }
     } else {
-      createSizeViolationAndResetCompressor(appInfo, payload.cp, payload.cpBytesLength, pending, factory, sink)
+      createSizeViolationAndResetCompressor(ctx, payload.cp, payload.cpBytesLength, pending)
     }
 }
