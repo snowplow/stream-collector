@@ -98,7 +98,9 @@ object BuildSettings {
         Dependencies.Libraries.kafka,
         Dependencies.Libraries.kafkaClients,
         Dependencies.Libraries.mskAuth,
+        Dependencies.Libraries.azureIdentity,
         Dependencies.Libraries.jsonSmart,
+        Dependencies.Libraries.nettyHttp,
         // integration tests dependencies
         Dependencies.Libraries.IntegrationTests.specs2,
         Dependencies.Libraries.IntegrationTests.specs2CE
