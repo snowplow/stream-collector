@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 ### Security
 
+## [3.6.0] - 2025-09-04
+### Added
+- Compressed payloads in the raw stream [snowplow/stream-collector-private#24]
+
+### Changed
+- Reworking of KinesisSink to better support compression feature [snowplow/stream-collector-private#35]
+- Upgrade dependencies in preparation for release [snowplow/stream-collector-private#36]
+
 ## [3.5.0] - 2025-08-04
 ### Added
 - Add script to synchronize private repo and public repo main branch
@@ -613,7 +621,8 @@ Ensure docker image has latest libfreetype6 version [#247]
 - Scala Stream Collector, Scala Kinesis Enrich: replaced stream list with describe to tighten permissions, thanks @pkallos! [snowplow/snowplow#535]
 
 
-[Unreleased]: https://github.com/snowplow/stream-collector/compare/3.5.0...HEAD
+[Unreleased]: https://github.com/snowplow/stream-collector/compare/3.6.0...HEAD
+[3.6.0]: https://github.com/snowplow/stream-collector/compare/3.5.0...3.6.0
 [3.5.0]: https://github.com/snowplow/stream-collector/compare/3.4.0...3.5.0
 [3.4.0]: https://github.com/snowplow/stream-collector/compare/3.3.0...3.4.0
 [3.3.0]: https://github.com/snowplow/stream-collector/compare/3.2.1...3.3.0
