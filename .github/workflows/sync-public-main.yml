@@ -1,4 +1,4 @@
-name: Sync to Public Repo
+name: sync-public-main
 
 on:
   workflow_dispatch:
@@ -8,8 +8,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MAIN_BRANCH: master
-  PUBLIC_REPO: https://github.com/snowplow/stream-collector-private.git
+  PUBLIC_REPO_MAIN: master
+  PUBLIC_REPO_URL: https://github.com/snowplow/stream-collector
+  SYNC_BRANCH: public-main
 
 jobs:
   sync:
@@ -18,11 +19,11 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Checkout private repo (public-main)
+      - name: Checkout private repo (${{ env.SYNC_BRANCH }})
         uses: actions/checkout@v4
         with:
-          ref: public-main
-          fetch-depth: 0 
+          ref: ${{ env.SYNC_BRANCH }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Generate GitHub App Token for Snowplow Incubator Org
@@ -39,42 +40,29 @@ jobs:
           private_key: ${{ secrets.GH_APP_PRIVATE_KEY }}
           installation_id: ${{ steps.generate_token.outputs.installation_id }}
 
-      - name: Set up Git
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "bot@snowplow.io"
-
       - name: Add public repo as remote
-        env:
-          PUBLIC_REPO: ${{ env.PUBLIC_REPO }}
         run: |
-          REPO_URL="${PUBLIC_REPO#https://}"
-          if ! git remote | grep -q "public-origin"; then
-            git remote add public-origin https://x-access-token:${{ steps.auth_token.outputs.token }}@$REPO_URL
-          fi
+          REPO_PATH="${PUBLIC_REPO_URL#https://}"
+          git remote add public-origin https://x-access-token:${{ steps.auth_token.outputs.token }}@$REPO_PATH
           git fetch public-origin
 
       - name: Fast-forward merge to main
         run: |
-          git checkout -b public-origin/${{ env.MAIN_BRANCH }} || git checkout public-origin/${{ env.MAIN_BRANCH }}
-          git merge --ff-only public-main || echo "Fast-forward merge not possible; skipping."
+          git checkout public-origin/${{ env.PUBLIC_REPO_MAIN }}
+          git merge --ff-only ${{ env.SYNC_BRANCH }}
 
       - name: Push Changes to Public Repo
         run: |
-          if ! git push public-origin public-main:${{ env.MAIN_BRANCH }}; then
+          if ! git push public-origin ${{ env.SYNC_BRANCH }}:${{ env.PUBLIC_REPO_MAIN }}; then
             echo "Push failed; check for conflicts or diverged branches."
             exit 1
           fi
 
       - name: Push missing tags to Public Repo
         run: |
-          TAGS_TO_PUSH=$(git log public-main --pretty=format:"%D" | grep -o 'tag: [0-9]\+\.[0-9]\+\.[0-9]\+' | sed 's/tag: //')
-
+          TAGS_TO_PUSH=$(git tag --merged ${{ env.SYNC_BRANCH }} | grep -E '^[0-9]+(\.[0-9]+){1,2}$')
           for TAG in $TAGS_TO_PUSH; do
-            git ls-remote --tags public-origin | grep -q "refs/tags/$TAG" && continue
-
             git push public-origin $TAG || {
               echo "Push failed for tag $TAG; check for conflicts or invalid tag state."
-              exit 1
             }
           done
