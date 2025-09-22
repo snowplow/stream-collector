@@ -13,6 +13,8 @@ import scodec.bits.ByteVector
 
 import cats.data.NonEmptyList
 
+import cats.effect.testing.specs2.CatsEffect
+import cats.effect.testkit.TestControl
 import cats.effect.{Clock, IO}
 import cats.effect.unsafe.implicits.global
 
@@ -24,7 +26,7 @@ import com.snowplowanalytics.snowplow.collector.thrift.CollectorPayload
 
 import java.util.UUID
 
-class ServiceSpec extends Specification {
+class ServiceSpec extends Specification with CatsEffect {
   case class ProbeService(service: Service[IO], queue: TestQueueSink)
 
   val service = new Service(
@@ -122,7 +124,7 @@ class ServiceSpec extends Specification {
             Header.Raw(ci"SP-Anonymous", "*")
           )
         ).addCookie(TestUtils.testConfig.cookie.name, nuid)
-        val r = service
+        service
           .cookie(
             body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
@@ -130,11 +132,11 @@ class ServiceSpec extends Specification {
             pixelExpected = false,
             contentType   = Some("image/gif")
           )
-          .unsafeRunSync()
-
-        r.status mustEqual Status.Ok
-        queue.result.get must have size 1
-        queue.result.get.head.networkUserId shouldEqual "00000000-0000-0000-0000-000000000000"
+          .map { r =>
+            r.status mustEqual Status.Ok
+            queue.result.get must have size 1
+            queue.result.get.head.networkUserId shouldEqual "00000000-0000-0000-0000-000000000000"
+          }
       }
       "network_userid from cookie should persist if SP-Anonymous is not present" in {
         val ProbeService(service, queue) = probeService()
@@ -142,7 +144,7 @@ class ServiceSpec extends Specification {
         val req = Request[IO](
           method = Method.POST
         ).addCookie(TestUtils.testConfig.cookie.name, nuid)
-        val r = service
+        service
           .cookie(
             body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
@@ -150,11 +152,11 @@ class ServiceSpec extends Specification {
             pixelExpected = false,
             contentType   = Some("image/gif")
           )
-          .unsafeRunSync()
-
-        r.status mustEqual Status.Ok
-        queue.result.get must have size 1
-        queue.result.get.head.networkUserId shouldEqual nuid
+          .map { r =>
+            r.status mustEqual Status.Ok
+            queue.result.get must have size 1
+            queue.result.get.head.networkUserId shouldEqual nuid
+          }
       }
       "use the ip address from 'X-Forwarded-For' header if it exists" in {
         val ProbeService(service, queue) = probeService()
@@ -164,7 +166,7 @@ class ServiceSpec extends Specification {
             `X-Forwarded-For`(IpAddress.fromString("192.0.2.4"))
           )
         ).withAttribute(Request.Keys.ConnectionInfo, testConnection)
-        val r = service
+        service
           .cookie(
             body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
@@ -172,18 +174,18 @@ class ServiceSpec extends Specification {
             pixelExpected = false,
             contentType   = Some("image/gif")
           )
-          .unsafeRunSync()
-
-        r.status mustEqual Status.Ok
-        queue.result.get must have size 1
-        queue.result.get.head.ipAddress shouldEqual "192.0.2.4"
+          .map { r =>
+            r.status mustEqual Status.Ok
+            queue.result.get must have size 1
+            queue.result.get.head.ipAddress shouldEqual "192.0.2.4"
+          }
       }
       "use the ip address from remote address if 'X-Forwarded-For' header doesn't exist" in {
         val ProbeService(service, queue) = probeService()
         val req = Request[IO](
           method = Method.POST
         ).withAttribute(Request.Keys.ConnectionInfo, testConnection)
-        val r = service
+        service
           .cookie(
             body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
@@ -191,11 +193,11 @@ class ServiceSpec extends Specification {
             pixelExpected = false,
             contentType   = Some("image/gif")
           )
-          .unsafeRunSync()
-
-        r.status mustEqual Status.Ok
-        queue.result.get must have size 1
-        queue.result.get.head.ipAddress shouldEqual "192.0.2.2"
+          .map { r =>
+            r.status mustEqual Status.Ok
+            queue.result.get must have size 1
+            queue.result.get.head.ipAddress shouldEqual "192.0.2.2"
+          }
       }
       "set the ip address to 'unknown' if if SP-Anonymous is present" in {
         val ProbeService(service, queue) = probeService()
@@ -205,7 +207,7 @@ class ServiceSpec extends Specification {
             Header.Raw(ci"SP-Anonymous", "*")
           )
         ).withAttribute(Request.Keys.ConnectionInfo, testConnection)
-        val r = service
+        service
           .cookie(
             body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
@@ -213,11 +215,11 @@ class ServiceSpec extends Specification {
             pixelExpected = false,
             contentType   = Some("image/gif")
           )
-          .unsafeRunSync()
-
-        r.status mustEqual Status.Ok
-        queue.result.get must have size 1
-        queue.result.get.head.ipAddress shouldEqual "unknown"
+          .map { r =>
+            r.status mustEqual Status.Ok
+            queue.result.get must have size 1
+            queue.result.get.head.ipAddress shouldEqual "unknown"
+          }
       }
       "respond with a 200 OK and a good row in good sink" in {
         val ProbeService(service, queue) = probeService()
@@ -230,7 +232,7 @@ class ServiceSpec extends Specification {
             authority = Some(Uri.Authority(host = Uri.RegName("example.com")))
           )
         ).withAttribute(Request.Keys.ConnectionInfo, testConnection).addCookie(TestUtils.testConfig.cookie.name, nuid)
-        val r = service
+        service
           .cookie(
             body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
@@ -238,33 +240,33 @@ class ServiceSpec extends Specification {
             pixelExpected = false,
             contentType   = Some("image/gif")
           )
-          .unsafeRunSync()
+          .map { r =>
+            r.status mustEqual Status.Ok
+            queue.result.get must have size 1
 
-        r.status mustEqual Status.Ok
-        queue.result.get must have size 1
-
-        val e = queue.result.get.head
-        e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
-        e.ipAddress shouldEqual "192.0.2.3"
-        e.encoding shouldEqual "UTF-8"
-        e.collector shouldEqual s"ssc-${TestUtils.appVersion}-testsink"
-        e.querystring shouldEqual "a=b"
-        new String(e.getBody, StandardCharsets.UTF_8) shouldEqual "b"
-        e.path shouldEqual "p"
-        e.userAgent shouldEqual "testUserAgent"
-        e.refererUri shouldEqual "example.com"
-        e.hostname shouldEqual "example.com"
-        e.networkUserId shouldEqual nuid
-        e.headers shouldEqual List(
-          "User-Agent: testUserAgent",
-          "Referer: example.com",
-          "Content-Type: application/json",
-          "X-Forwarded-For: 192.0.2.3",
-          "Access-Control-Allow-Credentials: true",
-          "Cookie: cookie=value;sp=dfdb716e-ecf9-4d00-8b10-44edfbc8a108",
-          "image/gif"
-        ).asJava
-        e.contentType shouldEqual "image/gif"
+            val e = queue.result.get.head
+            e.schema shouldEqual "iglu:com.snowplowanalytics.snowplow/CollectorPayload/thrift/1-0-0"
+            e.ipAddress shouldEqual "192.0.2.3"
+            e.encoding shouldEqual "UTF-8"
+            e.collector shouldEqual s"ssc-${TestUtils.appVersion}-testsink"
+            e.querystring shouldEqual "a=b"
+            new String(e.getBody, StandardCharsets.UTF_8) shouldEqual "b"
+            e.path shouldEqual "p"
+            e.userAgent shouldEqual "testUserAgent"
+            e.refererUri shouldEqual "example.com"
+            e.hostname shouldEqual "example.com"
+            e.networkUserId shouldEqual nuid
+            e.headers shouldEqual List(
+              "User-Agent: testUserAgent",
+              "Referer: example.com",
+              "Content-Type: application/json",
+              "X-Forwarded-For: 192.0.2.3",
+              "Access-Control-Allow-Credentials: true",
+              "Cookie: cookie=value;sp=dfdb716e-ecf9-4d00-8b10-44edfbc8a108",
+              "image/gif"
+            ).asJava
+            e.contentType shouldEqual "image/gif"
+          }
       }
 
       "sink event with headers removed when spAnonymous set" in {
@@ -274,7 +276,7 @@ class ServiceSpec extends Specification {
           method  = Method.POST,
           headers = testHeaders.put(Header.Raw(ci"SP-Anonymous", "*"))
         )
-        val r = service
+        service
           .cookie(
             body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
@@ -282,19 +284,19 @@ class ServiceSpec extends Specification {
             pixelExpected = false,
             contentType   = Some("image/gif")
           )
-          .unsafeRunSync()
+          .map { r =>
+            r.status mustEqual Status.Ok
+            queue.result.get must have size 1
 
-        r.status mustEqual Status.Ok
-        queue.result.get must have size 1
-
-        queue.result.get.head.headers shouldEqual List(
-          "User-Agent: testUserAgent",
-          "Referer: example.com",
-          "Content-Type: application/json",
-          "Access-Control-Allow-Credentials: true",
-          "SP-Anonymous: *",
-          "image/gif"
-        ).asJava
+            queue.result.get.head.headers shouldEqual List(
+              "User-Agent: testUserAgent",
+              "Referer: example.com",
+              "Content-Type: application/json",
+              "Access-Control-Allow-Credentials: true",
+              "SP-Anonymous: *",
+              "image/gif"
+            ).asJava
+          }
       }
 
       "sink event with Cookie header upcased" in {
@@ -304,7 +306,7 @@ class ServiceSpec extends Specification {
           method  = Method.POST,
           headers = Headers(Header.Raw(CIString("cookie"), "name=value"))
         )
-        val r = service
+        service
           .cookie(
             body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
@@ -312,16 +314,15 @@ class ServiceSpec extends Specification {
             pixelExpected = false,
             contentType   = Some("image/gif")
           )
-          .unsafeRunSync()
-
-        r.status mustEqual Status.Ok
-        queue.result.get must have size 1
-
-        queue.result.get.head.headers.asScala must contain("Cookie: name=value")
+          .map { r =>
+            r.status mustEqual Status.Ok
+            queue.result.get must have size 1
+            queue.result.get.head.headers.asScala must contain("Cookie: name=value")
+          }
       }
 
       "return necessary cache control headers and respond with pixel when pixelExpected is true" in {
-        val r = service
+        service
           .cookie(
             body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
@@ -329,15 +330,22 @@ class ServiceSpec extends Specification {
             pixelExpected = true,
             contentType   = None
           )
-          .unsafeRunSync()
-        r.headers.get[`Cache-Control`] shouldEqual Some(
-          `Cache-Control`(CacheDirective.`no-cache`(), CacheDirective.`no-store`, CacheDirective.`must-revalidate`)
-        )
-        r.body.compile.toList.unsafeRunSync().toArray shouldEqual Service.pixel
+          .flatMap { r =>
+            r.body.compile.toList.map { body =>
+              r.headers.get[`Cache-Control`] shouldEqual Some(
+                `Cache-Control`(
+                  CacheDirective.`no-cache`(),
+                  CacheDirective.`no-store`,
+                  CacheDirective.`must-revalidate`
+                )
+              )
+              body.toArray shouldEqual Service.pixel
+            }
+          }
       }
 
       "include CORS headers in the response" in {
-        val r = service
+        service
           .cookie(
             body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
@@ -345,13 +353,14 @@ class ServiceSpec extends Specification {
             pixelExpected = true,
             contentType   = None
           )
-          .unsafeRunSync()
-        r.headers.get[`Access-Control-Allow-Credentials`] shouldEqual Some(
-          `Access-Control-Allow-Credentials`()
-        )
-        r.headers.get(ci"Access-Control-Allow-Origin").map(_.head) shouldEqual Some(
-          Header.Raw(ci"Access-Control-Allow-Origin", "*")
-        )
+          .map { r =>
+            r.headers.get[`Access-Control-Allow-Credentials`] shouldEqual Some(
+              `Access-Control-Allow-Credentials`()
+            )
+            r.headers.get(ci"Access-Control-Allow-Origin").map(_.head) shouldEqual Some(
+              Header.Raw(ci"Access-Control-Allow-Origin", "*")
+            )
+          }
       }
 
       "include the origin if given to CORS headers in the response" in {
@@ -370,7 +379,7 @@ class ServiceSpec extends Specification {
             .asInstanceOf[Origin]
         )
         val request = Request[IO](headers = headers)
-        val r = service
+        service
           .cookie(
             body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
@@ -378,13 +387,14 @@ class ServiceSpec extends Specification {
             pixelExpected = true,
             contentType   = None
           )
-          .unsafeRunSync()
-        r.headers.get[`Access-Control-Allow-Credentials`] shouldEqual Some(
-          `Access-Control-Allow-Credentials`()
-        )
-        r.headers.get(ci"Access-Control-Allow-Origin").map(_.head) shouldEqual Some(
-          Header.Raw(ci"Access-Control-Allow-Origin", "http://origin.com")
-        )
+          .map { r =>
+            r.headers.get[`Access-Control-Allow-Credentials`] shouldEqual Some(
+              `Access-Control-Allow-Credentials`()
+            )
+            r.headers.get(ci"Access-Control-Allow-Origin").map(_.head) shouldEqual Some(
+              Header.Raw(ci"Access-Control-Allow-Origin", "http://origin.com")
+            )
+          }
       }
 
       "redirect if path starts with '/r/'" in {
@@ -399,7 +409,7 @@ class ServiceSpec extends Specification {
           method = Method.GET,
           uri    = Uri.unsafeFromString(testPath)
         )
-        val r = service
+        service
           .cookie(
             body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = testPath,
@@ -407,11 +417,11 @@ class ServiceSpec extends Specification {
             pixelExpected = false,
             contentType   = None
           )
-          .unsafeRunSync()
-
-        r.status mustEqual Status.Found
-        r.headers.get[Location] must beSome(Location(Uri.unsafeFromString("https://snowplow.acme.com/12")))
-        queue.result.get must have size 1
+          .map { r =>
+            r.status mustEqual Status.Found
+            r.headers.get[Location] must beSome(Location(Uri.unsafeFromString("https://snowplow.acme.com/12")))
+            queue.result.get must have size 1
+          }
       }
 
       "return client cookie if client cookie name is configured" in {
@@ -426,7 +436,7 @@ class ServiceSpec extends Specification {
         val req = Request[IO](
           method = Method.POST
         ).addCookie(TestUtils.testConfig.cookie.name, nuid)
-        val r = service
+        service
           .cookie(
             body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
@@ -434,16 +444,16 @@ class ServiceSpec extends Specification {
             pixelExpected = false,
             contentType   = Some("image/gif")
           )
-          .unsafeRunSync()
-
-        r.status mustEqual Status.Ok
-        val cookies                        = r.headers.get[`Set-Cookie`].get
-        val `Set-Cookie`(clientCookieResp) = cookies.find(_.cookie.name == clientCookieName).get
-        val `Set-Cookie`(cookieResp)       = cookies.find(_.cookie.name == TestUtils.testConfig.cookie.name).get
-        queue.result.get must have size 1
-        cookies.toList must haveSize(2)
-        clientCookieResp.content must beEqualTo(nuid)
-        clientCookieResp must beEqualTo(cookieResp.copy(httpOnly = false, name = clientCookieName))
+          .map { r =>
+            r.status mustEqual Status.Ok
+            val cookies                        = r.headers.get[`Set-Cookie`].get
+            val `Set-Cookie`(clientCookieResp) = cookies.find(_.cookie.name == clientCookieName).get
+            val `Set-Cookie`(cookieResp)       = cookies.find(_.cookie.name == TestUtils.testConfig.cookie.name).get
+            queue.result.get must have size 1
+            cookies.toList must haveSize(2)
+            clientCookieResp.content must beEqualTo(nuid)
+            clientCookieResp must beEqualTo(cookieResp.copy(httpOnly = false, name = clientCookieName))
+          }
       }
 
       "not return client cookie if client cookie name isn't configured" in {
@@ -457,7 +467,7 @@ class ServiceSpec extends Specification {
         val req = Request[IO](
           method = Method.POST
         ).addCookie(TestUtils.testConfig.cookie.name, nuid)
-        val r = service
+        service
           .cookie(
             body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
@@ -465,14 +475,14 @@ class ServiceSpec extends Specification {
             pixelExpected = false,
             contentType   = Some("image/gif")
           )
-          .unsafeRunSync()
-
-        r.status mustEqual Status.Ok
-        val cookies    = r.headers.get[`Set-Cookie`].get
-        val cookieResp = cookies.find(_.cookie.name == TestUtils.testConfig.cookie.name)
-        queue.result.get must have size 1
-        cookies.toList must haveSize(1)
-        cookieResp must beSome
+          .map { r =>
+            r.status mustEqual Status.Ok
+            val cookies    = r.headers.get[`Set-Cookie`].get
+            val cookieResp = cookies.find(_.cookie.name == TestUtils.testConfig.cookie.name)
+            queue.result.get must have size 1
+            cookies.toList must haveSize(1)
+            cookieResp must beSome
+          }
       }
 
       "not return client cookie if cookie isn't enabled" in {
@@ -486,7 +496,7 @@ class ServiceSpec extends Specification {
         val req = Request[IO](
           method = Method.POST
         ).addCookie(TestUtils.testConfig.cookie.name, nuid)
-        val r = service
+        service
           .cookie(
             body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
@@ -494,12 +504,12 @@ class ServiceSpec extends Specification {
             pixelExpected = false,
             contentType   = Some("image/gif")
           )
-          .unsafeRunSync()
-
-        r.status mustEqual Status.Ok
-        val cookies = r.headers.get[`Set-Cookie`]
-        queue.result.get must have size 1
-        cookies must beNone
+          .map { r =>
+            r.status mustEqual Status.Ok
+            val cookies = r.headers.get[`Set-Cookie`]
+            queue.result.get must have size 1
+            cookies must beNone
+          }
       }
 
       "return a client cookie with empty content and expiration in the past if SP-Anonymous is present and nuid is set in request" in {
@@ -516,7 +526,7 @@ class ServiceSpec extends Specification {
           method  = Method.POST,
           headers = testHeaders.put(Header.Raw(ci"SP-Anonymous", "*"))
         ).addCookie(TestUtils.testConfig.cookie.name, nuid)
-        val r = service
+        service
           .cookie(
             body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
@@ -524,20 +534,20 @@ class ServiceSpec extends Specification {
             pixelExpected = false,
             contentType   = Some("image/gif")
           )
-          .unsafeRunSync()
-
-        r.status mustEqual Status.Ok
-        val cookies                        = r.headers.get[`Set-Cookie`].get
-        val `Set-Cookie`(clientCookieResp) = cookies.find(_.cookie.name == clientCookieName).get
-        val `Set-Cookie`(cookieResp)       = cookies.find(_.cookie.name == TestUtils.testConfig.cookie.name).get
-        queue.result.get must have size 1
-        cookies.toList must haveSize(2)
-        clientCookieResp must beEqualTo(cookieResp.copy(httpOnly = false, name = clientCookieName))
-        clientCookieResp.content must beEqualTo("")
-        (now - clientCookieResp.expires.get.toDuration).toMillis must beCloseTo(
-          TestUtils.testConfig.cookie.expiration.toMillis,
-          1000L
-        )
+          .map { r =>
+            r.status mustEqual Status.Ok
+            val cookies                        = r.headers.get[`Set-Cookie`].get
+            val `Set-Cookie`(clientCookieResp) = cookies.find(_.cookie.name == clientCookieName).get
+            val `Set-Cookie`(cookieResp)       = cookies.find(_.cookie.name == TestUtils.testConfig.cookie.name).get
+            queue.result.get must have size 1
+            cookies.toList must haveSize(2)
+            clientCookieResp must beEqualTo(cookieResp.copy(httpOnly = false, name = clientCookieName))
+            clientCookieResp.content must beEqualTo("")
+            (now - clientCookieResp.expires.get.toDuration).toMillis must beCloseTo(
+              TestUtils.testConfig.cookie.expiration.toMillis,
+              1000L
+            )
+          }
       }
 
       "not return a client cookie with empty content and expiration in the past if SP-Anonymous is present and nuid is not set in request" in {
@@ -552,7 +562,7 @@ class ServiceSpec extends Specification {
           method  = Method.POST,
           headers = testHeaders.put(Header.Raw(ci"SP-Anonymous", "*"))
         )
-        val r = service
+        service
           .cookie(
             body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
             path          = "p",
@@ -560,12 +570,29 @@ class ServiceSpec extends Specification {
             pixelExpected = false,
             contentType   = Some("image/gif")
           )
-          .unsafeRunSync()
+          .map { r =>
+            r.status mustEqual Status.Ok
+            val cookies = r.headers.get[`Set-Cookie`]
+            queue.result.get must have size 1
+            cookies must beNone
+          }
+      }
 
-        r.status mustEqual Status.Ok
-        val cookies = r.headers.get[`Set-Cookie`]
-        queue.result.get must have size 1
-        cookies must beNone
+      "return a 408 to a slow client" in {
+        val req = Request[IO](method = Method.POST)
+        val io = service
+          .cookie(
+            body          = IO.sleep(1.minute) >> IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
+            path          = "p",
+            request       = req,
+            pixelExpected = false,
+            contentType   = Some("image/gif")
+          )
+          .map { r =>
+            r.status mustEqual Status.RequestTimeout
+          }
+
+        TestControl.executeEmbed(io)
       }
     }
 
@@ -577,7 +604,9 @@ class ServiceSpec extends Specification {
           `Access-Control-Allow-Headers`(ci"Content-Type", ci"SP-Anonymous"),
           `Access-Control-Max-Age`.Cache(3600).asInstanceOf[`Access-Control-Max-Age`]
         )
-        service.preflightResponse(Request[IO]()).unsafeRunSync().headers shouldEqual expected
+        service.preflightResponse(Request[IO]()).map { r =>
+          r.headers shouldEqual expected
+        }
       }
     }
 

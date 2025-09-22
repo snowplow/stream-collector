@@ -18,8 +18,8 @@ import scodec.bits.ByteVector
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 
-import cats.effect.{Clock, Sync}
 import cats.implicits._
+import cats.effect.{Async, Clock, Outcome, Sync}
 import cats.effect.std.QueueSink
 
 import fs2.Stream
@@ -60,7 +60,7 @@ object Service {
   *  @appInfo Details of this variant of collector
   *
   */
-class Service[F[_]: Sync](
+class Service[F[_]: Async](
   config: Config[Any],
   queue: QueueSink[F, CollectorPayload],
   appInfo: AppInfo
@@ -78,25 +78,26 @@ class Service[F[_]: Sync](
     pixelExpected: Boolean,
     contentType: Option[String] = None
   ): F[Response[F]] =
-    for {
-      body <- body
-      redirect        = path.startsWith("/r/")
-      hostname        = extractHostname(request)
-      userAgent       = extractHeader(request, "User-Agent")
-      refererUri      = extractHeader(request, "Referer")
-      spAnonymous     = extractHeader(request, "SP-Anonymous").isDefined
-      ip              = extractIp(request, spAnonymous)
-      queryString     = Some(request.queryString)
-      cookie          = extractCookie(request)
-      doNotTrack      = checkDoNotTrackCookie(request)
-      alreadyBouncing = config.cookieBounce.enabled && request.queryString.contains(config.cookieBounce.name)
-      nuidOpt         = networkUserId(request, cookie, spAnonymous)
-      nuid = nuidOpt.getOrElse {
+    withBodyOrTimeout(body) { body =>
+      val redirect        = path.startsWith("/r/")
+      val hostname        = extractHostname(request)
+      val userAgent       = extractHeader(request, "User-Agent")
+      val refererUri      = extractHeader(request, "Referer")
+      val spAnonymous     = extractHeader(request, "SP-Anonymous").isDefined
+      val ip              = extractIp(request, spAnonymous)
+      val queryString     = Some(request.queryString)
+      val cookie          = extractCookie(request)
+      val doNotTrack      = checkDoNotTrackCookie(request)
+      val alreadyBouncing = config.cookieBounce.enabled && request.queryString.contains(config.cookieBounce.name)
+      val nuidOpt         = networkUserId(request, cookie, spAnonymous)
+      val nuid = nuidOpt.getOrElse {
         if (alreadyBouncing) config.cookieBounce.fallbackNetworkUserId
         else UUID.randomUUID().toString
       }
-      shouldBounce = config.cookieBounce.enabled && nuidOpt.isEmpty && !alreadyBouncing && pixelExpected && !redirect
-      event = buildEvent(
+      val shouldBounce = config
+        .cookieBounce
+        .enabled && nuidOpt.isEmpty && !alreadyBouncing && pixelExpected && !redirect
+      val event = buildEvent(
         queryString,
         body,
         path,
@@ -108,37 +109,39 @@ class Service[F[_]: Sync](
         contentType,
         headers(request, spAnonymous)
       )
-      now <- Clock[F].realTime
-      createCookieHeader = { c: Config.Cookie =>
-        cookieHeader(
-          headers         = request.headers,
-          cookieConfig    = c,
-          networkUserId   = nuid,
-          doNotTrack      = doNotTrack,
-          spAnonymous     = spAnonymous,
-          now             = now,
-          cookieInRequest = cookie.isDefined
+      for {
+        now <- Clock[F].realTime
+        createCookieHeader = { c: Config.Cookie =>
+          cookieHeader(
+            headers         = request.headers,
+            cookieConfig    = c,
+            networkUserId   = nuid,
+            doNotTrack      = doNotTrack,
+            spAnonymous     = spAnonymous,
+            now             = now,
+            cookieInRequest = cookie.isDefined
+          )
+        }
+        setCookieHeader       = createCookieHeader(config.cookie)
+        clientSetCookieHeader = config.cookie.clientCookie.flatMap(createCookieHeader)
+        headerList = List(
+          setCookieHeader.map(_.toRaw1),
+          clientSetCookieHeader.map(_.toRaw1),
+          cacheControl(pixelExpected).map(_.toRaw1),
+          accessControlAllowOriginHeader(request).some,
+          `Access-Control-Allow-Credentials`().toRaw1.some
+        ).flatten
+        responseHeaders = Headers(headerList ++ bounceLocationHeaders(config.cookieBounce, shouldBounce, request))
+        _ <- if (!doNotTrack && !shouldBounce) queue.offer(event) else Sync[F].unit
+        resp = buildHttpResponse(
+          queryParams   = request.uri.query.params,
+          headers       = responseHeaders,
+          redirect      = redirect,
+          pixelExpected = pixelExpected,
+          shouldBounce  = shouldBounce
         )
-      }
-      setCookieHeader       = createCookieHeader(config.cookie)
-      clientSetCookieHeader = config.cookie.clientCookie.flatMap(createCookieHeader)
-      headerList = List(
-        setCookieHeader.map(_.toRaw1),
-        clientSetCookieHeader.map(_.toRaw1),
-        cacheControl(pixelExpected).map(_.toRaw1),
-        accessControlAllowOriginHeader(request).some,
-        `Access-Control-Allow-Credentials`().toRaw1.some
-      ).flatten
-      responseHeaders = Headers(headerList ++ bounceLocationHeaders(config.cookieBounce, shouldBounce, request))
-      _ <- if (!doNotTrack && !shouldBounce) queue.offer(event) else Sync[F].unit
-      resp = buildHttpResponse(
-        queryParams   = request.uri.query.params,
-        headers       = responseHeaders,
-        redirect      = redirect,
-        pixelExpected = pixelExpected,
-        shouldBounce  = shouldBounce
-      )
-    } yield resp
+      } yield resp
+    }
 
   override def determinePath(vendor: String, version: String): String = {
     val original = s"/$vendor/$version"
@@ -473,4 +476,31 @@ class Service[F[_]: Sync](
       `Location`(redirectUri).toRaw1
     } else None
 
+  /** Reads the full request body from the client, or returns a 408 if this client is too slow */
+  private def withBodyOrTimeout(body: F[Option[ByteVector]])(f: Option[ByteVector] => F[Response[F]]): F[Response[F]] =
+    Async[F].racePair(body, Async[F].sleep(config.networking.bodyReadTimeout)).flatMap {
+
+      // The happyy scenario. We received the full request body within the deadline.
+      // Cancel the timer and handle the request
+      case Left((Outcome.Succeeded(bodyResult), fib2)) =>
+        fib2.cancel >> bodyResult.flatMap(f(_))
+
+      // The slow client scenario. We timed out waiting for the full request body.
+      // Return a 408.
+      case Right((fib1, Outcome.Succeeded(_))) =>
+        Response[F](status = RequestTimeout)
+          .withEntity(Stream.eval(fib1.cancel).drain.covaryOutput[Byte]) // cancel the body fiber _after_ sending the response
+          .withHeaders(Connection.close)
+          .pure[F]
+
+      // Housekeeping, errors and cancellations
+      case Left((Outcome.Errored(e), fib2)) =>
+        fib2.cancel >> Async[F].raiseError(e)
+      case Left((Outcome.Canceled(), fib2)) =>
+        fib2.cancel >> Async[F].never
+      case Right((fib1, Outcome.Errored(e))) =>
+        fib1.cancel >> Async[F].raiseError(e)
+      case Right((fib1, Outcome.Canceled())) =>
+        fib1.cancel >> Async[F].never
+    }
 }

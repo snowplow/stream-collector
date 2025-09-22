@@ -157,6 +157,7 @@ object NsqConfigSpec {
       maxConnections        = 1024,
       idleTimeout           = 610.seconds,
       responseHeaderTimeout = 30.seconds,
+      bodyReadTimeout       = 25.seconds,
       maxRequestLineLength  = 20480,
       maxHeadersLength      = 40960,
       maxPayloadSize        = 1048576,
