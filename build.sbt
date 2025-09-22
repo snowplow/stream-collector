@@ -22,6 +22,7 @@ lazy val core = project
       Dependencies.Libraries.http4sDsl,
       Dependencies.Libraries.http4sBlaze,
       Dependencies.Libraries.http4sClient,
+      Dependencies.Libraries.fs2io,
       Dependencies.Libraries.log4cats,
       Dependencies.Libraries.thrift,
       Dependencies.Libraries.badRows,

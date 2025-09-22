@@ -14,8 +14,8 @@ object Dependencies {
 
   object V {
     val commonStreams  = "0.13.1"
-    val awsSdk         = "2.33.0"
-    val azureSdk       = "1.17.0" // Override version of transitive dependency
+    val awsSdk         = "2.34.0"
+    val azureSdk       = "1.18.0" // Override version of transitive dependency
     val badRows        = "2.2.1"
     val blaze          = "0.23.15"
     val catsRetry      = "3.1.0"
@@ -35,10 +35,9 @@ object Dependencies {
     val tracker        = "2.0.0"
     val dataDog4s      = "0.32.0"
     val jnrPosix       = "3.1.20" // Override version of transitive dependency
-    val httpClient       = "4.5.14" // Override version of transitive dependency
-    val jsonSmart      = "2.5.2" // Override version of transitive dependency
+    val httpClient     = "4.5.14" // Override version of transitive dependency
     val zstd           = "1.5.7-4"
-    val netty          = "4.1.124.Final" // Override version of transitive dependency
+    val fs2            = "3.12.2" // Override version of transitive dependency
   }
 
   object Libraries {
@@ -53,6 +52,7 @@ object Dependencies {
     val http4sBlaze     = "org.http4s"                %% "http4s-blaze-server"                   % V.blaze
     val http4sClient    = "org.http4s"                %% "http4s-blaze-client"                   % V.blaze
     val http4sDsl       = "org.http4s"                %% "http4s-dsl"                            % V.http4s
+    val fs2io           = "co.fs2"                    %% "fs2-io"                                % V.fs2
     val log4cats        = "org.typelevel"             %% "log4cats-slf4j"                        % V.log4cats
     val slf4j           = "org.slf4j"                 % "slf4j-simple"                           % V.slf4j
     val thrift          = "org.apache.thrift"         % "libthrift"                              % V.thrift
@@ -74,8 +74,6 @@ object Dependencies {
     val sqs           = "software.amazon.awssdk"  %  "sqs"               % V.awsSdk
     val sts           = "software.amazon.awssdk"  %  "sts"               % V.awsSdk % Runtime // Enables web token authentication https://github.com/snowplow/stream-collector/issues/169
     val azureIdentity = "com.azure"               % "azure-identity"     % V.azureSdk % Runtime // Enables Event Hub authentication
-    val jsonSmart     = "net.minidev"             % "json-smart"         % V.jsonSmart
-    val nettyHttp     = "io.netty"                % "netty-codec-http2"  % V.netty
 
     //common unit tests
     val specs2    = "org.specs2"     %% "specs2-core"                % V.specs2    % Test
