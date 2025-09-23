@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 ### Security
 
+## [3.7.0] - 2025-09-23
+### Added
+- Return 408 to slow clients (snowplow/stream-collector-private#38)
+
+### Security
+- Bump dependencies [snowplow/stream-collector-private#39]
+
+### Changed
+- Update sync-public-main (stream-collector-private#17)
+
 ## [3.6.0] - 2025-09-04
 ### Added
 - Compressed payloads in the raw stream [snowplow/stream-collector-private#24]
@@ -621,7 +631,8 @@ Ensure docker image has latest libfreetype6 version [#247]
 - Scala Stream Collector, Scala Kinesis Enrich: replaced stream list with describe to tighten permissions, thanks @pkallos! [snowplow/snowplow#535]
 
 
-[Unreleased]: https://github.com/snowplow/stream-collector/compare/3.6.0...HEAD
+[Unreleased]: https://github.com/snowplow/stream-collector/compare/3.7.0...HEAD
+[3.7.0]: https://github.com/snowplow/stream-collector/compare/3.6.0...3.7.0
 [3.6.0]: https://github.com/snowplow/stream-collector/compare/3.5.0...3.6.0
 [3.5.0]: https://github.com/snowplow/stream-collector/compare/3.4.0...3.5.0
 [3.4.0]: https://github.com/snowplow/stream-collector/compare/3.3.0...3.4.0
