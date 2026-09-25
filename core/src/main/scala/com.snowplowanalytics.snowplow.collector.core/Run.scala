@@ -15,7 +15,7 @@ import java.nio.file.Path
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.{Duration, FiniteDuration}
 
 import cats.implicits._
 import cats.data.EitherT
@@ -32,6 +32,9 @@ import io.circe.Decoder
 
 import com.snowplowanalytics.snowplow.scalatracker.Tracking
 import com.snowplowanalytics.snowplow.collector.thrift.CollectorPayload
+
+import com.snowplowanalytics.snowplow.streams.http.HttpSinkConfig
+import com.snowplowanalytics.snowplow.streams.http.sink.HttpSink
 
 object Run {
 
@@ -88,18 +91,37 @@ object Run {
   ): F[ExitCode] = {
 
     val resource = for {
-      queue <- Resource.eval(Queue.unbounded[F, CollectorPayload])
-      sinks <- mkSinks(config.streams)
-      _     <- runHttpServer(config, appInfo, sinks, queue)
-      sig   <- Resource.eval(Deferred[F, Throwable])
-      _ <- Sinks
-        .dequeue(config, appInfo, queue, sinks)
-        .compile
-        .drain
-        .onError {
-          case t => sig.complete(t).void
-        }
-        .background
+      queue    <- Resource.eval(Queue.unbounded[F, Option[CollectorPayload]])
+      httpSink <- mkHttpSink(config.streams.http)
+      sinks <- mkSinks(config.streams).map { s =>
+        val goodSink = httpSink.getOrElse(s.good)
+        s.copy(good = goodSink)
+      }
+      sig <- Resource.eval(Deferred[F, Throwable])
+      // The dequeue loop is acquired before the http server, so that on shutdown the http server is
+      // released first.  This means we stop accepting new events before we stop draining the queue.
+      //
+      // On release we offer `None` into the queue, which is the signal for the dequeue stream to
+      // terminate.  A clean termination flushes any partially-filled batch to the sink, whereas
+      // cancelling the fiber would discard it.  We then join the fiber, so that release does not
+      // complete until everything left in the queue has been written to the sink.
+      _ <- Resource.make(
+        Sinks
+          .dequeue(config, appInfo, queue, sinks)
+          .compile
+          .drain
+          .onError {
+            case t => Logger[F].error(t)("Error writing events to the sink") >> sig.complete(t).void
+          }
+          .start
+      ) { fiber =>
+        Logger[F].info("Draining the queue of pending events before shutting down the sinks") >>
+          queue.offer(None) >>
+          fiber.join.void >>
+          Logger[F].info("Finished draining the queue of pending events")
+      }
+      payloadSink = (queue: QueueSink[F, Option[CollectorPayload]]).contramap[CollectorPayload](Some(_))
+      _ <- runHttpServer(config, appInfo, sinks, payloadSink)
       appId = java.util.UUID.randomUUID.toString
       httpClient <- BlazeClientBuilder[F].resource
       _ <- Telemetry
@@ -150,6 +172,23 @@ object Run {
       )(HttpServer.buildBlazeServer)
       .void
   }
+
+  private def mkHttpSink[F[_]: Async](httpSinkConfig: Option[HttpSinkConfig]): Resource[F, Option[Sink[F]]] =
+    httpSinkConfig match {
+      case None => Resource.pure(None)
+      case Some(c) =>
+        HttpSink.resource(c).flatMap { sink =>
+          Sink
+            .ofCommonStreamsSink(
+              name                       = "httpSink",
+              maxBytes                   = 10000000,
+              sinkRetryInterval          = Duration.Zero,
+              startupHealthCheckInterval = Duration.Zero,
+              sink                       = sink
+            )
+            .map(s => Some(s))
+        }
+    }
 
   private def prettyLogException[F[_]: Sync](e: Throwable): F[Unit] = {
 

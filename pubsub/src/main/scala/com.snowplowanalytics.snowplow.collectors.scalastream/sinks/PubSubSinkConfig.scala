@@ -4,8 +4,6 @@ import io.circe.Decoder
 import io.circe.config.syntax.durationDecoder
 import io.circe.generic.semiauto._
 
-import com.snowplowanalytics.snowplow.streams.pubsub.GcpUserAgent
-
 import scala.concurrent.duration.FiniteDuration
 
 final case class PubSubSinkConfig(
@@ -13,7 +11,6 @@ final case class PubSubSinkConfig(
   googleProjectId: String,
   startupCheckInterval: FiniteDuration,
   retryInterval: FiniteDuration,
-  gcpUserAgent: GcpUserAgent,
   emulatorHost: Option[String]
 )
 

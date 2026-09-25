@@ -14,6 +14,7 @@ import cats.implicits._
 import cats.effect.{Async, Ref, Resource, Sync}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import software.amazon.awssdk.core.client.config.SdkAdvancedClientOption
 import software.amazon.awssdk.awscore.defaultsmode.DefaultsMode
 import software.amazon.awssdk.http.async.SdkAsyncHttpClient
 import software.amazon.awssdk.regions.Region
@@ -187,6 +188,10 @@ object SqsOps {
           .httpClient(httpClient)
           .defaultsMode(DefaultsMode.AUTO)
           .region(Region.of(config.region))
+          .overrideConfiguration { c =>
+            c.putAdvancedOption(SdkAdvancedClientOption.USER_AGENT_PREFIX, KinesisOps.AWS_USER_AGENT)
+            ()
+          }
           .build()
       }
     }

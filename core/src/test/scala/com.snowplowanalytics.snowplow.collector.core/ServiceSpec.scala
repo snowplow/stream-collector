@@ -299,7 +299,7 @@ class ServiceSpec extends Specification with CatsEffect {
           }
       }
 
-      "sink event with Cookie header upcased" in {
+      "sink event with the Cookie header name casing preserved" in {
         val ProbeService(service, queue) = probeService()
 
         val req = Request[IO](
@@ -317,7 +317,7 @@ class ServiceSpec extends Specification with CatsEffect {
           .map { r =>
             r.status mustEqual Status.Ok
             queue.result.get must have size 1
-            queue.result.get.head.headers.asScala must contain("Cookie: name=value")
+            queue.result.get.head.headers.asScala must contain("cookie: name=value")
           }
       }
 
@@ -939,6 +939,54 @@ class ServiceSpec extends Specification with CatsEffect {
             `X-Forwarded-For`(IpAddress.fromString("127.0.0.1")),
             Header.Raw(ci"X-Real-Ip", "127.0.0.1"),
             Cookie(RequestCookie("cookie", "value"))
+          )
+        )
+        val expected = List(
+          "User-Agent: testUserAgent"
+        )
+        service.headers(request, spAnonymous = true) shouldEqual expected
+      }
+      "preserve the case of the Cookie header name" in {
+        val request = Request[IO](
+          headers = Headers(
+            Header.Raw(ci"cookie", "lower=value"),
+            Header.Raw(ci"COOKIE", "upper=value")
+          )
+        )
+        val expected = List(
+          "cookie: lower=value",
+          "COOKIE: upper=value"
+        )
+        service.headers(request, spAnonymous = false) shouldEqual expected
+      }
+      "filter out the invalid parts of the cookie whatever the case of the header name" in {
+        val request = Request[IO](
+          headers = Headers(
+            Header.Raw(ci"cookie", "valid=value;invalid=va\"lue")
+          )
+        )
+        val expected = List(
+          "cookie: valid=value"
+        )
+        service.headers(request, spAnonymous = false) shouldEqual expected
+      }
+      "strip the quotes wrapping a cookie value" in {
+        val request = Request[IO](
+          headers = Headers(
+            Header.Raw(ci"cookie", "sp=\"dfdb716e-ecf9-4d00-8b10-44edfbc8a108\"")
+          )
+        )
+        val expected = List(
+          "cookie: sp=dfdb716e-ecf9-4d00-8b10-44edfbc8a108"
+        )
+        service.headers(request, spAnonymous = false) shouldEqual expected
+      }
+      "filter out the Cookie header if SP-Anonymous is present whatever the case of the header name" in {
+        val request = Request[IO](
+          headers = Headers(
+            `User-Agent`(ProductId("testUserAgent")),
+            Header.Raw(ci"cookie", "lower=value"),
+            Header.Raw(ci"COOKIE", "upper=value")
           )
         )
         val expected = List(

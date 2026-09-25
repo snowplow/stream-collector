@@ -153,7 +153,8 @@ object KafkaConfigSpec {
           startupCheckInterval = 10.seconds,
           retryInterval        = 10.seconds
         )
-      )
+      ),
+      http = None
     ),
     telemetry = Config.Telemetry(
       disable         = false,

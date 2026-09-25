@@ -13,7 +13,6 @@ import cats.effect.testing.specs2.CatsEffect
 import cats.effect.{ExitCode, IO}
 import com.snowplowanalytics.snowplow.collector.core.{Config, ConfigParser}
 import com.snowplowanalytics.snowplow.collectors.scalastream.sinks.PubSubSinkConfig
-import com.snowplowanalytics.snowplow.streams.pubsub.GcpUserAgent
 import org.http4s.SameSite
 import org.specs2.mutable.Specification
 
@@ -132,11 +131,10 @@ object ConfigSpec {
           timeLimit   = 1000
         ),
         config = PubSubSinkConfig(
-          maxBytes             = 10000000,
+          maxBytes             = 9000000,
           googleProjectId      = "google-project-id",
           startupCheckInterval = 10.seconds,
           retryInterval        = 10.seconds,
-          gcpUserAgent         = GcpUserAgent(productName = "Snowplow OSS", productVersion = "collector"),
           emulatorHost         = None
         )
       ),
@@ -148,14 +146,14 @@ object ConfigSpec {
           timeLimit   = 1000
         ),
         config = PubSubSinkConfig(
-          maxBytes             = 10000000,
+          maxBytes             = 9000000,
           googleProjectId      = "google-project-id",
           startupCheckInterval = 10.seconds,
           retryInterval        = 10.seconds,
-          gcpUserAgent         = GcpUserAgent(productName = "Snowplow OSS", productVersion = "collector"),
           emulatorHost         = None
         )
-      )
+      ),
+      http = None
     ),
     telemetry = Config.Telemetry(
       disable         = false,

@@ -159,7 +159,8 @@ object SqsConfigSpec {
           ),
           threadPoolSize = 10
         )
-      )
+      ),
+      http = None
     ),
     telemetry = Config.Telemetry(
       disable         = false,

@@ -10,7 +10,7 @@ object PubSubCollector extends App[PubSubSinkConfig](BuildInfo) {
   override def mkSinks(config: Config.Streams[PubSubSinkConfig]): Resource[IO, Sinks[IO]] =
     for {
       factory <- PubsubFactory.resource[IO](
-        PubsubFactoryConfig(config.good.config.gcpUserAgent, config.good.config.emulatorHost)
+        PubsubFactoryConfig(config.good.config.emulatorHost)
       )
       good <- PubSubSink.create[IO](config.good, factory)
       bad  <- PubSubSink.create[IO](config.bad, factory)

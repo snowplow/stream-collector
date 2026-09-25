@@ -13,6 +13,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 ### Security
 
+## [3.8.0] - 2026-09-14
+### Added
+- Add AWS user-agent (#45)
+- add .publishignore (#59)
+
+### Changed
+- Use compression from common-streams (#55)
+- Use common-streams HTTP sink if configured (#48)
+- Supervisor to manage lifecycle of fibers writing to the sink (#46)
+- [PDP-2804] Use default maxRecordSize from common-streams (#66)
+- Consume common-streams reusable Compressor (#60)
+- [QA-832] Consume Snowman's async rollout dispatch (#58)
+- Rewrite deploy.yml to use reusable docker-publish workflow (#51)
+- Update sync workflow for stream-collector (#47)
+- [QA-135] - Applied private repo access for Snowman tests (#41)
+
+### Fixed
+- Preserve file permissions of the staged docker context (#68)
+- [PDP-2839] Accept DQUOTE-wrapped cookie values (#65)
+- Check that timeLimit > 0
+
+### Removed
+- Remove Snyk scanning from Github Actions (#67)
+- [PDP-994] Remove temporary fix for cookie header processing (#65)
+- Remove unused preTerminationUnhealthy and terminationDeadline config parameters
+
+### Security
+- Bump dependencies and sbt plugins (#67)
+
 ## [3.7.0] - 2025-09-23
 ### Added
 - Return 408 to slow clients (snowplow/stream-collector-private#38)
@@ -631,7 +660,8 @@ Ensure docker image has latest libfreetype6 version [#247]
 - Scala Stream Collector, Scala Kinesis Enrich: replaced stream list with describe to tighten permissions, thanks @pkallos! [snowplow/snowplow#535]
 
 
-[Unreleased]: https://github.com/snowplow/stream-collector/compare/3.7.0...HEAD
+[Unreleased]: https://github.com/snowplow/stream-collector/compare/3.8.0...HEAD
+[3.8.0]: https://github.com/snowplow/stream-collector/compare/3.7.0...3.8.0
 [3.7.0]: https://github.com/snowplow/stream-collector/compare/3.6.0...3.7.0
 [3.6.0]: https://github.com/snowplow/stream-collector/compare/3.5.0...3.6.0
 [3.5.0]: https://github.com/snowplow/stream-collector/compare/3.4.0...3.5.0

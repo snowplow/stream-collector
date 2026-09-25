@@ -243,13 +243,6 @@ collector {
   # During this period the collector continues to accept new connections and respond to requests.
   preTerminationPeriod = 10 seconds
 
-  # During the preTerminationPeriod, the collector can be configured to return 503s on the /health endpoint
-  # Can be helpful for removing the collector from a load balancer's targets.
-  preTerminationUnhealthy = false
-
-  # The server's deadline for closing connections during graceful shutdown
-  terminationDeadline = 10 seconds
-
   experimental {
     # Enable an experimental feature to send some "warm-up" requests to the collector's own /health endpoint during startup.
     # We have found from experiment this can cut down the number of 502s returned from a load balancer in front of the collector in Kubernetes deployments.

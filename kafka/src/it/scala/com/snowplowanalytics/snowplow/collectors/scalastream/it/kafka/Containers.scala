@@ -58,8 +58,7 @@ object Containers {
             "KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR" -> "1"
           ),
           exposedPorts = List(brokerExternalPort, brokerInternalPort),
-          exposedHostPort = brokerExternalPort,
-          exposedContainerPort = brokerExternalPort
+          portBindings = List(brokerExternalPort -> brokerExternalPort)
         )
         container.container.withNetwork(network)
         container.container.withNetworkAliases(brokerContainerName)

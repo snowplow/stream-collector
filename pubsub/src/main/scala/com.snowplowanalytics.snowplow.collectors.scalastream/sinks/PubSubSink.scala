@@ -15,6 +15,8 @@ import cats.effect.{Async, Resource, Sync}
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
+import scala.concurrent.duration.DurationInt
+
 import com.snowplowanalytics.snowplow.streams.pubsub.{
   PubsubSinkConfig => CommonPubsubSinkConfig,
   PubsubFactory,
@@ -51,6 +53,12 @@ object PubSubSink {
     CommonPubsubSinkConfigM[Id](
       topic                = CommonPubsubSinkConfig.Topic(c.googleProjectId, name),
       batchSize            = Int.MaxValue,
-      requestByteThreshold = Int.MaxValue
+      requestByteThreshold = Int.MaxValue,
+      retries = CommonPubsubSinkConfig.Retries(
+        transientErrors = CommonPubsubSinkConfig.TransientErrorRetrying(
+          delay    = 100.milliseconds,
+          attempts = 10
+        )
+      )
     )
 }

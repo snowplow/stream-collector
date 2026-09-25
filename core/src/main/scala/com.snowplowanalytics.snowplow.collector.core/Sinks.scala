@@ -12,10 +12,9 @@ package com.snowplowanalytics.snowplow.collector.core
 
 import fs2.{Chunk, Pipe, Pull, Stream}
 import cats.{Applicative, Foldable}
-import cats.effect.std.QueueSource
+import cats.effect.std.{QueueSource, Supervisor}
 import cats.effect.Async
 import cats.implicits._
-import cats.effect.implicits._
 
 import com.snowplowanalytics.snowplow.collector.thrift.CollectorPayload
 import com.snowplowanalytics.snowplow.badrows.BadRow
@@ -33,24 +32,34 @@ object Sinks {
     *
     *  @config The app config
     *  @appInfo Details of this variant of collector
-    *  @queue The queue from which to pull `CollectorPayload`s
+    *  @queue The queue from which to pull `CollectorPayload`s.  A `None` in the queue means no more
+    *         payloads are coming, so the stream terminates, flushing anything still pending.
     *  @sinks The good and bad `Sink`s, responsible for sinking serialized payloads to the output streams
     */
   def dequeue[F[_]: Async](
     config: Config[Any],
     appInfo: AppInfo,
-    queue: QueueSource[F, CollectorPayload],
+    queue: QueueSource[F, Option[CollectorPayload]],
     sinks: Sinks[F]
   ): Stream[F, Nothing] =
-    Stream
-      .fromQueueUnterminated(queue)
-      .through {
-        if (config.compression.enabled)
-          CompressingDequeuer.batchAndSinkGood(appInfo, config.compression, config.streams.good.buffer, sinks.good)
-        else
-          batchAndSinkGood(config.streams.good.buffer, config.networking, new SplitBatch(appInfo), sinks.good)
-      }
-      .through(batchAndSinkBad(config.streams.bad.buffer, sinks.bad))
+    Stream.resource(Supervisor[F](await = true)).flatMap { supervisor =>
+      Stream
+        .fromQueueNoneTerminated(queue)
+        .through {
+          if (config.compression.enabled)
+            CompressingDequeuer
+              .batchAndSinkGood(appInfo, config.compression, config.streams.good.buffer, sinks.good, supervisor)
+          else
+            batchAndSinkGood(
+              config.streams.good.buffer,
+              config.networking,
+              new SplitBatch(appInfo),
+              sinks.good,
+              supervisor
+            )
+        }
+        .through(batchAndSinkBad(config.streams.bad.buffer, sinks.bad, supervisor))
+    }
 
   /** A fs2 `Pipe` that batches up `CollectorPayload`s and sends serialized batches to the good `Sink`
     *
@@ -60,16 +69,17 @@ object Sinks {
     config: Config.Buffer,
     networking: Config.Networking,
     splitter: SplitBatch,
-    sink: Sink[F]
+    sink: Sink[F],
+    supervisor: Supervisor[F]
   ): Pipe[F, CollectorPayload, BadRow.SizeViolation] = {
     def go(timedPull: Pull.Timed[F, CollectorPayload], pending: PendingOutput): Pull[F, BadRow.SizeViolation, Unit] =
       timedPull.uncons.flatMap {
         case None =>
           // Upstream finished cleanly. Emit whatever is pending and we're done.
-          Pull.eval(writeToSink(sink, pending.serialized))
+          Pull.eval(writeToSink(supervisor, sink, pending.serialized))
         case Some((Left(_), next)) =>
           // Timer timed-out. Emit whatever is pending
-          Pull.eval(writeToSink(sink, pending.serialized)) >> go(next, PendingOutput(Nil, 0, 0L))
+          Pull.eval(writeToSink(supervisor, sink, pending.serialized)) >> go(next, PendingOutput(Nil, 0, 0L))
         case Some((Right(chunk), next)) =>
           // Upstream emitted something to us. We might already have pending payloads.
           val setTimeout = if (pending.serialized.isEmpty) next.timeout(config.timeLimit.millis) else Pull.done
@@ -85,7 +95,7 @@ object Sinks {
                       case (acc, bytes) =>
                         if (acc.totalSizeBytes + bytes.size > config.byteLimit || acc.numItems + 1 > config.recordLimit) {
                           Pull
-                            .eval(writeToSink(sink, acc.serialized))
+                            .eval(writeToSink(supervisor, sink, acc.serialized))
                             .as(PendingOutput(List(bytes), 1, bytes.size.toLong))
                         } else {
                           Pull.pure(
@@ -121,25 +131,26 @@ object Sinks {
     totalSizeBytes: Long
   )
 
-  private def writeToSink[F[_]: Async](sink: Sink[F], messages: List[Array[Byte]]): F[Unit] =
+  private def writeToSink[F[_]: Async](supervisor: Supervisor[F], sink: Sink[F], messages: List[Array[Byte]]): F[Unit] =
     if (messages.nonEmpty)
-      sink.storeRawEvents(messages).start.void
+      supervisor.supervise(sink.storeRawEvents(messages)).void
     else
       Applicative[F].unit
 
   /** A fs2 `Pipe` that batches up `SizeViolations`s and sends serialized batches to the bad `Sink` */
   private def batchAndSinkBad[F[_]: Async](
     config: Config.Buffer,
-    sink: Sink[F]
+    sink: Sink[F],
+    supervisor: Supervisor[F]
   ): Pipe[F, BadRow.SizeViolation, Nothing] = {
     def go(timedPull: Pull.Timed[F, BadRow.SizeViolation], pending: PendingOutput): Pull[F, Nothing, Unit] =
       timedPull.uncons.flatMap {
         case None =>
           // Upstream finished cleanly. Emit whatever is pending and we're done.
-          Pull.eval(writeToSink(sink, pending.serialized))
+          Pull.eval(writeToSink(supervisor, sink, pending.serialized))
         case Some((Left(_), next)) =>
           // Timer timed-out. Emit whatever is pending
-          Pull.eval(writeToSink(sink, pending.serialized)) >> go(next, PendingOutput(Nil, 0, 0L))
+          Pull.eval(writeToSink(supervisor, sink, pending.serialized)) >> go(next, PendingOutput(Nil, 0, 0L))
         case Some((Right(chunk), next)) =>
           // Upstream emitted something to us. We might already have pending bad rows.
           val setTimeout = if (pending.serialized.isEmpty) next.timeout(config.timeLimit.millis) else Pull.done
@@ -149,7 +160,9 @@ object Sinks {
                 case (acc, badRow) =>
                   val bytes = badRow.compact.getBytes(StandardCharsets.UTF_8)
                   if (acc.totalSizeBytes + bytes.size > config.byteLimit || acc.numItems + 1 > config.recordLimit) {
-                    Pull.eval(writeToSink(sink, acc.serialized)).as(PendingOutput(List(bytes), 1, bytes.size.toLong))
+                    Pull
+                      .eval(writeToSink(supervisor, sink, acc.serialized))
+                      .as(PendingOutput(List(bytes), 1, bytes.size.toLong))
                   } else {
                     Pull.pure(
                       PendingOutput(bytes :: acc.serialized, acc.numItems + 1, bytes.size.toLong + acc.totalSizeBytes)

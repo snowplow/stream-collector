@@ -185,8 +185,8 @@ collector {
 
       # Optional. Maximum number of bytes that a single record can contain.
       # If a record is bigger, a size violation bad row is emitted instead
-      # Default: 10 MB
-      maxBytes = 10000000
+      # Default: 9 MB
+      maxBytes = 9000000
 
       # Optional. When collector starts, it checks if PubSub topics exist with listTopics.
       # This is the interval for the calls.
@@ -222,8 +222,8 @@ collector {
 
       # Optional. Maximum number of bytes that a single record can contain.
       # If a record is bigger, a size violation bad row is emitted instead
-      # Default: 10 MB
-      maxBytes = 10000000
+      # Default: 9 MB
+      maxBytes = 9000000
 
       # Optional. When collector starts, it checks if PubSub topics exist with listTopics.
       # This is the interval for the calls.
@@ -282,11 +282,4 @@ collector {
   # Configures how long the colletor should pause after receiving a sigterm before starting the graceful shutdown.
   # During this period the collector continues to accept new connections and respond to requests.
   preTerminationPeriod = 10 seconds
-
-  # During the preTerminationPeriod, the collector can be configured to return 503s on the /health endpoint
-  # Can be helpful for removing the collector from a load balancer's targets.
-  preTerminationUnhealthy = false
-
-  # The server's deadline for closing connections during graceful shutdown
-  terminationDeadline = 10 seconds
 }

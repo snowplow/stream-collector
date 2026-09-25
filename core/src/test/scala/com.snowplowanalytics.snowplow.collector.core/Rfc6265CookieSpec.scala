@@ -31,5 +31,37 @@ class Rfc6265CookieSpec extends Specification {
       Rfc6265Cookie.parse(";") must beNone
       Rfc6265Cookie.parse(";;") must beNone
     }
+
+    "strip the quotes wrapping a value" in {
+      Rfc6265Cookie.parse("name=\"value\"") must beSome(valid1)
+      Rfc6265Cookie.parse(s"""name="value";name1="value2"""") must beSome(bothValid)
+      Rfc6265Cookie.parse(s"""name="value";$valid2""") must beSome(bothValid)
+      Rfc6265Cookie.parse(s"""$valid1;name1="value2"""") must beSome(bothValid)
+    }
+
+    "strip the quotes wrapping a base64 value, as reported in CSTMR-2167" in {
+      val b64 = "eyJmb28iOiJiYXIifQ=="
+      Rfc6265Cookie.parse(s"""RF="$b64"""") must beSome(s"RF=$b64")
+    }
+
+    "keep a quoted value that is empty or holds only cookie-octets" in {
+      Rfc6265Cookie.parse("name=\"\"") must beSome("name=")
+      Rfc6265Cookie.parse("name=\"a+b/c=\"") must beSome("name=a+b/c=")
+    }
+
+    "reject a quote that is not wrapping the whole value" in {
+      Rfc6265Cookie.parse("name=\"value") must beNone
+      Rfc6265Cookie.parse("name=value\"") must beNone
+      Rfc6265Cookie.parse("name=va\"lue") must beNone
+      // A valid quoted value cannot hold a DQUOTE of its own, so this stays invalid
+      Rfc6265Cookie.parse("name=\"va\"lue\"") must beNone
+      Rfc6265Cookie.parse("name=\"") must beNone
+    }
+
+    "reject a value containing backslashes or improperly placed quotes" in {
+      Rfc6265Cookie.parse("""AS_JSON={\"Key\":\"Value\"}""") must beNone
+      Rfc6265Cookie.parse("""AS_JSON="{\"Key\":\"Value\"}"""") must beNone
+      Rfc6265Cookie.parse(s"""AS_JSON={\"Key\":\"Value\"};$valid1""") must beSome(valid1)
+    }
   }
 }

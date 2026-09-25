@@ -138,7 +138,8 @@ object NsqConfigSpec {
           host     = "nsqHost",
           port     = 4150
         )
-      )
+      ),
+      http = None
     ),
     telemetry = Config.Telemetry(
       disable         = false,

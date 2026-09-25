@@ -1,17 +1,14 @@
 /**
- * Copyright (c) 2013-present Snowplow Analytics Ltd.
- * All rights reserved.
- *
- * This software is made available by Snowplow Analytics, Ltd.,
- * under the terms of the Snowplow Limited Use License Agreement, Version 1.1
- * located at https://docs.snowplow.io/limited-use-license-1.1
- * BY INSTALLING, DOWNLOADING, ACCESSING, USING OR DISTRIBUTING ANY PORTION
- * OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
- */
-  
-lazy val root = project
-  .in(file("."))
-  .aggregate(kinesis, pubsub, kafka, nsq, stdout, sqs, core)
+  * Copyright (c) 2013-present Snowplow Analytics Ltd.
+  * All rights reserved.
+  *
+  * This software is made available by Snowplow Analytics, Ltd.,
+  * under the terms of the Snowplow Limited Use License Agreement, Version 1.1
+  * located at https://docs.snowplow.io/limited-use-license-1.1
+  * BY INSTALLING, DOWNLOADING, ACCESSING, USING OR DISTRIBUTING ANY PORTION
+  * OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
+  */
+lazy val root = project.in(file(".")).aggregate(kinesis, pubsub, kafka, nsq, stdout, sqs, core)
 
 lazy val core = project
   .settings(moduleName := "snowplow-stream-collector-http4s-core")
@@ -25,6 +22,9 @@ lazy val core = project
       Dependencies.Libraries.fs2io,
       Dependencies.Libraries.log4cats,
       Dependencies.Libraries.thrift,
+      Dependencies.Libraries.commonsCodec,
+      Dependencies.Libraries.javaxAnnotation,
+      Dependencies.Libraries.httpClient5,
       Dependencies.Libraries.badRows,
       Dependencies.Libraries.slf4j,
       Dependencies.Libraries.decline,
@@ -38,13 +38,10 @@ lazy val core = project
       Dependencies.Libraries.specs2CE,
       Dependencies.Libraries.ceTestkit,
       Dependencies.Libraries.jnrPosix,
-      Dependencies.Libraries.zstd,
-
       //Integration tests
       Dependencies.Libraries.IntegrationTests.testcontainers,
       Dependencies.Libraries.IntegrationTests.http4sClient,
       Dependencies.Libraries.IntegrationTests.catsRetry
-
     )
   )
   .configs(IntegrationTest)

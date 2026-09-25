@@ -20,6 +20,8 @@ import io.circe._
 
 import org.http4s.SameSite
 
+import com.snowplowanalytics.snowplow.streams.http.HttpSinkConfig
+
 case class Config[+SinkConfig](
   interface: String,
   port: Int,
@@ -104,7 +106,8 @@ object Config {
 
   case class Streams[+SinkConfig](
     good: Sink[SinkConfig],
-    bad: Sink[SinkConfig]
+    bad: Sink[SinkConfig],
+    http: Option[HttpSinkConfig]
   )
 
   final case class Sink[+SinkConfig](name: String, buffer: Buffer, config: SinkConfig)
@@ -220,8 +223,12 @@ object Config {
     implicit val hsts             = deriveDecoder[HSTS]
     implicit val telemetry        = deriveDecoder[Telemetry]
     implicit val networking       = deriveDecoder[Networking]
-    implicit val sinkConfig       = newDecoder[SinkConfig].or(legacyDecoder[SinkConfig])
-    implicit val streams          = deriveDecoder[Streams[SinkConfig]]
+    implicit val sinkConfig = newDecoder[SinkConfig].or(legacyDecoder[SinkConfig]).emap {
+      case Sink(_, buffer, _) if buffer.timeLimit <= 0L =>
+        Left("timeLimit have to be > 0")
+      case valid => Right(valid)
+    }
+    implicit val streams = deriveDecoder[Streams[SinkConfig]]
 
     implicit val compressionType = Decoder[String].emap[Compression.Type] { str =>
       str.toLowerCase match {

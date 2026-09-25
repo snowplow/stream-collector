@@ -16,6 +16,7 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import software.amazon.awssdk.awscore.defaultsmode.DefaultsMode
 import software.amazon.awssdk.core.SdkBytes
+import software.amazon.awssdk.core.client.config.SdkAdvancedClientOption
 import software.amazon.awssdk.http.async.SdkAsyncHttpClient
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.kinesis.KinesisAsyncClient
@@ -157,6 +158,8 @@ class KinesisOps[F[_]: Async] private (client: KinesisAsyncClient, streamName: S
 
 object KinesisOps {
 
+  val AWS_USER_AGENT = "APN/1.1 (ak035lu2m8ge2f9qx90duo3ww)"
+
   def resource[F[_]: Async](
     httpClient: SdkAsyncHttpClient,
     streamName: String,
@@ -178,6 +181,10 @@ object KinesisOps {
           .httpClient(httpClient)
           .defaultsMode(DefaultsMode.AUTO)
           .region(Region.of(config.region))
+          .overrideConfiguration { c =>
+            c.putAdvancedOption(SdkAdvancedClientOption.USER_AGENT_PREFIX, AWS_USER_AGENT)
+            ()
+          }
         config.endpoint.foreach(endpoint => builder.endpointOverride(URI.create(endpoint)))
         builder.build()
       }

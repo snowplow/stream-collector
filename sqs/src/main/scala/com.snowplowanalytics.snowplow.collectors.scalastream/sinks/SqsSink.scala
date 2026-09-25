@@ -23,6 +23,7 @@ import scala.concurrent.ExecutionContextExecutorService
 import scala.concurrent.duration.{DurationLong, MILLISECONDS}
 import scala.jdk.CollectionConverters._
 
+import software.amazon.awssdk.core.client.config.SdkAdvancedClientOption
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.sqs.SqsClient
 import software.amazon.awssdk.services.sqs.model._
@@ -205,6 +206,8 @@ class SqsSink[F[_]: Async] private (
 /** SqsSink companion object with factory method */
 object SqsSink {
 
+  val AWS_USER_AGENT = "APN/1.1 (ak035lu2m8ge2f9qx90duo3ww)"
+
   /**
     * Events to be written to SQS.
     * @param payloads Serialized events extracted from a CollectorPayload.
@@ -234,7 +237,14 @@ object SqsSink {
 
   def createSqsClient(region: String): Either[Throwable, SqsClient] =
     Either.catchNonFatal(
-      SqsClient.builder().region(Region.of(region)).build
+      SqsClient
+        .builder()
+        .region(Region.of(region))
+        .overrideConfiguration { c =>
+          c.putAdvancedOption(SdkAdvancedClientOption.USER_AGENT_PREFIX, AWS_USER_AGENT)
+          ()
+        }
+        .build
     )
 
   /**

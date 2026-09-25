@@ -179,7 +179,8 @@ object KinesisConfigSpec {
           customEndpoint       = None,
           startupCheckInterval = 1.second
         )
-      )
+      ),
+      http = None
     ),
     telemetry = Config.Telemetry(
       disable         = false,

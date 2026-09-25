@@ -31,7 +31,6 @@ import retry.RetryPolicies
 import com.snowplowanalytics.snowplow.badrows.BadRow
 
 import com.snowplowanalytics.iglu.core.SelfDescribingData
-import com.snowplowanalytics.iglu.core.circe.implicits._
 
 import com.snowplowanalytics.snowplow.collector.thrift.CollectorPayload
 
@@ -48,9 +47,8 @@ object utils {
     val str = new String(bytes)
     val parsed = for {
       json <- parser.parse(str).leftMap(_.message)
-      sdj <- SelfDescribingData.parse(json).leftMap(_.message("Can't decode JSON as SDJ"))
-      br <- sdj.data.as[BadRow].leftMap(_.getMessage())
-    } yield br
+      sdj <- json.as[SelfDescribingData[BadRow]].leftMap(_.getMessage())
+    } yield sdj.data
     parsed match {
       case Right(br) => br
       case Left(err) => throw new RuntimeException(s"Can't parse bad row. Error: $err")
