@@ -89,6 +89,8 @@ class Routes[F[_]: Async](
       )
     case GET -> Root / "robots.txt" =>
       Ok("User-agent: *\nDisallow: /\n\nUser-agent: Googlebot\nDisallow: /\n\nUser-agent: AdsBot-Google\nDisallow: /")
+    case GET -> Root / ".well-known" / "fastly" / "logging" / "challenge" =>
+      Ok("*")
   }
 
   val value: HttpRoutes[F] = {

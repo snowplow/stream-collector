@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 ### Security
 
+## [3.9.0] - 2026-10-24
+Add Fastly logging challenge endpoint (#73)
+
 ## [3.8.0] - 2026-09-14
 ### Added
 - Add AWS user-agent (#45)

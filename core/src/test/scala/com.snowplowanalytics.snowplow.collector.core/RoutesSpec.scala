@@ -88,6 +88,15 @@ class RoutesSpec extends Specification {
       response.as[String].unsafeRunSync() must beEqualTo("ok")
     }
 
+    "respond to the fastly logging challenge with a wildcard" in {
+      val (_, routes) = createTestServices()
+      val request     = Request[IO](method = Method.GET, uri = uri"/.well-known/fastly/logging/challenge")
+      val response    = routes.run(request).unsafeRunSync()
+
+      response.status must beEqualTo(Status.Ok)
+      response.as[String].unsafeRunSync() must beEqualTo("*")
+    }
+
     "respond to the cors route with a preflight response" in {
       val (_, routes) = createTestServices()
       def test(uri: Uri) = {
