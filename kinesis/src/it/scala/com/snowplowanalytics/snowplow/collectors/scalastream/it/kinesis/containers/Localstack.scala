@@ -43,7 +43,7 @@ object Localstack {
 
   val localstack = {
     val container = GenericContainer(
-      dockerImage = "localstack/localstack-light:1.3.0",
+      dockerImage = "localstack/localstack:4.14.0",
       env = Map(
         "AWS_ACCESS_KEY_ID" -> "unused",
         "AWS_SECRET_ACCESS_KEY" -> "unused"

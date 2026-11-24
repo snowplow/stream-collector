@@ -16,18 +16,21 @@ import cats.effect.std.Supervisor
 import cats.implicits._
 import org.apache.thrift.TBaseHelper
 import org.apache.thrift.protocol.TBinaryProtocol
-import org.apache.thrift.transport.TMemoryTransport
+import org.apache.thrift.transport.TIOStreamTransport
 
 import com.snowplowanalytics.snowplow.collector.thrift.CollectorPayload
-import com.snowplowanalytics.snowplow.badrows.{BadRow, Failure, Payload, Processor}
+import com.snowplowanalytics.snowplow.badrows.BadRow
 import com.snowplowanalytics.snowplow.streams.compression.{Compressor, CompressorFactory}
 
+import java.io.ByteArrayOutputStream
+
 import scala.concurrent.duration.{Duration, DurationLong}
-import java.time.Instant
 
 object CompressingDequeuer {
 
   private val CollectorPayloadFormatVersion = 1
+
+  private val SerializationBufferInitialSize = 16 * 1024
 
   /**
     * Represents a batch of events that are being accumulated before emission to the sink.
@@ -62,6 +65,40 @@ object CompressingDequeuer {
     cpBytesOffset: Int,
     cpBytesLength: Int
   )
+
+  /**
+    * A `ByteArrayOutputStream` whose backing array is exposed and whose `reset` keeps the array.
+    *
+    * Thrift's `TByteArrayOutputStream` is not used because its `reset` replaces a grown array with
+    * a new one of the initial size.
+    */
+  final private class ReusableOutputStream(initialSize: Int) extends ByteArrayOutputStream(initialSize) {
+    def array: Array[Byte] = buf
+    def length: Int        = count
+  }
+
+  /**
+    * Serializes payloads into one buffer that is reused for every payload of a stream.
+    *
+    * The `PayloadData` returned by `serialize` points into that buffer, so its `cpBytes` are only
+    * valid until the next call to `serialize`. They must not be retained beyond the handling of
+    * their own payload. This holds because the dequeuer handles payloads one at a time, and
+    * `Compressor.addRecord` consumes the bytes synchronously and keeps no reference to them after
+    * it returns.
+    *
+    * The buffer keeps the capacity of the largest payload serialized so far, for the lifetime of
+    * the stream. That memory is accepted in exchange for not allocating per payload.
+    */
+  final private class PayloadSerializer {
+    private val stream   = new ReusableOutputStream(SerializationBufferInitialSize)
+    private val protocol = new TBinaryProtocol(new TIOStreamTransport(stream))
+
+    def serialize(cp: CollectorPayload): PayloadData = {
+      stream.reset()
+      cp.write(protocol)
+      PayloadData(cp, stream.array, 0, stream.length)
+    }
+  }
 
   /**
     * Groups together all the processing dependencies needed for compression and batching.
@@ -101,7 +138,8 @@ object CompressingDequeuer {
     def go(
       timedPull: Pull.Timed[F, CollectorPayload],
       maybePending: Option[PendingOutput],
-      compressor: Compressor
+      compressor: Compressor,
+      serializer: PayloadSerializer
     ): Pull[F, BadRow.SizeViolation, Unit] =
       timedPull.uncons.flatMap {
         case None =>
@@ -109,32 +147,40 @@ object CompressingDequeuer {
           Pull.eval(emitAnythingPendingToSink(supervisor, sink, maybePending, compressor))
         case Some((Left(_), next)) =>
           // Timer timed-out. Emit whatever is pending
-          Pull.eval(emitAnythingPendingToSink(supervisor, sink, maybePending, compressor)) >> go(next, None, compressor)
+          Pull.eval(emitAnythingPendingToSink(supervisor, sink, maybePending, compressor)) >> go(
+            next,
+            None,
+            compressor,
+            serializer
+          )
         case Some((Right(chunk), next)) =>
           Foldable[Chunk]
             .foldM(chunk, maybePending) {
               case (maybePending, cp) =>
                 val context = ProcessingContext(bufferConfig, appInfo, compressor, next, sink, supervisor)
                 for {
-                  payload <- Pull.eval(Sync[F].delay(serializeCollectorPayload(cp)))
+                  payload <- Pull.eval(Sync[F].delay(serializer.serialize(cp)))
                   pending <- getOrCreatePendingOutput(context, maybePending)
                   result  <- handleCollectorPayload(context, pending, payload)
                 } yield result
             }
             .flatMap { result =>
               val cancelTimeout = if (result.isEmpty) next.timeout(Duration.Zero) else Pull.done
-              cancelTimeout >> go(next, result, compressor)
+              cancelTimeout >> go(next, result, compressor, serializer)
             }
       }
 
     in =>
-      Stream.resource(factory.resource[F]).flatMap { compressor =>
-        in.pull
+      for {
+        compressor <- Stream.resource(factory.resource[F])
+        serializer <- Stream.eval(Sync[F].delay(new PayloadSerializer))
+        out <- in
+          .pull
           .timed { timedPull =>
-            go(timedPull, None, compressor)
+            go(timedPull, None, compressor, serializer)
           }
           .stream
-      }
+      } yield out
   }
 
   /**
@@ -248,30 +294,6 @@ object CompressingDequeuer {
       _ <- timedPull.timeout(config.timeLimit.millis)
     } yield PendingOutput(Nil, 1, 0L, targetSize)
 
-  private def oversizedPayload(
-    appInfo: AppInfo,
-    event: CollectorPayload,
-    size: Int,
-    maxSize: Int
-  ): BadRow.SizeViolation =
-    BadRow.SizeViolation(
-      Processor(appInfo.name, appInfo.version),
-      Failure.SizeViolation(
-        Instant.now(),
-        maxSize,
-        size,
-        s"oversized collector payload: Uncompressed size $size exceeded max allowed size $maxSize after compression"
-      ),
-      Payload.RawPayload(event.toString().take(maxSize / 10))
-    )
-
-  private def serializeCollectorPayload(cp: CollectorPayload): PayloadData = {
-    val transport = new TMemoryTransport(Array())
-    val protocol  = new TBinaryProtocol(transport)
-    cp.write(protocol)
-    PayloadData(cp, transport.getOutput.get, 0, transport.getOutput.len)
-  }
-
   /**
     * Resets the shared compressor to begin a new batch, using the current target size from the sink.
     *
@@ -312,7 +334,14 @@ object CompressingDequeuer {
     cpBytesLength: Int,
     pending: PendingOutput
   ): Pull[F, BadRow.SizeViolation, Option[PendingOutput]] = {
-    val br = oversizedPayload(ctx.appInfo, cp, cpBytesLength, ctx.sink.maxBytes)
+    val maxSize = ctx.sink.maxBytes
+    val br = Sinks.oversizedPayload(
+      ctx.appInfo,
+      cp,
+      cpBytesLength,
+      maxSize,
+      s"oversized collector payload: Uncompressed size $cpBytesLength exceeded max allowed size $maxSize after compression"
+    )
     for {
       targetSize <- resetWithLatestTargetSize(ctx.compressor, ctx.sink)
       _          <- Pull.output1(br)

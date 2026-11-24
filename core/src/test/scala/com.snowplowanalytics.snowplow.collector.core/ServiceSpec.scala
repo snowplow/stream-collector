@@ -158,6 +158,105 @@ class ServiceSpec extends Specification with CatsEffect {
             queue.result.get.head.networkUserId shouldEqual nuid
           }
       }
+      "not overwrite the network_userid of the request cookie with the nuid query parameter" in {
+        val ProbeService(service, queue) = probeService()
+        val ownNuid                      = UUID.randomUUID().toString
+        val queryNuid                    = UUID.randomUUID().toString
+        val req = Request[IO](
+          method = Method.POST,
+          uri    = Uri().withQueryParam("nuid", queryNuid)
+        ).addCookie(TestUtils.testConfig.cookie.name, ownNuid)
+        service
+          .cookie(
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
+            path          = "p",
+            request       = req,
+            pixelExpected = false,
+            contentType   = Some("image/gif")
+          )
+          .map { r =>
+            r.status mustEqual Status.Ok
+            val `Set-Cookie`(cookieResp) = r.headers.get[`Set-Cookie`].get.head
+            cookieResp.content must beEqualTo(ownNuid)
+            queue.result.get must have size 1
+            queue.result.get.head.networkUserId shouldEqual queryNuid
+          }
+      }
+      "not set a cookie with the network_userid of the nuid query parameter if the request has no cookie" in {
+        val ProbeService(service, queue) = probeService()
+        val queryNuid                    = UUID.randomUUID().toString
+        val req = Request[IO](
+          method = Method.POST,
+          uri    = Uri().withQueryParam("nuid", queryNuid)
+        )
+        service
+          .cookie(
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
+            path          = "p",
+            request       = req,
+            pixelExpected = false,
+            contentType   = Some("image/gif")
+          )
+          .map { r =>
+            r.status mustEqual Status.Ok
+            val `Set-Cookie`(cookieResp) = r.headers.get[`Set-Cookie`].get.head
+            cookieResp.content mustNotEqual queryNuid
+            uuidRegex.pattern.matcher(cookieResp.content).matches() must beTrue
+            queue.result.get must have size 1
+            queue.result.get.head.networkUserId shouldEqual queryNuid
+          }
+      }
+      "use the same generated network_userid for the event and the cookie if the request has neither cookie nor nuid" in {
+        val ProbeService(service, queue) = probeService()
+        val req                          = Request[IO](method = Method.POST)
+        service
+          .cookie(
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
+            path          = "p",
+            request       = req,
+            pixelExpected = false,
+            contentType   = Some("image/gif")
+          )
+          .map { r =>
+            r.status mustEqual Status.Ok
+            val `Set-Cookie`(cookieResp) = r.headers.get[`Set-Cookie`].get.head
+            uuidRegex.pattern.matcher(cookieResp.content).matches() must beTrue
+            queue.result.get must have size 1
+            queue.result.get.head.networkUserId shouldEqual cookieResp.content
+          }
+      }
+      "not set a client cookie with the network_userid of the nuid query parameter if the request has no cookie" in {
+        val clientCookieName = "sp_client"
+        val testConf = TestUtils
+          .testConfig
+          .copy(
+            cookie = TestUtils.testConfig.cookie.copy(clientCookieName = Some(clientCookieName))
+          )
+        val ProbeService(service, queue) = probeService(config = testConf)
+        val queryNuid                    = UUID.randomUUID().toString
+        val req = Request[IO](
+          method = Method.POST,
+          uri    = Uri().withQueryParam("nuid", queryNuid)
+        )
+        service
+          .cookie(
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
+            path          = "p",
+            request       = req,
+            pixelExpected = false,
+            contentType   = Some("image/gif")
+          )
+          .map { r =>
+            r.status mustEqual Status.Ok
+            val cookies                        = r.headers.get[`Set-Cookie`].get
+            val `Set-Cookie`(clientCookieResp) = cookies.find(_.cookie.name == clientCookieName).get
+            val `Set-Cookie`(cookieResp)       = cookies.find(_.cookie.name == TestUtils.testConfig.cookie.name).get
+            uuidRegex.pattern.matcher(cookieResp.content).matches() must beTrue
+            clientCookieResp.content must beEqualTo(cookieResp.content)
+            queue.result.get must have size 1
+            queue.result.get.head.networkUserId shouldEqual queryNuid
+          }
+      }
       "use the ip address from 'X-Forwarded-For' header if it exists" in {
         val ProbeService(service, queue) = probeService()
         val req = Request[IO](
@@ -682,7 +781,7 @@ class ServiceSpec extends Specification with CatsEffect {
           )
         val ProbeService(service, _) = probeService(config = testConfig)
         val res = service.buildHttpResponse(
-          queryParams   = Map("u" -> "https://example1.com/12"),
+          query         = Query("u" -> Some("https://example1.com/12")),
           headers       = testHeaders,
           redirect      = true,
           pixelExpected = true,
@@ -693,7 +792,7 @@ class ServiceSpec extends Specification with CatsEffect {
       }
       "send back a gif if pixelExpected is true" in {
         val res = service.buildHttpResponse(
-          queryParams   = Map.empty,
+          query         = Query.empty,
           headers       = testHeaders,
           redirect      = false,
           pixelExpected = true,
@@ -705,7 +804,7 @@ class ServiceSpec extends Specification with CatsEffect {
       }
       "return 302 Found if expecting tracking pixel and cookie shouldBounce is performed" in {
         val res = service.buildHttpResponse(
-          queryParams   = Map.empty,
+          query         = Query.empty,
           headers       = testHeaders,
           redirect      = false,
           pixelExpected = true,
@@ -717,7 +816,7 @@ class ServiceSpec extends Specification with CatsEffect {
       "send back ok otherwise" in {
         val headers = testHeaders.put(`Content-Type`(MediaType.text.plain))
         val res = service.buildHttpResponse(
-          queryParams   = Map.empty,
+          query         = Query.empty,
           headers       = headers,
           redirect      = false,
           pixelExpected = false,
@@ -946,6 +1045,19 @@ class ServiceSpec extends Specification with CatsEffect {
         )
         service.headers(request, spAnonymous = true) shouldEqual expected
       }
+      "filter out the X-Forwarded-For and X-Real-Ip headers if SP-Anonymous is present whatever the case of the header name" in {
+        val request = Request[IO](
+          headers = Headers(
+            `User-Agent`(ProductId("testUserAgent")),
+            Header.Raw(ci"x-forwarded-for", "127.0.0.1"),
+            Header.Raw(ci"x-real-ip", "127.0.0.1")
+          )
+        )
+        val expected = List(
+          "User-Agent: testUserAgent"
+        )
+        service.headers(request, spAnonymous = true) shouldEqual expected
+      }
       "preserve the case of the Cookie header name" in {
         val request = Request[IO](
           headers = Headers(
@@ -1012,6 +1124,23 @@ class ServiceSpec extends Specification with CatsEffect {
           service.networkUserId(
             Request[IO](),
             Some(RequestCookie("nuid", nuid)),
+            spAnonymous = false
+          ) shouldEqual Some(nuid)
+        }
+        "give back the request cookie if nuid only appears inside another key or a value" in {
+          val nuid = UUID.randomUUID().toString
+          service.networkUserId(
+            Request[IO]().withUri(Uri.unsafeFromString("/i?tnuid=abc&e=nuid")),
+            Some(RequestCookie("sp", nuid)),
+            spAnonymous = false
+          ) shouldEqual Some(nuid)
+        }
+        "give back the request cookie if the nuid key is percent-encoded" in {
+          val nuid = UUID.randomUUID().toString
+          Uri.unsafeFromString("/i?nu%69d=abc").query.params.get("nuid") shouldEqual Some("abc")
+          service.networkUserId(
+            Request[IO]().withUri(Uri.unsafeFromString("/i?nu%69d=abc")),
+            Some(RequestCookie("sp", nuid)),
             spAnonymous = false
           ) shouldEqual Some(nuid)
         }
@@ -1430,6 +1559,33 @@ class ServiceSpec extends Specification with CatsEffect {
           )
           .unsafeRunSync()
         r.headers.get(ci"Location").headOption.map(_.head.value) must beNone
+      }
+      "should use the fallback network_userid for the event but not for the cookie when already bouncing" in {
+        val ProbeService(service, queue) = probeService(config)
+        val req = Request[IO](
+          method  = Method.POST,
+          headers = testHeaders,
+          uri = Uri(
+            path      = Uri.Path.unsafeFromString("i"),
+            query     = Query.unsafeFromString("e=pv&n3pc=true"),
+            authority = Some(Uri.Authority(host = Uri.RegName("example.com")))
+          )
+        ).withAttribute(Request.Keys.ConnectionInfo, testConnection)
+
+        val r = service
+          .cookie(
+            body          = IO.pure(Some(ByteVector("b".getBytes(StandardCharsets.UTF_8)))),
+            path          = "p",
+            request       = req,
+            pixelExpected = true,
+            contentType   = None
+          )
+          .unsafeRunSync()
+        val `Set-Cookie`(cookieResp) = r.headers.get[`Set-Cookie`].get.head
+        cookieResp.content mustNotEqual config.cookieBounce.fallbackNetworkUserId
+        uuidRegex.pattern.matcher(cookieResp.content).matches() must beTrue
+        queue.result.get must have size 1
+        queue.result.get.head.networkUserId shouldEqual config.cookieBounce.fallbackNetworkUserId
       }
     }
   }

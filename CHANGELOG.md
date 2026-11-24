@@ -1,3 +1,22 @@
+Version 3.10.0 (2026-11-19)
+---------------------------
+Keep the lane's published final release published (#94)
+Persist checkout credentials so Claude mentions can fetch (#80)
+Call the shared docker-publish workflow, remove the public sync, and gate final releases (#71)
+Bump common-streams to 0.29.0 (#93)
+Bump jackson-databind, kafka-clients, azure-identity, common-streams, guava (#88)
+Use actions/setup-python v5 with Python 3.12 in telemetry integration test (#89)
+Restructure Dependencies.scala and group security overrides per module (#90)
+Exclude unused transitive dependencies of libthrift (#87)
+Reuse one serialization buffer in the compressing dequeuer (#85)
+Use localstack/localstack:4.14.0 in Kinesis integration tests (#84)
+Only parse the query string when it may contain nuid (#83)
+Match header names in Service.headers with stable identifiers (#82)
+Only match route variables that decode to a single segment (#78)
+Remove SplitBatch from the uncompressed sink path (#79)
+Derive the response cookie id from the request's own cookie (#77)
+Harden claude.yml workflow against prompt injection
+
 # Changelog
 
 All notable changes to this project will be documented in this file.

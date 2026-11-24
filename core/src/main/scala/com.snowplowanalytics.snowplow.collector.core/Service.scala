@@ -51,6 +51,12 @@ object Service {
   // Contains an invisible pixel to return for `/i` requests.
   val pixel           = Base64.decodeBase64("R0lGODlhAQABAPAAAP///wAAACH5BAUAAAAALAAAAAABAAEAAAICRAEAOw==")
   val spAnonymousNuid = "00000000-0000-0000-0000-000000000000"
+
+  // Matched as stable identifiers, which compare with CIString's case-insensitive `==`.
+  // A `ci"..."` pattern instead builds an extractor and runs a general glob match on every evaluation.
+  private val XForwardedForHeaderName = ci"X-Forwarded-For"
+  private val XRealIpHeaderName       = ci"X-Real-Ip"
+  private val CookieHeaderName        = ci"Cookie"
 }
 
 /** Handles requests/responses and adds `CollectorPayload`s into a queue to be processed by a different fiber
@@ -90,10 +96,14 @@ class Service[F[_]: Async](
       val doNotTrack      = checkDoNotTrackCookie(request)
       val alreadyBouncing = config.cookieBounce.enabled && request.queryString.contains(config.cookieBounce.name)
       val nuidOpt         = networkUserId(request, cookie, spAnonymous)
+      // A `lazy val`, not a `def`: the event and the response cookie must share one generated id
+      lazy val generatedNuid = UUID.randomUUID().toString
       val nuid = nuidOpt.getOrElse {
         if (alreadyBouncing) config.cookieBounce.fallbackNetworkUserId
-        else UUID.randomUUID().toString
+        else generatedNuid
       }
+      // Not the `nuid` query parameter (any third-party page can set it) nor the bounce fallback id (shared by every visitor)
+      val cookieNuid = cookie.map(_.content).getOrElse(generatedNuid)
       val shouldBounce = config
         .cookieBounce
         .enabled && nuidOpt.isEmpty && !alreadyBouncing && pixelExpected && !redirect
@@ -115,7 +125,7 @@ class Service[F[_]: Async](
           cookieHeader(
             headers         = request.headers,
             cookieConfig    = c,
-            networkUserId   = nuid,
+            networkUserId   = cookieNuid,
             doNotTrack      = doNotTrack,
             spAnonymous     = spAnonymous,
             now             = now,
@@ -134,7 +144,7 @@ class Service[F[_]: Async](
         responseHeaders = Headers(headerList ++ bounceLocationHeaders(config.cookieBounce, shouldBounce, request))
         _ <- if (!doNotTrack && !shouldBounce) queue.offer(event) else Sync[F].unit
         resp = buildHttpResponse(
-          queryParams   = request.uri.query.params,
+          query         = request.uri.query,
           headers       = responseHeaders,
           redirect      = redirect,
           pixelExpected = pixelExpected,
@@ -250,14 +260,14 @@ class Service[F[_]: Async](
   }
 
   def buildHttpResponse(
-    queryParams: Map[String, String],
+    query: Query,
     headers: Headers,
     redirect: Boolean,
     pixelExpected: Boolean,
     shouldBounce: Boolean
   ): Response[F] =
     if (redirect)
-      buildRedirectHttpResponse(queryParams, headers)
+      buildRedirectHttpResponse(query.params, headers)
     else
       buildUsualHttpResponse(pixelExpected, shouldBounce, headers)
 
@@ -315,9 +325,10 @@ class Service[F[_]: Async](
   def headers(request: Request[F], spAnonymous: Boolean): List[String] =
     request.headers.headers.flatMap { h =>
       h.name match {
-        case ci"X-Forwarded-For" | ci"X-Real-Ip" | ci"Cookie" if spAnonymous => None
-        case ci"Cookie" => Rfc6265Cookie.parse(h.value).map(c => s"${h.name}: $c")
-        case _          => Some(h.toString())
+        case Service.XForwardedForHeaderName | Service.XRealIpHeaderName | Service.CookieHeaderName if spAnonymous =>
+          None
+        case Service.CookieHeaderName => Rfc6265Cookie.parse(h.value).map(c => s"${h.name}: $c")
+        case _                        => Some(h.toString())
       }
     }
 
@@ -450,7 +461,16 @@ class Service[F[_]: Async](
     spAnonymous: Boolean
   ): Option[String] =
     if (spAnonymous) Some(Service.spAnonymousNuid)
-    else request.uri.query.params.get("nuid").orElse(requestCookie.map(_.content))
+    else {
+      // `query.params` decodes the whole query string on first access, so it is only read when the raw string mentions `nuid`.
+      // Trade-off: a percent-encoded key (e.g. `nu%69d`) decodes to `nuid` but misses this check, so the cookie is used.
+      // Accepted because such keys are pathological, and enrich decodes keys and applies a `nuid` parameter to
+      // `network_userid` itself.
+      val queryNuid =
+        if (request.queryString.contains("nuid")) request.uri.query.params.get("nuid")
+        else None
+      queryNuid.orElse(requestCookie.map(_.content))
+    }
 
   /**
     * Builds a location header redirecting to itself to check if third-party cookies are blocked.

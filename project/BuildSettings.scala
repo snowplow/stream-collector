@@ -39,7 +39,7 @@ object BuildSettings {
     javacOptions := Seq("-source", "21", "-target", "21"),
     // specs2 builds a specification out of expressions whose value is discarded, which
     // -Wnonunit-statement reports on every example. It is fatal in tpolecat's CI mode.
-    Test / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement,
+    Test            / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement,
     IntegrationTest / tpolecatExcludeOptions += ScalacOptions.warnNonUnitStatement,
     resolvers ++= Seq(
       // For uaParser utils
@@ -88,7 +88,7 @@ object BuildSettings {
         // integration tests dependencies
         Dependencies.Libraries.IntegrationTests.specs2,
         Dependencies.Libraries.IntegrationTests.specs2CE
-      )
+      ) ++ Dependencies.Libraries.pubsubSecurityOverrides
     )
 
   lazy val kafkaSettings =
@@ -100,11 +100,10 @@ object BuildSettings {
         Dependencies.Libraries.kafka,
         Dependencies.Libraries.kafkaClients,
         Dependencies.Libraries.mskAuth,
-        Dependencies.Libraries.azureIdentity,
         // integration tests dependencies
         Dependencies.Libraries.IntegrationTests.specs2,
         Dependencies.Libraries.IntegrationTests.specs2CE
-      )
+      ) ++ Dependencies.Libraries.kafkaSecurityOverrides
     )
 
   lazy val nsqSettings =
@@ -113,8 +112,7 @@ object BuildSettings {
       buildInfoKeys += BuildInfoKey("sinkName" -> "nsq"),
       Docker / packageName := "scala-stream-collector-nsq",
       libraryDependencies ++= Seq(
-        Dependencies.Libraries.nsq,
-        Dependencies.Libraries.httpClient
+        Dependencies.Libraries.nsq
       )
     )
 

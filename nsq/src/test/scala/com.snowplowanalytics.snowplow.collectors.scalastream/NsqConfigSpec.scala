@@ -161,7 +161,6 @@ object NsqConfigSpec {
       bodyReadTimeout       = 25.seconds,
       maxRequestLineLength  = 20480,
       maxHeadersLength      = 40960,
-      maxPayloadSize        = 1048576,
       dropPayloadSize       = 2097152
     ),
     license = Config.License(accept = true),

@@ -33,8 +33,15 @@ class Routes[F[_]: Async](
       service.preflightResponse(req)
   }
 
+  /** A single path segment can decode to a string that contains a '/' (eg when it is sent as `%2F`).
+    * Such a segment would make `Service.determinePath` build a path with more segments than the
+    * two-segment vendor/version protocol allows, and that path can start with `/r/` even though the
+    * request never matched the `rejectRedirect` route below, which matches on decoded segments.
+    */
+  private def isSingleSegment(segment: String): Boolean = !segment.contains("/")
+
   private val cookieRoutes = HttpRoutes.of[F] {
-    case req @ POST -> Root / vendor / version =>
+    case req @ POST -> Root / vendor / version if isSingleSegment(vendor) && isSingleSegment(version) =>
       val path = service.determinePath(vendor, version)
       service.cookie(
         body          = req.body.compile.to(ByteVector).map(Some(_)),
@@ -44,7 +51,7 @@ class Routes[F[_]: Async](
         contentType   = req.contentType.map(_.value.toLowerCase)
       )
 
-    case req @ (GET | HEAD) -> Root / vendor / version =>
+    case req @ (GET | HEAD) -> Root / vendor / version if isSingleSegment(vendor) && isSingleSegment(version) =>
       val path = service.determinePath(vendor, version)
       service.cookie(
         body          = Sync[F].pure(None),

@@ -16,10 +16,13 @@ import cats.effect.std.{QueueSource, Supervisor}
 import cats.effect.Async
 import cats.implicits._
 
+import org.apache.thrift.TSerializer
+
 import com.snowplowanalytics.snowplow.collector.thrift.CollectorPayload
-import com.snowplowanalytics.snowplow.badrows.BadRow
+import com.snowplowanalytics.snowplow.badrows.{BadRow, Failure, Payload, Processor}
 
 import java.nio.charset.StandardCharsets
+import java.time.Instant
 import scala.concurrent.duration.{Duration, DurationLong}
 
 case class Sinks[F[_]](good: Sink[F], bad: Sink[F])
@@ -50,13 +53,7 @@ object Sinks {
             CompressingDequeuer
               .batchAndSinkGood(appInfo, config.compression, config.streams.good.buffer, sinks.good, supervisor)
           else
-            batchAndSinkGood(
-              config.streams.good.buffer,
-              config.networking,
-              new SplitBatch(appInfo),
-              sinks.good,
-              supervisor
-            )
+            batchAndSinkGood(appInfo, config.streams.good.buffer, sinks.good, supervisor)
         }
         .through(batchAndSinkBad(config.streams.bad.buffer, sinks.bad, supervisor))
     }
@@ -66,9 +63,8 @@ object Sinks {
     *  The output type of this `Pipe` is `BadRow.SizeViolation`. These are the bad rows that this `Pipe` could not write into the good `Sink`.
     */
   private def batchAndSinkGood[F[_]: Async](
+    appInfo: AppInfo,
     config: Config.Buffer,
-    networking: Config.Networking,
-    splitter: SplitBatch,
     sink: Sink[F],
     supervisor: Supervisor[F]
   ): Pipe[F, CollectorPayload, BadRow.SizeViolation] = {
@@ -87,26 +83,20 @@ object Sinks {
             Foldable[Chunk]
               .foldM(chunk, pending) {
                 case (acc, cp) =>
-                  val splitResult =
-                    splitter.splitAndSerializePayload(cp, sink.maxBytes, networking.maxPayloadSize)
-                  val emitBad = if (splitResult.bad.isEmpty) Pull.done else Pull.output(Chunk.from(splitResult.bad))
-                  emitBad >>
-                    Foldable[List].foldM(splitResult.good, acc) {
-                      case (acc, bytes) =>
-                        if (acc.totalSizeBytes + bytes.size > config.byteLimit || acc.numItems + 1 > config.recordLimit) {
-                          Pull
-                            .eval(writeToSink(supervisor, sink, acc.serialized))
-                            .as(PendingOutput(List(bytes), 1, bytes.size.toLong))
-                        } else {
-                          Pull.pure(
-                            PendingOutput(
-                              bytes :: acc.serialized,
-                              acc.numItems      + 1,
-                              bytes.size.toLong + acc.totalSizeBytes
-                            )
-                          )
-                        }
-                    }
+                  val bytes = new TSerializer().serialize(cp)
+                  if (bytes.size > sink.maxBytes) {
+                    val message =
+                      s"oversized collector payload: Payload exceeds max size of ${sink.maxBytes}. Actual length: ${bytes.size}"
+                    Pull.output1(oversizedPayload(appInfo, cp, bytes.size, sink.maxBytes, message)).as(acc)
+                  } else if (acc.totalSizeBytes + bytes.size > config.byteLimit || acc.numItems + 1 > config.recordLimit) {
+                    Pull
+                      .eval(writeToSink(supervisor, sink, acc.serialized))
+                      .as(PendingOutput(List(bytes), 1, bytes.size.toLong))
+                  } else {
+                    Pull.pure(
+                      PendingOutput(bytes :: acc.serialized, acc.numItems + 1, bytes.size.toLong + acc.totalSizeBytes)
+                    )
+                  }
               }
               .flatMap { result =>
                 val cancelTimeout = if (result.serialized.isEmpty) next.timeout(Duration.Zero) else Pull.done
@@ -118,6 +108,28 @@ object Sinks {
       go(timedPull, PendingOutput(Nil, 0, 0L))
     }.stream
   }
+
+  /** Creates a bad row while maintaining a truncation of the original payload to ease debugging.
+    *
+    *  Keeps a tenth of the original payload.
+    */
+  private[core] def oversizedPayload(
+    appInfo: AppInfo,
+    event: CollectorPayload,
+    size: Int,
+    maxSize: Int,
+    message: String
+  ): BadRow.SizeViolation =
+    BadRow.SizeViolation(
+      Processor(appInfo.name, appInfo.version),
+      Failure.SizeViolation(
+        Instant.now(),
+        maxSize,
+        size,
+        message
+      ),
+      Payload.RawPayload(event.toString().take(maxSize / 10))
+    )
 
   /** Intermediate state of our fs2 `Pipe`s for batching up events according to time limit and size limits
     *

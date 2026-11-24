@@ -39,26 +39,45 @@ class TestSink(
       }.sum
     }
 
-  private def countEvents(compressedBytes: Array[Byte], compressionType: Config.Compression.Type): Int = {
+  /**
+    * Decompress all received compressed batches, returning each record's bytes in emission order.
+    *
+    * `CompressingDequeuer` hands each batch's frames to the sink newest-first, so frames are read
+    * in reverse within a batch. Batches are read in the order `storeRawEvents` was called.
+    */
+  def getDecompressedRecords(compressionType: Config.Compression.Type): IO[List[Array[Byte]]] =
+    receivedRawEvents.get.map { batches =>
+      batches.flatMap { batch =>
+        batch.reverse.flatMap(decompressRecords(_, compressionType))
+      }
+    }
+
+  private def countEvents(compressedBytes: Array[Byte], compressionType: Config.Compression.Type): Int =
+    decompressRecords(compressedBytes, compressionType).size
+
+  private def decompressRecords(
+    compressedBytes: Array[Byte],
+    compressionType: Config.Compression.Type
+  ): List[Array[Byte]] = {
     val factory = compressionType match {
       case Config.Compression.GZIP => new Decompressor.Gzip(maxBytes)
       case Config.Compression.ZSTD => new Decompressor.Zstd(maxBytes)
     }
     factory.build(ByteBuffer.wrap(compressedBytes)) match {
       case Decompressor.FactorySuccess(decompressor, _) =>
-        drainCount(decompressor)
+        drainRecords(decompressor)
       case other =>
         throw new RuntimeException(s"Can't initialize Decompressor: $other")
     }
   }
 
   @tailrec
-  private def drainCount(d: Decompressor, acc: Int = 0): Int =
+  private def drainRecords(d: Decompressor, acc: List[Array[Byte]] = Nil): List[Array[Byte]] =
     d.getNextRecord match {
-      case Decompressor.Record(_) => drainCount(d, acc + 1)
+      case Decompressor.Record(value) => drainRecords(d, value :: acc)
       case Decompressor.EndOfRecords =>
         d.close()
-        acc
+        acc.reverse
       case other =>
         d.close()
         throw new RuntimeException(s"Unexpected decompressor result: $other")

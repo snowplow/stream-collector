@@ -17,7 +17,7 @@ import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.noop.NoOpLogger
 import org.specs2.mutable.Specification
 
-import com.snowplowanalytics.snowplow.streams.{ListOfList, Sink => CommonStreamsSink, Sinkable}
+import com.snowplowanalytics.snowplow.streams.{Sink => CommonStreamsSink, Sinkable}
 
 import scala.concurrent.duration.DurationLong
 
@@ -36,7 +36,7 @@ class SinkSpec extends Specification with CatsEffect {
 
     // A common-streams sink which reports itself as healthy only after 1 hours
     def testSink = new CommonStreamsSink[IO] {
-      def sink(batch: ListOfList[Sinkable]): IO[Unit] =
+      def sink(batch: Iterable[Sinkable]): IO[Unit] =
         IO.unit
 
       def isHealthy: IO[Boolean] =
@@ -62,7 +62,7 @@ class SinkSpec extends Specification with CatsEffect {
 
     // A common-streams sink whose health check raises an exception until after 1 hours
     def testSink = new CommonStreamsSink[IO] {
-      def sink(batch: ListOfList[Sinkable]): IO[Unit] =
+      def sink(batch: Iterable[Sinkable]): IO[Unit] =
         IO.unit
 
       def isHealthy: IO[Boolean] =
@@ -91,7 +91,7 @@ class SinkSpec extends Specification with CatsEffect {
 
     // A common-streams sink which yields exceptions upon sinking events until after 1 hour
     def testSink = new CommonStreamsSink[IO] {
-      def sink(batch: ListOfList[Sinkable]): IO[Unit] =
+      def sink(batch: Iterable[Sinkable]): IO[Unit] =
         IO.realTime.flatMap { t =>
           if (t < 1.hours)
             IO.raiseError(new RuntimeException("boom!"))

@@ -19,12 +19,10 @@ lazy val core = project
       Dependencies.Libraries.http4sDsl,
       Dependencies.Libraries.http4sBlaze,
       Dependencies.Libraries.http4sClient,
-      Dependencies.Libraries.fs2io,
       Dependencies.Libraries.log4cats,
       Dependencies.Libraries.thrift,
       Dependencies.Libraries.commonsCodec,
       Dependencies.Libraries.javaxAnnotation,
-      Dependencies.Libraries.httpClient5,
       Dependencies.Libraries.badRows,
       Dependencies.Libraries.slf4j,
       Dependencies.Libraries.decline,
@@ -37,12 +35,11 @@ lazy val core = project
       Dependencies.Libraries.specs2,
       Dependencies.Libraries.specs2CE,
       Dependencies.Libraries.ceTestkit,
-      Dependencies.Libraries.jnrPosix,
       //Integration tests
       Dependencies.Libraries.IntegrationTests.testcontainers,
       Dependencies.Libraries.IntegrationTests.http4sClient,
       Dependencies.Libraries.IntegrationTests.catsRetry
-    )
+    ) ++ Dependencies.Libraries.coreSecurityOverrides
   )
   .configs(IntegrationTest)
 

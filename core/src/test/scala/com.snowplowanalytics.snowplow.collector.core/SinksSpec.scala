@@ -5,9 +5,14 @@ import cats.effect.testkit.TestControl
 import cats.effect.testing.specs2.CatsEffect
 import cats.effect.std.Queue
 import cats.implicits._
+import io.circe.{ACursor, Json}
+import io.circe.parser.parse
+import org.apache.thrift.TSerializer
 import org.specs2.mutable.Specification
 
 import com.snowplowanalytics.snowplow.collector.thrift.CollectorPayload
+
+import java.nio.charset.StandardCharsets
 
 import scala.concurrent.duration.{DurationLong, FiniteDuration}
 
@@ -27,6 +32,8 @@ class SinksSpec extends Specification with CatsEffect {
     emit batches of 1 to the BAD sink when they arrive at intervals greater than time limit $bad2
     emit bigger batches to the BAD sink when payloads arrive at intervals less than time limit $bad3
     emit batches to BAD respecting the buffer's recordLimit $bad4
+    emit a single bad row, without splitting, for an oversized self-describing POST body $bad5
+    emit to GOOD a payload of exactly maxBytes, and to BAD a payload of maxBytes + 1 $bad6
 
   When compression is enabled:
     Sinks.dequeue with good events should:
@@ -57,6 +64,10 @@ class SinksSpec extends Specification with CatsEffect {
       good events before AND after a size violation all round-trip correctly (zstd) $c_interleave_zstd
       all events round-trip when the sink's target size changes across batches (gzip) $c_dynamic_target_gzip
       all events round-trip when the sink's target size changes across batches (zstd) $c_dynamic_target_zstd
+
+    Reuse of the serialization buffer across payloads:
+      consecutive payloads of varying sizes round-trip byte-for-byte (gzip) $c_buffer_reuse_gzip
+      consecutive payloads of varying sizes round-trip byte-for-byte (zstd) $c_buffer_reuse_zstd
 
   On shutdown, when the queue is terminated with a None, Sinks.dequeue should:
     flush a partially-filled batch to the GOOD sink $shutdown1
@@ -277,6 +288,59 @@ class SinksSpec extends Specification with CatsEffect {
     } yield {
       sunkGoods must beEmpty
       sunkBads must beEqualTo(List(2, 2))
+    }
+
+    TestControl.executeEmbed(io)
+  }
+
+  def bad5 = {
+    val io = for {
+      goodSink <- TestSink.build()
+      badSink  <- TestSink.build()
+      sinks = Sinks(goodSink, badSink)
+      queue <- Queue.unbounded[IO, Option[CollectorPayload]]
+      fiber <- Sinks.dequeue(testConfig(), TestUtils.appInfo, queue, sinks).compile.drain.start
+      payload = selfDescribingCollectorPayload(numEvents = 100, eventSize = goodSink.maxBytes / 10)
+      _         <- queue.offer(Some(payload))
+      _         <- IO.sleep(testTimeLimit * 2)
+      sunkGoods <- goodSink.receivedBatchSizes.get
+      sunkBads  <- badSink.receivedBatchSizes.get
+      badRows   <- badSink.receivedRawEvents.get
+      _         <- fiber.cancel
+    } yield {
+      val failure = badRowFailure(badRows.flatten.head)
+      sunkGoods must beEmpty
+      sunkBads must beEqualTo(List(1))
+      failure.downField("maximumAllowedSizeBytes").as[Int] must beRight(goodSink.maxBytes)
+      failure.downField("actualSizeBytes").as[Int] must beRight(serializedSize(payload))
+      failure.downField("expectation").as[String] must beRight(startWith("oversized collector payload:"))
+    }
+
+    TestControl.executeEmbed(io)
+  }
+
+  def bad6 = {
+    val io = for {
+      goodSink <- TestSink.build()
+      badSink  <- TestSink.build()
+      sinks = Sinks(goodSink, badSink)
+      queue <- Queue.unbounded[IO, Option[CollectorPayload]]
+      fiber <- Sinks.dequeue(testConfig(), TestUtils.appInfo, queue, sinks).compile.drain.start
+      atLimit   = collectorPayloadOfSerializedSize(goodSink.maxBytes)
+      overLimit = collectorPayloadOfSerializedSize(goodSink.maxBytes + 1)
+      _         <- queue.offer(Some(atLimit))
+      _         <- queue.offer(Some(overLimit))
+      _         <- IO.sleep(testTimeLimit * 2)
+      sunkGoods <- goodSink.receivedBatchSizes.get
+      sunkBads  <- badSink.receivedBatchSizes.get
+      badRows   <- badSink.receivedRawEvents.get
+      _         <- fiber.cancel
+    } yield {
+      serializedSize(atLimit) must beEqualTo(goodSink.maxBytes)
+      serializedSize(overLimit) must beEqualTo(goodSink.maxBytes + 1)
+      sunkGoods must beEqualTo(List(1))
+      sunkBads must beEqualTo(List(1))
+      badRowFailure(badRows.flatten.head).downField("actualSizeBytes").as[Int] must beRight(goodSink.maxBytes + 1)
     }
 
     TestControl.executeEmbed(io)
@@ -706,6 +770,42 @@ class SinksSpec extends Specification with CatsEffect {
   def c_dynamic_target_gzip = testDynamicTarget(Config.Compression.GZIP)
   def c_dynamic_target_zstd = testDynamicTarget(Config.Compression.ZSTD)
 
+  /**
+    * Payloads are serialized into one buffer reused across payloads. Sizes go up and down, and
+    * each body uses a different byte, so stale bytes or a wrong length from an earlier, larger
+    * payload would show up as a mismatch against the payload's own Thrift serialization. The
+    * 40000-byte payload is larger than the buffer's initial size, so the buffer grows and the
+    * grown buffer is then reused by the smaller payloads after it.
+    */
+  private def testBufferReuse(tpe: Config.Compression.Type) = {
+    val config = testConfig(compression = testCompression(true, tpe))
+    val payloads = List(500, 50, 2000, 10, 40000, 300, 20000, 1).zipWithIndex.map {
+      case (size, i) =>
+        val cp = new CollectorPayload()
+        cp.setBody(Array.fill(size)(('a' + i).toByte))
+        cp
+    }
+    val io = for {
+      goodSink <- TestSink.build(maxBytes = 100000)
+      badSink  <- TestSink.build()
+      sinks = Sinks(goodSink, badSink)
+      queue   <- Queue.unbounded[IO, Option[CollectorPayload]]
+      fiber   <- Sinks.dequeue(config, TestUtils.appInfo, queue, sinks).compile.drain.start
+      _       <- payloads.traverse_(cp => queue.offer(Some(cp)))
+      _       <- IO.sleep(testTimeLimit * 2)
+      records <- goodSink.getDecompressedRecords(tpe)
+      _       <- fiber.cancel
+    } yield {
+      val expected = payloads.map(cp => new TSerializer().serialize(cp).toList)
+      records.map(_.toList) must beEqualTo(expected)
+    }
+
+    TestControl.executeEmbed(io)
+  }
+
+  def c_buffer_reuse_gzip = testBufferReuse(Config.Compression.GZIP)
+  def c_buffer_reuse_zstd = testBufferReuse(Config.Compression.ZSTD)
+
   def shutdown1 = {
     val io = for {
       goodSink <- TestSink.build()
@@ -864,6 +964,35 @@ object SinksSpec {
       override def storeRawEvents(events: List[Array[Byte]]): IO[Unit] =
         IO.sleep(delay) >> underlying.storeRawEvents(events)
     }
+
+  /** A POST body made of a self-describing JSON with a `data` array of `numEvents` events */
+  def selfDescribingCollectorPayload(numEvents: Int, eventSize: Int): CollectorPayload = {
+    val event = s"""{"e":"pv","p":"${"X" * eventSize}"}"""
+    val body =
+      s"""{"schema":"iglu:com.snowplowanalytics.snowplow/payload_data/jsonschema/1-0-4","data":[${List
+        .fill(numEvents)(event)
+        .mkString(",")}]}"""
+    val cp = new CollectorPayload()
+    cp.setBody(body.getBytes(StandardCharsets.UTF_8))
+    cp
+  }
+
+  def serializedSize(cp: CollectorPayload): Int =
+    new TSerializer().serialize(cp).length
+
+  /** A payload whose Thrift-serialized size is exactly `size` bytes */
+  def collectorPayloadOfSerializedSize(size: Int): CollectorPayload = {
+    val overhead = serializedSize(simpleCollectorPayload(approximateSize = 0))
+    simpleCollectorPayload(approximateSize = size - overhead)
+  }
+
+  /** The `data.failure` object of a serialized bad row */
+  def badRowFailure(badRow: Array[Byte]): ACursor =
+    parse(new String(badRow, StandardCharsets.UTF_8))
+      .getOrElse(Json.Null)
+      .hcursor
+      .downField("data")
+      .downField("failure")
 
   def simpleCollectorPayload(approximateSize: Int = 10): CollectorPayload = {
     val cp = new CollectorPayload()

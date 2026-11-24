@@ -298,6 +298,23 @@ class RoutesSpec extends Specification {
       test(Method.POST)
     }
 
+    "not route a vendor or version segment that decodes to more than one segment" in {
+      def test(method: Method, enabledDefaultRedirect: Boolean) = {
+        val (collectorService, routes) = createTestServices(enabledDefaultRedirect = enabledDefaultRedirect)
+
+        val request  = Request[IO](method = method, uri = uri"/r%2Fx/y?u=https%3A%2F%2Fevil.example/")
+        val response = routes.run(request).unsafeRunSync()
+
+        collectorService.getCookieCalls must beEmpty
+        response.status must beEqualTo(Status.NotFound)
+      }
+
+      test(Method.GET, enabledDefaultRedirect  = false)
+      test(Method.POST, enabledDefaultRedirect = false)
+      test(Method.GET, enabledDefaultRedirect  = true)
+      test(Method.POST, enabledDefaultRedirect = true)
+    }
+
     "respond to root route" in {
       "enabled return the response" in {
         val (_, routes) = createTestServices(enableRootResponse = true)

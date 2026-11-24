@@ -15,7 +15,7 @@ import cats.effect.implicits._
 import cats.effect.{Async, Ref, Resource}
 import org.typelevel.log4cats.Logger
 
-import com.snowplowanalytics.snowplow.streams.{ListOfList, Sink => CommonStreamsSink}
+import com.snowplowanalytics.snowplow.streams.{Sink => CommonStreamsSink}
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -88,7 +88,7 @@ object Sink {
     override def targetBytes: F[Int] = maxBytes.pure[F]
 
     override def storeRawEvents(events: List[Array[Byte]]): F[Unit] =
-      sink.sinkSimple(ListOfList.of(List(events))).attempt.flatMap {
+      sink.sinkSimple(events).attempt.flatMap {
         case Left(e) =>
           isHealthyState.set(false) >>
             Logger[F].error(s"Error sinking events to $name: ${e.getMessage}") >>

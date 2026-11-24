@@ -170,7 +170,6 @@ object Config {
     bodyReadTimeout: FiniteDuration,
     maxRequestLineLength: Int,
     maxHeadersLength: Int,
-    maxPayloadSize: Long,
     dropPayloadSize: Long
   )
 

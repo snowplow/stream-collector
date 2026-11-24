@@ -117,7 +117,6 @@ object TestUtils {
       25.seconds,
       20480,
       40960,
-      1048576,
       2097152
     ),
     enableDefaultRedirect = false,

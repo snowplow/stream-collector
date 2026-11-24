@@ -46,9 +46,7 @@ class HttpServerSpec extends Specification with CatsEffect {
     "manage request size" should {
       "drop requests larger than `networking.dropPayloadSize`" in {
         val config =
-          TestUtils
-            .testConfig
-            .copy(networking = TestUtils.testConfig.networking.copy(maxPayloadSize = 5L, dropPayloadSize = 10L))
+          TestUtils.testConfig.copy(networking = TestUtils.testConfig.networking.copy(dropPayloadSize = 10L))
         val request: Request[IO] = Request(
           Method.POST,
           uri"/large"
